@@ -405,6 +405,7 @@ import {
   type EnvironmentUnavailableState,
   useSystemComposerBanners,
 } from "./chat/useSystemComposerBanners";
+import { PmPageWindow } from "../pm/pageWindow"; // t3code-pm:
 import { useDraftHeroLayoutTransition } from "./chat/useDraftHeroLayoutTransition";
 import { useLocalDispatchState } from "./chat/useLocalDispatchState";
 import { draftFanoutSelectionsAtom, draftSendState } from "./chat/chatViewSend";
@@ -4044,6 +4045,8 @@ export default function ChatView(props: ChatViewProps) {
                 miniPlayer={shownPreviewMiniPlayer}
               />
             ) : null}
+            {/* t3code-pm: */}
+            {activeThreadRef && !embedded ? <PmPageWindow threadRef={activeThreadRef} /> : null}
 
             {embedded ? null : (
               <>
