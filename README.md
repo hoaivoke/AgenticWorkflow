@@ -76,7 +76,7 @@ Get the files from the [latest release](https://github.com/maddada/t3code-pm/rel
 
 ### macOS (Apple Silicon)
 
-1. Download the `.dmg`, open it, and drag **T3 Code PM** to Applications.
+1. Download `T3-Code-PM-<version>-arm64.dmg`, open it, and drag **T3 Code PM** to Applications.
 2. The app is ad-hoc signed, not notarized, so macOS blocks the first open. Do one of these:
    - Right-click the app in Applications and choose **Open**, then **Open** again.
    - Or try to open it once, then go to System Settings, Privacy & Security, and click **Open Anyway**.
@@ -85,21 +85,24 @@ Get the files from the [latest release](https://github.com/maddada/t3code-pm/rel
 
 ### Windows (x64)
 
-Download the `.exe` installer and run it. If SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
+1. Download `T3-Code-PM-<version>-x64.exe` and run it. The installer isn't signed, so if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
+2. It installs for your user only, into `%LOCALAPPDATA%\Programs\t3code-pm`, and adds **T3 Code PM** to the Start menu. Remove it from Settings, Apps, Installed apps, where it has its own **T3 Code PM** entry.
 
 ### Linux (x64)
 
-Download the `.AppImage`, make it executable, and run it:
+Download `T3-Code-PM-<version>-x86_64.AppImage`, make it executable, and run it:
 
 ```sh
-chmod +x T3-Code-PM-*.AppImage
-./T3-Code-PM-*.AppImage
+chmod +x T3-Code-PM-*-x86_64.AppImage
+./T3-Code-PM-*-x86_64.AppImage
 ```
+
+On Ubuntu 22.04 and later, AppImages need FUSE 2 first: `sudo apt install libfuse2t64` (`libfuse2` on 22.04). On first launch it registers its own `t3code-pm://` handler and launcher entry, and never replaces T3 Code's.
 
 ### Android (arm64)
 
 1. Download the `.apk` on your phone and open it. Allow installs from your browser or file manager when Android asks.
-2. Or from a computer: `adb install t3code-pm-<version>.apk`.
+2. Or from a computer: `adb install t3code-pm-<version>-arm64.apk`.
 
 It installs as **T3 Code PM**, next to the official T3 Code app. Then [connect it to your computer](#connect-your-phone).
 
