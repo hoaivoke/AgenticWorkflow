@@ -107,7 +107,10 @@ export function resolveDesktopAppBranding(input: {
   return {
     baseName: APP_BASE_NAME,
     stageLabel,
-    displayName: `${APP_BASE_NAME} (${stageLabel})`,
+    displayName: pmDesktop(
+      stageLabel === "Beta" ? APP_BASE_NAME : `${APP_BASE_NAME} (${stageLabel})`,
+      `${APP_BASE_NAME} (${stageLabel})`,
+    ), // t3code-pm: plain "T3 Code PM" in release builds
   };
 }
 

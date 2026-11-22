@@ -13,9 +13,13 @@ import type { LinuxWindowSnapshot } from "./LinuxSnapShot.ts";
 import { CaptureSetupRequiredError, readPortalPng } from "./linuxCaptureSession.ts";
 import { startNativeCaptureFeedback } from "./NativeCaptureFeedback.ts";
 export { isKdeCaptureSession } from "./linuxCaptureSession.ts";
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 
 export const KDE_CAPTURE_EXECUTABLE = "t3-kde-snap-shot";
-const DESKTOP_FILE = "com.t3tools.T3Code.KdeCapture.desktop";
+const DESKTOP_FILE = pmDesktop(
+  `${PM.linuxWindowClass}.KdeCapture.desktop`,
+  "com.t3tools.T3Code.KdeCapture.desktop",
+); // t3code-pm:
 const MARKER = "X-T3Code-Capture-Helper=true";
 const decodeCapabilities = Schema.decodeUnknownSync(
   Schema.fromJsonString(Schema.Struct({ feedbackAvailable: Schema.optional(Schema.Boolean) })),
@@ -24,7 +28,12 @@ export type KdeCapturePaths = { readonly bundle: string; readonly dataHome: stri
 
 export function kdeCapturePaths(paths: KdeCapturePaths) {
   return {
-    executable: NodePath.join(paths.dataHome, "t3code", "kde-capture", KDE_CAPTURE_EXECUTABLE),
+    executable: NodePath.join(
+      paths.dataHome,
+      pmDesktop("t3code-pm", "t3code"),
+      "kde-capture",
+      KDE_CAPTURE_EXECUTABLE,
+    ), // t3code-pm:
     desktop: NodePath.join(paths.dataHome, "applications", DESKTOP_FILE),
   };
 }

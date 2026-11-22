@@ -14,6 +14,7 @@ import {
   resolveDesktopStateDir,
   type JoinPath,
 } from "./DesktopStatePaths.ts";
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 
 interface EarlyDesktopSettingsInput {
   readonly env: NodeJS.ProcessEnv;
@@ -31,7 +32,10 @@ export interface EarlyLinuxElectronOptions {
 }
 
 export const resolveLinuxDesktopEntryName = (isDevelopment: boolean): string =>
-  isDevelopment ? "com.t3tools.T3Code.Development.desktop" : "com.t3tools.T3Code.desktop";
+  pmDesktop(
+    isDevelopment ? `${PM.linuxWindowClass}.Development.desktop` : `${PM.linuxWindowClass}.desktop`,
+    isDevelopment ? "com.t3tools.T3Code.Development.desktop" : "com.t3tools.T3Code.desktop",
+  ); // t3code-pm: never the official app's URL-handler entry
 
 const trimNonEmpty = (value: string | undefined): string | null => {
   const trimmed = value?.trim();
