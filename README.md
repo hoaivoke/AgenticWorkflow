@@ -1,108 +1,155 @@
 <p align="center">
-  <a href="https://t3.codes">
-    <img src="./assets/prod/t3-black-web-icon-192x192.png" width="80" height="80" alt="T3 Code logo" />
-  </a>
+  <img src="./assets/prod/t3-black-web-icon-192x192.png" width="80" height="80" alt="T3 Code logo" />
 </p>
 
-<h1 align="center">T3 Code</h1>
+<h1 align="center">T3 Code PM</h1>
 
-<p align="center">The open-source control plane for coding agents.</p>
+<p align="center">T3 Code with a project manager in your sidebar.</p>
 
 <p align="center">
-  <a href="https://t3.codes/download"><strong>Download</strong></a> ·
-  <a href="https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824">iOS</a> ·
-  <a href="https://play.google.com/store/apps/details?id=com.t3tools.t3code">Android</a> ·
-  <a href="https://app.t3.codes">Web</a> ·
-  <a href="./docs/README.md">Docs</a> ·
-  <a href="https://discord.gg/jn4EGJjrvv">Discord</a>
+  <a href="https://github.com/maddada/t3code-pm/releases/latest"><strong>Download</strong></a> ·
+  <a href="#install">Install</a> ·
+  <a href="#connect-your-phone">Phone</a> ·
+  <a href="https://github.com/pingdotgg/t3code">Upstream T3 Code</a>
 </p>
 
 <p align="center">
-  <a href="https://t3.codes">
-    <img src="./.github/readme/hero.webp" width="100%" alt="T3 Code on desktop with a finished Claude thread, next to the phone app asking to approve a command from Codex" />
-  </a>
+  <img src="./docs/pm/screenshots/hero.png" width="100%" alt="A Project Manager thread in T3 Code PM: the PM's plan in the chat, its questions above the chat box, its workers nested in the sidebar, and its work items grouped by status in the details panel" />
 </p>
 
-T3 Code runs the coding agents on your machine and gives them one fast interface. Start a thread at your desk, then approve the next step from your phone.
+T3 Code PM is an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) that adds **Project Manager threads**. You give a PM a brief. It splits the work into items, starts worker threads for them, follows those workers, and comes back to you only when it needs a decision.
 
-It works with Claude Code, Codex, Cursor, OpenCode, Grok Build, Antigravity, Kiro, Pi, Muse Code, fx, and any [ACP](./docs/user/providers-acp.md) agent. If an agent is set up on your computer, T3 Code can control it.
+Everything else is T3 Code: the same fast app, the same agents, the same subscriptions you already pay for.
+
+## Why a coordinator?
+
+Once you run more than a couple of agent threads, you become the dispatcher. You check which thread finished, which one is stuck on a question, which one went quiet, and what is left to do. A PM does that part for you.
+
+- It keeps the plan: a mission, standing instructions, memory notes, and numbered work items.
+- It starts workers with a full brief and hears back from them on its own.
+- It asks you numbered questions with one-click answers, and keeps going on everything else.
 
 ## What you get
 
-- **Your subscriptions.** T3 Code does not resell tokens. It drives the agents you are already signed in to.
-- **Every agent in one place.** Change models in the middle of a thread. Let Claude hand a task to Codex.
-- **Desktop, web, and phone.** One server, and every client shows the same threads. There are apps for iOS and Android.
-- **Remote ready.** Run agents on any machine. Connect over your local network, Tailscale, or [T3 Connect](./docs/user/remote-access.md).
-- **Git built in.** Each thread can work in its own worktree. Review the diff, then commit, push, and open a pull request with one button.
-- **Fast.** Performance is a feature here. We measure it, and we treat a dropped frame as a bug.
-- **Open.** MIT licensed. If you don't like something, fork it.
+**PM threads.** A PM is a thread in a project's sidebar, next to your other threads. A project can have as many PMs as you like. Each one has a mission, standing instructions and memory you can edit in the details panel.
+
+**Work items.** Every line of work gets a tag (W1, W2, ...) and a status: Needs you, Blocked, In progress, Waiting, or Done. The Work items card in the details panel shows them grouped, with steps, links and what each one waits on.
+
+**Workers that report back.** When a worker finishes, needs an answer, goes quiet for 8 minutes, stops mid-turn, or restarts with the server, its PM gets a report and wakes up. Each report is delivered once, even across restarts.
+
+**A dock of questions.** The PM's questions (Q1, Q2, ...) sit above the chat box. Pick an answer in one click (the PM's pick has a star), or snooze, dismiss, or copy a question's tag.
+
+<p align="center">
+  <img src="./docs/pm/screenshots/dock.png" width="80%" alt="The dock above the chat box with two questions and a Live page, each with one-click answers" />
+</p>
+
+**Live pages.** When a question needs more than a button, the PM publishes a page that opens in a pop-up window over the chat. Your choices go straight back to the PM.
+
+<p align="center">
+  <img src="./docs/pm/screenshots/live-page.png" width="100%" alt="A Live page pop-up asking which view the dashboard should open on, with a recommended choice" />
+</p>
+
+**One sidebar.** A PM's row shows its status and counts, with its workers nested under it. Hover it for the mission and a summary.
+
+<p align="center">
+  <img src="./docs/pm/screenshots/sidebar.png" width="60%" alt="The sidebar with a PM row, its three workers nested under it, and its hover card" />
+</p>
+
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/pm/screenshots/work-items.png" alt="The Work items card grouped by Needs you, Blocked, In progress, Waiting and Done" /></td>
+    <td width="50%" align="center"><img src="./docs/pm/screenshots/mobile.png" alt="The sidebar at phone width, with the PM and its workers" /></td>
+  </tr>
+  <tr>
+    <td align="center">The details panel: mission, instructions and work items</td>
+    <td align="center">The same sidebar at phone width</td>
+  </tr>
+</table>
+
+**Any agent.** The PM drives its work through T3's MCP tools, so it runs on any agent that gets them: Claude, Codex, Cursor, OpenCode, Pi, Muse Code and ACP agents. Workers can use any agent T3 Code supports.
+
+**One switch.** Settings, Project managers turns the whole feature off (on the phone: Settings, Environments, your environment, Project managers). PM threads then show as normal threads, and nothing is deleted.
 
 ## Install
 
-### Desktop app
+Get the files from the [latest release](https://github.com/maddada/t3code-pm/releases/latest). Like T3 Code, it needs at least one coding agent installed and signed in, such as Claude Code (`claude auth login`) or Codex (`codex login`).
 
-[Download T3 Code](https://t3.codes/download) for macOS, Windows, or Linux. You can also use a package manager:
+### macOS (Apple Silicon)
 
-| Platform       | Command                                                              |
-| -------------- | -------------------------------------------------------------------- |
-| macOS          | `brew install --cask t3-code`                                        |
-| Windows        | `winget install T3Tools.T3Code` or `scoop install extras/t3code`     |
-| Arch Linux     | `yay -S t3code-bin`                                                  |
-| Nix            | `nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code`         |
-| Debian, Ubuntu | `.deb` from [Releases](https://github.com/pingdotgg/t3code/releases) |
+1. Download the `.dmg`, open it, and drag **T3 Code PM** to Applications.
+2. The app is ad-hoc signed, not notarized, so macOS blocks the first open. Do one of these:
+   - Right-click the app in Applications and choose **Open**, then **Open** again.
+   - Or try to open it once, then go to System Settings, Privacy & Security, and click **Open Anyway**.
+   - Or run `xattr -dr com.apple.quarantine "/Applications/T3 Code PM.app"`.
+3. After each update, macOS asks once for the "t3code-pm Safe Storage" keychain item. Choose **Always Allow**.
 
-### Command line
+### Windows (x64)
 
-This installs the `t3` command. Run `t3` to start the server and open the web app.
+Download the `.exe` installer and run it. If SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
 
-```bash
-curl -fsSL https://t3.codes/install.sh | sh
+### Linux (x64)
+
+Download the `.AppImage`, make it executable, and run it:
+
+```sh
+chmod +x T3-Code-PM-*.AppImage
+./T3-Code-PM-*.AppImage
 ```
 
-On Windows, in PowerShell:
+### Android (arm64)
 
-```powershell
-irm https://t3.codes/install.ps1 | iex
+1. Download the `.apk` on your phone and open it. Allow installs from your browser or file manager when Android asks.
+2. Or from a computer: `adb install t3code-pm-<version>.apk`.
+
+It installs as **T3 Code PM**, next to the official T3 Code app. Then [connect it to your computer](#connect-your-phone).
+
+### iOS
+
+There is no iOS app. The official T3 Code iOS app can still connect to a T3 Code PM server; PMs show there as plain threads.
+
+## Runs beside T3 Code
+
+T3 Code PM is a separate app with its own name, its own `t3-pm` command, and its own data folder, `~/.t3-pm`. It never reads or writes the official app's `~/.t3`, so you can keep both installed and switch freely.
+
+- **Bring your threads over:** quit both apps, then copy `~/.t3/userdata/statev2.sqlite` into `~/.t3-pm/userdata/`.
+- **Go back:** open the official T3 Code. It never saw `~/.t3-pm`, so there is nothing to undo. To take your fork threads with you, copy the same file the other way while both apps are closed. PMs open there as plain threads.
+- **Remove it:** delete the app and `~/.t3-pm`.
+- **Updates:** the app does not update itself. Download new versions from [Releases](https://github.com/maddada/t3code-pm/releases).
+
+A new PM's first turn runs on Claude Opus at high effort. Each later PM starts on the model the previous one used, and you can change a PM's model in its composer.
+
+## Connect your phone
+
+Connect the Android app over Tailscale or your local network.
+
+1. **Tailscale (recommended):** install it on your computer and phone, and sign both in to the same tailnet. On a local network, make sure both devices are on the same Wi-Fi.
+2. **Turn on remote access** in the desktop app: Settings, Connections.
+3. **Pair:** in the phone app, tap Add environment and scan the QR code from Settings, Connections. Or enter the computer's address with its port (for example `100.x.y.z:13773`) and a pairing code from the same screen.
+
+Your projects appear, and PMs show in the thread list with their workers. The list button in a PM's header opens its work items, workers, mission and memory.
+
+T3 Connect sign-in does not work in the fork's APK: T3's sign-in only accepts T3's own apps. Use Tailscale or your local network instead.
+
+## Unofficial
+
+This is a personal fork. It is not made or supported by the T3 Code team, so please report fork bugs [here](https://github.com/maddada/t3code-pm/issues), not upstream.
+
+It tracks upstream T3 Code closely and is rebased onto upstream `main` regularly. Everything outside Project Managers is upstream's work: for T3 Code itself, see the [upstream README](https://github.com/pingdotgg/t3code#readme) and [docs](./docs/README.md).
+
+## For developers
+
+```sh
+vp i
+vp run dev                      # server and web, state in the worktree's .t3
+vp run dist:desktop:dmg:arm64   # T3 Code PM for Apple Silicon
+scripts/sync-upstream.sh        # rebase onto upstream main and run the checks
 ```
 
-To try it once without an install, run `npx t3@latest`.
+The free `Replay (dev)` provider has a `pm` scenario that drives the real PM tools without a paid model. The fork keeps its code in `apps/*/src/pm`, `apps/server/src/pm` and `packages/pm`, and marks each small edit to an upstream file with `t3code-pm:`.
 
-### Phone
-
-Get the app from the [App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or [Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code). Then follow [remote access](./docs/user/remote-access.md) to connect it to your computer.
-
-### Sign in to an agent
-
-T3 Code needs one agent that is installed and signed in. For example, install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`, or install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`.
-
-[Provider setup](./docs/user/install.md#providers) has the steps for each agent. [Install T3 Code](./docs/user/install.md) covers nightly builds, AppImage, WSL, and NixOS.
-
-## "Wait, what are you selling me?"
-
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
-
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork and build the tool that you want.
-
-## Documentation
-
-- [Install and first run](./docs/user/install.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Source control](./docs/user/source-control.md)
-- [Connect outside agents over MCP](./docs/user/outside-agents.md)
-- [FAQ](./docs/user/faq.md)
-
-[All docs](./docs/README.md) has the full list.
-
-## Contributing
-
-We have limited review capacity. Small, focused fixes are the most likely to be merged. Features need an approved discussion first.
-
-- Read [CONTRIBUTING.md](./CONTRIBUTING.md) before you report a bug or open a pull request.
-- Put feature requests in [Ideas](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
-- Build from source with the [development runbook](./docs/operations/development.md#first-checkout). The [architecture overview](./docs/internals/overview.md) explains how it works.
-- Get help in [Discord](https://discord.gg/jn4EGJjrvv).
+- [Development notes](./docs/pm/development.md): building the apps and the APK, syncing with upstream, translations, and data compatibility.
+- [PM_DESIGN.md](./PM_DESIGN.md): how PM threads work.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE), like T3 Code.

@@ -487,7 +487,7 @@ both apps, translate by hand in every catalog, keep `vp run i18n:check` green.
 | Providers        | Any provider with T3's MCP tools can be a PM (5.6). Workers: any provider.                                                                                                               |
 | Reverse states   | Snooze/Wake, Dismiss/Undo, Archive/Unarchive, setting off/on, unlink through the PM.                                                                                                     |
 | Connection modes | Everything travels over `pm.*` RPC and existing messages; pages go over the WebSocket. Works locally, over Tailscale and over T3 Connect when the client can sign in (section 9).        |
-| Docs             | `README-PM.md` (fork-only) per requirement 8. No upstream doc changes.                                                                                                                   |
+| Docs             | `README.md` (fork-first) and `docs/pm/development.md` (fork-only) per requirement 8. No other upstream doc changes.                                                                      |
 
 ## 9. Distribution: trying the fork, including an Android APK
 
@@ -678,7 +678,7 @@ numbers are from the research pass; implementation re-checks each before editing
 
 Fork-only files (no upstream conflict): `apps/server/src/pm/**`, `apps/web/src/pm/**`,
 `apps/mobile/src/pm/**`, `packages/pm/**`, `packages/contracts/src/pm.ts`,
-`apps/web/src/routes/_chat.settings.project-managers.tsx`, `README-PM.md`, `scripts/sync-upstream.sh`.
+`apps/web/src/routes/_chat.settings.project-managers.tsx`, `docs/pm/development.md`, `scripts/sync-upstream.sh`.
 
 ## 12. Left out of v1
 
