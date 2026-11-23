@@ -16,6 +16,7 @@ import { HttpClient } from "effect/http";
 import * as Schema from "effect/Schema";
 
 import { CLI_RELEASE_BASE_URL_ENV } from "@t3tools/shared/cliRelease";
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 
 import * as ProcessRunner from "../processRunner.ts";
 import { acquireServiceSelectionLock } from "./serviceSelectionLock.ts";
@@ -57,11 +58,14 @@ export {
   serviceUnitProgramOf as bootServiceProgramOf,
 } from "./serviceProtocol.ts";
 
-const BOOT_SERVICE_NAME = "t3code";
+const BOOT_SERVICE_NAME = pmDesktop(PM.service.name, "t3code"); // t3code-pm:
 export const BOOT_SERVICE_UNIT_FILE = `${BOOT_SERVICE_NAME}.service`;
 // `.service` suffix keeps the label distinct from the desktop app's bundle id
 // (com.t3tools.t3code), so launchd and TCC records never collide.
-export const BOOT_SERVICE_LAUNCHD_LABEL = "com.t3tools.t3code.service";
+export const BOOT_SERVICE_LAUNCHD_LABEL = pmDesktop(
+  PM.service.launchdLabel,
+  "com.t3tools.t3code.service",
+); // t3code-pm:
 export const BOOT_SERVICE_PLIST_FILE = `${BOOT_SERVICE_LAUNCHD_LABEL}.plist`;
 export const BOOT_SERVICE_LOG_FILE = "boot-service.log";
 /** `schtasks /Query /HRESULT` exits with this when the task is not registered. */
@@ -312,7 +316,7 @@ const defaultSystemdUnitDir = (path: Path.Path, homeDir: string, xdgConfigHome: 
   );
 
 const scheduledTaskPath = (path: Path.Path, localAppData: string) =>
-  path.join(localAppData, "t3code", BOOT_SERVICE_TASK_FILE);
+  path.join(localAppData, BOOT_SERVICE_NAME, BOOT_SERVICE_TASK_FILE); // t3code-pm: was "t3code"
 
 const launchdPlistPath = (path: Path.Path, homeDir: string) =>
   path.join(homeDir, "Library", "LaunchAgents", BOOT_SERVICE_PLIST_FILE);
@@ -681,7 +685,7 @@ export function formatBootServiceProblem(
     case "service-disabled":
       return `The service is not enabled to start automatically. Run \`${commands.install}\` to repair it.`;
     case "service-stopped":
-      return `The service is not running. Check the service log (on Linux, also \`systemctl --user status t3code.service\`), then run \`${commands.install}\`.`;
+      return `The service is not running. Check the service log (on Linux, also \`systemctl --user status ${BOOT_SERVICE_UNIT_FILE}\`), then run \`${commands.install}\`.`;
     case "restart-pending":
       return `A newer version is installed but the service is still running the previous one. Run \`${commands.restart}\` to switch.`;
   }
@@ -1248,6 +1252,13 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
     readonly allowDowngrade?: boolean;
     readonly start?: boolean;
   }) {
+    // t3code-pm: the default runtime download is upstream's `t3`, which would serve this home
+    // without PMs. The fork publishes no runtime, so only an explicit mirror can install one.
+    if (pmDesktop(true, false) && releaseBaseUrl === undefined) {
+      return yield* new PinnedRuntimeInstallError({
+        step: `finding a ${PM.productName} runtime: ${PM.productName} publishes none yet, so the background service is not available`,
+      });
+    }
     let manager = yield* requireManager;
     if (manager.kind === "systemd" && systemdUnsafeValue(plan)) {
       return yield* new BootServiceBaseDirUnsupportedError({ baseDir: input.baseDir });

@@ -52,7 +52,13 @@ export const renderCliShim = (input: {
           ]
         : []),
       `set "T3CODE_CLI_PATH=${cmdText(input.shimPath)}"`,
-      `if not defined T3CODE_HOME set "T3CODE_HOME=${cmdText(input.t3Home)}"`,
+      ...pmDesktop(
+        [
+          `if not defined ${PM.homeEnv} set "${PM.homeEnv}=${cmdText(input.t3Home)}"`,
+          `set "T3CODE_HOME=%${PM.homeEnv}%"`,
+        ],
+        [`if not defined T3CODE_HOME set "T3CODE_HOME=${cmdText(input.t3Home)}"`],
+      ), // t3code-pm: an ambient T3CODE_HOME is official T3 Code's
       'set "ELECTRON_RUN_AS_NODE=1"',
       // Electron's Windows executable starts without stdin; this tells the CLI to reopen the console.
       'set "T3CODE_DESKTOP_CLI_LAUNCHER=1"',
@@ -74,7 +80,10 @@ export const renderCliShim = (input: {
     `# ${MARKER}`,
     `export T3CODE_CLI_PATH=${shellWord(input.shimPath)}`,
     `home=${shellWord(input.t3Home)}`,
-    'export T3CODE_HOME="${T3CODE_HOME:-$home}"',
+    pmDesktop(
+      `export ${PM.homeEnv}="\${${PM.homeEnv}:-$home}" T3CODE_HOME="\${${PM.homeEnv}:-$home}"`,
+      'export T3CODE_HOME="${T3CODE_HOME:-$home}"',
+    ), // t3code-pm: an ambient T3CODE_HOME is official T3 Code's
     "export ELECTRON_RUN_AS_NODE=1",
     `app=${shellWord(target.kind === "appimage" ? target.appImage : target.executable)}`,
     'if [ ! -x "$app" ]; then',

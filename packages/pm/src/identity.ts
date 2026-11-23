@@ -15,12 +15,21 @@ export const PM_DESKTOP_IDENTITY = {
   cliName: "t3-pm",
   linuxExecutableName: "t3code-pm",
   linuxWindowClass: "com.t3codepm.T3CodePM",
+  /** The data home variable. `T3CODE_HOME` is official T3 Code's and may name someone's real data. */
+  homeEnv: "T3CODE_PM_HOME",
+  /** `t3-pm service install` names, so it never replaces or removes the official `t3` service. */
+  service: {
+    /** The systemd unit, the Task Scheduler task prefix, its XML copy and its folder. */
+    name: "t3code-pm",
+    launchdLabel: "com.t3codepm.service",
+    protectDropIn: "90-t3code-pm-protect.conf",
+  },
 } as const;
 
 declare const __T3CODE_PM_DESKTOP_IDENTITY__: boolean | undefined;
 
 /**
- * The desktop bundle defines this (apps/desktop/vite.config.ts); Vitest runs without the bundler,
+ * The desktop and server bundles define this (apps/{desktop,server}/vite.config.ts); Vitest runs without the bundler,
  * so upstream's tests keep pinning upstream's identity while every fork build uses ours.
  */
 const identityOn =

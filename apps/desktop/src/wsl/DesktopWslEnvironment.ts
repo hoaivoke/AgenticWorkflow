@@ -18,7 +18,7 @@ import { satisfiesSemverRange } from "@t3tools/shared/semver";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopManagedPolicy from "../app/DesktopManagedPolicy.ts";
 import { parseWslDistroList, type WslDistro } from "./wslPathParsing.ts";
-import { pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 
 const PROCESS_TERMINATE_GRACE = Duration.seconds(1);
 const LIST_TIMEOUT = Duration.seconds(8);
@@ -454,7 +454,7 @@ const formatNodePtyProbeFailureReason = (exitCode: number): string | null =>
 // Capture login-shell PATH because the server launches provider CLIs by name.
 const RESOLVED_PATH_LINE = `printf 'resolvedPath:%s\\n' "$PATH"`;
 // wsl.exe --exec skips the profile, so the server only sees a profile-exported T3CODE_HOME if passed on.
-const T3_HOME_LINE = `printf 't3Home:%s\\n' "\${T3CODE_HOME:-}"`;
+const T3_HOME_LINE = `printf 't3Home:%s\\n' "\${${pmDesktop(PM.homeEnv, "T3CODE_HOME")}:-}"`; // t3code-pm:
 
 const NODE_PTY_PROBE_SCRIPT = (
   linuxServerDir: string,

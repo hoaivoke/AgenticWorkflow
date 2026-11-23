@@ -1,3 +1,4 @@
+import "./pm/homeEnvironment.ts"; // t3code-pm: first, so nothing reads T3CODE_HOME before it
 import * as MacPermissions from "./permissions/MacPermissions.ts";
 import { handleStdioError } from "./app/stdioErrors.ts";
 

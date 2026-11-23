@@ -335,8 +335,10 @@ export const createDevRunnerEnv = Effect.fn("dev-runner.createDevRunnerEnv")(fun
   const isLiveHome = resolvedBaseDir === path.join(yield* HostProcess.HomeDirectory, ".t3");
   if (configuredBaseDir !== undefined && !isLiveHome) {
     output.T3CODE_HOME = resolvedBaseDir;
+    output.T3CODE_PM_HOME = resolvedBaseDir; // t3code-pm: the fork desktop app reads only this one
   } else {
     delete output.T3CODE_HOME;
+    delete output.T3CODE_PM_HOME; // t3code-pm:
   }
 
   // Managed T3 service shells leak launcher variables that make dev servers fail version checks.

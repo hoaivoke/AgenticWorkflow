@@ -7,6 +7,7 @@ import * as NodeFS from "node:fs";
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 import { acquireServiceSelectionLock } from "./cloud/serviceSelectionLock.ts";
 import { isNoCopyOnWrite, markNoCopyOnWrite } from "./noCopyOnWrite.ts";
 
@@ -791,7 +792,8 @@ async function terminateChild(
 }
 
 /** Task Scheduler names are machine-wide, so each Windows account runs its own task. */
-export const serviceTaskName = (domain: string, userName: string) => `t3code-${domain}-${userName}`;
+export const serviceTaskName = (domain: string, userName: string) =>
+  `${pmDesktop(PM.service.name, "t3code")}-${domain}-${userName}`; // t3code-pm:
 
 export const serviceLauncherLockPath = (baseDir: string) =>
   NodePath.join(baseDir, "runtime", SERVICE_LAUNCHER_LOCK_FILE);

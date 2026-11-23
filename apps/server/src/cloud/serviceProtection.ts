@@ -7,9 +7,10 @@ import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as ProcessRunner from "../processRunner.ts";
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 import { BOOT_SERVICE_UNIT_FILE } from "./bootService.ts";
 
-const PROTECT_DROP_IN = "90-t3code-protect.conf";
+const PROTECT_DROP_IN = pmDesktop(PM.service.protectDropIn, "90-t3code-protect.conf"); // t3code-pm:
 const SYSTEM_UNIT_DIR = "/etc/systemd/system";
 export const REMOTE_ACCESS_UNITS = ["tailscaled.service", "ssh.service", "sshd.service"];
 

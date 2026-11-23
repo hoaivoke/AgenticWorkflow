@@ -8,7 +8,12 @@ the Ghostex coordinator playbook (`packages/pm/src/playbook.ts`).
 ## Data and compatibility
 
 - The fork's default data folder is **`~/.t3-pm`**, not `~/.t3`, so it never shares state with
-  the official app. `T3CODE_HOME` still overrides it.
+  the official app. `T3CODE_PM_HOME` overrides it. The desktop app and the `t3-pm` command ignore
+  `T3CODE_HOME`, which may name the official app's data, and pass the fork's home on to the server
+  as `T3CODE_HOME` themselves.
+- `t3-pm service install` uses its own names (`t3code-pm.service`, `com.t3codepm.service`,
+  `t3code-pm-<domain>-<user>`). The fork publishes no runtime archive for it, so it stops unless
+  `T3CODE_RELEASE_BASE_URL` names a mirror holding one; it never fetches upstream's `t3`.
 - PM state lives in `pm_*` tables with their own migration ledger (`pm_migrations`). Upstream
   builds open a fork database and ignore those tables; the fork opens an upstream database and adds
   them. No upstream table is altered.
