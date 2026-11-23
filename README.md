@@ -2,9 +2,9 @@
   <img src="./assets/prod/t3-black-web-icon-192x192.png" width="80" height="80" alt="T3 Code logo" />
 </p>
 
-<h1 align="center">T3 Code PM</h1>
+<h1 align="center">T3 Code PM Mod</h1>
 
-<p align="center">T3 Code with a project manager in your sidebar.</p>
+<p align="center">T3 Code with project managers in your sidebar.</p>
 
 <p align="center">
   <a href="https://github.com/maddada/t3code-pm/releases/latest"><strong>Download</strong></a> ·
