@@ -1,4 +1,4 @@
-# t3code-pm: Project Manager threads, design
+# PM3code: Project Manager threads, design
 
 Status: approved; open questions decided (section 13). Requirements and UI source of truth:
 the approved requirements page and the mockups `01-sidebar` to `07-mobile` (kept outside the repo,
@@ -15,13 +15,17 @@ every edit to an upstream file is small and marked `// t3code-pm:`, and one sett
 
 ## 2. Names
 
+The fork is **PM3code** ("PMs Mod for T3code") wherever a person reads a name. Ids, folders,
+schemes, the `t3-pm` command and the `t3code-pm:` code marker keep the older `t3code-pm` spelling,
+so installs from 0.1.0 and 0.2.0 keep their data.
+
 | Thing                 | Name                                                                     | Why                                                                                                                                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The PM's goal         | **Mission** (`pm_threads.mission`, `pm_set_mission`, UI label "Mission") | Upstream already has a per-thread `goal`: the provider-native `/goal` objective (`OrchestrationV2ProviderGoal`, `packages/contracts/src/orchestrationV2.ts:1174-1193`, shown as the status word "Goal" at `apps/web/src/components/sidebar/SidebarThreadRow.tsx:789-790`). A PM can also send `/goal` to a worker, so "goal" must keep meaning that one. |
 | Standing instructions | Instructions (`pm_threads.instructions`)                                 | No clash.                                                                                                                                                                                                                                                                                                                                                |
 | Work item / ask tags  | `W<n>`, `Q<n>`, per PM, never reused                                     | Same as Ghostex.                                                                                                                                                                                                                                                                                                                                         |
 | Wire namespace        | `pm.*` RPC methods, `pm_*` MCP tools, `pm_*` tables                      | Requirement 7.                                                                                                                                                                                                                                                                                                                                           |
-| Setting               | "Project Managers (t3code-pm)"                                           | Requirement 7.                                                                                                                                                                                                                                                                                                                                           |
+| Setting               | "Project Managers (PM3code)"                                             | Requirement 7.                                                                                                                                                                                                                                                                                                                                           |
 
 The mockups say "Goal" in the details card and the hover card; implementation uses "Mission" there.
 
@@ -432,7 +436,7 @@ A fork-only page `/settings/project-managers` (kept, user's pick): new route fil
 `apps/web/src/routes/_chat.settings.project-managers.tsx`, plus marked entries in
 `settingsSearch.ts` (`SettingsPath` union `:20-43`, labels `:96-120`, nav groups `:132-175`, search
 entries `:490-503`) and an icon in `SettingsSidebarNav.tsx:89-115`. Contents: the
-"Project Managers (t3code-pm)" switch, the shipped playbook (version and View), and the playbook
+"Project Managers (PM3code)" switch, the shipped playbook (version and View), and the playbook
 overrides editor (kept). The default-model row is cut (user's pick): create remembers the last model.
 Archived threads (`ArchivedThreadsPanel.tsx`) gets a marked line for the PM badge and worker count.
 
@@ -497,7 +501,7 @@ both apps, translate by hand in every catalog, keep `vp run i18n:check` green.
 `apps/mobile/.gitignore:40-41`):
 
 - Add a fourth variant `pm` to `VARIANT_CONFIG` (`app.config.ts:80-105`) and `resolveAppVariant`
-  (`:107-118`): app name "T3 Code PM", scheme `t3code-pm`, package and bundle id
+  (`:107-118`): app name "PM3code", scheme `t3code-pm`, package and bundle id
   `com.<you>.t3codepm`, own icon tint.
 - Build with `T3CODE_MOBILE_UPDATES_ENABLED=0` (`:248-253`). Otherwise the app checks T3's EAS update
   channel (`updates.url` `u.expo.dev/d763fcb8-...`, `:250`) and could load upstream's JavaScript

@@ -2,24 +2,28 @@
   <img src="./assets/prod/t3-black-web-icon-192x192.png" width="80" height="80" alt="T3 Code logo" />
 </p>
 
-<h1 align="center">T3 Code PM Mod</h1>
+<h1 align="center">PM3code</h1>
+
+<p align="center"><strong>PMs Mod for T3code</strong></p>
 
 <p align="center">T3 Code with project managers in your sidebar.</p>
 
 <p align="center">
-  <a href="https://github.com/maddada/t3code-pm/releases/latest"><strong>Download</strong></a> ·
+  <a href="https://github.com/maddada/pm3code/releases/latest"><strong>Download</strong></a> ·
   <a href="#install">Install</a> ·
   <a href="#connect-your-phone">Phone</a> ·
   <a href="https://github.com/pingdotgg/t3code">Upstream T3 Code</a>
 </p>
 
 <p align="center">
-  <img src="./docs/pm/screenshots/hero.png" width="100%" alt="A Project Manager thread in T3 Code PM: the PM's plan in the chat, its questions above the chat box, its workers nested in the sidebar, and its work items grouped by status in the details panel" />
+  <img src="./docs/pm/screenshots/hero.png" width="100%" alt="A Project Manager thread in PM3code: the PM's plan in the chat, its questions above the chat box, its workers nested in the sidebar, and its work items grouped by status in the details panel" />
 </p>
 
-T3 Code PM is an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) that adds **Project Manager threads**. You give a PM a brief. It splits the work into items, starts worker threads for them, follows those workers, and comes back to you only when it needs a decision.
+PM3code (PMs Mod for T3code) is an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) that adds **Project Manager threads**. You give a PM a brief. It splits the work into items, starts worker threads for them, follows those workers, and comes back to you only when it needs a decision.
 
 Everything else is T3 Code: the same fast app, the same agents, the same subscriptions you already pay for.
+
+> We're not trying to create a separate app. This is just a test to let people try [Ghostex](https://github.com/maddada/Ghostex)'s orchestration and inbox workflow inside T3 Code, in an app you can install side by side with regular T3 Code.
 
 ## Why a coordinator?
 
@@ -72,29 +76,31 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 
 ## Install
 
-Get the files from the [latest release](https://github.com/maddada/t3code-pm/releases/latest). Like T3 Code, it needs at least one coding agent installed and signed in, such as Claude Code (`claude auth login`) or Codex (`codex login`).
+Get the files from the [latest release](https://github.com/maddada/pm3code/releases/latest). Like T3 Code, it needs at least one coding agent installed and signed in, such as Claude Code (`claude auth login`) or Codex (`codex login`).
+
+Releases up to 0.2.0 were called T3 Code PM, and their files and app are named `T3-Code-PM-*` and **T3 Code PM**. Newer ones keep the same data, so updating from them loses nothing. On macOS, delete the old **T3 Code PM** app from Applications after installing **PM3code**.
 
 ### macOS (Apple Silicon)
 
-1. Download `T3-Code-PM-<version>-arm64.dmg`, open it, and drag **T3 Code PM** to Applications.
+1. Download `PM3code-<version>-arm64.dmg`, open it, and drag **PM3code** to Applications.
 2. The app is ad-hoc signed, not notarized, so macOS blocks the first open. Do one of these:
    - Right-click the app in Applications and choose **Open**, then **Open** again.
    - Or try to open it once, then go to System Settings, Privacy & Security, and click **Open Anyway**.
-   - Or run `xattr -dr com.apple.quarantine "/Applications/T3 Code PM.app"`.
+   - Or run `xattr -dr com.apple.quarantine "/Applications/PM3code.app"`.
 3. After each update, macOS asks once for the "t3code-pm Safe Storage" keychain item. Choose **Always Allow**.
 
 ### Windows (x64)
 
-1. Download `T3-Code-PM-<version>-x64.exe` and run it. The installer isn't signed, so if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
-2. It installs for your user only, into `%LOCALAPPDATA%\Programs\t3code-pm`, and adds **T3 Code PM** to the Start menu. Remove it from Settings, Apps, Installed apps, where it has its own **T3 Code PM** entry.
+1. Download `PM3code-<version>-x64.exe` and run it. The installer isn't signed, so if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
+2. It installs for your user only, into `%LOCALAPPDATA%\Programs\t3code-pm`, and adds **PM3code** to the Start menu. Remove it from Settings, Apps, Installed apps, where it has its own **PM3code** entry.
 
 ### Linux (x64)
 
-Download `T3-Code-PM-<version>-x86_64.AppImage`, make it executable, and run it:
+Download `PM3code-<version>-x86_64.AppImage`, make it executable, and run it:
 
 ```sh
-chmod +x T3-Code-PM-*-x86_64.AppImage
-./T3-Code-PM-*-x86_64.AppImage
+chmod +x PM3code-*-x86_64.AppImage
+./PM3code-*-x86_64.AppImage
 ```
 
 On Ubuntu 22.04 and later, AppImages need FUSE 2 first: `sudo apt install libfuse2t64` (`libfuse2` on 22.04). On first launch it registers its own `t3code-pm://` handler and launcher entry, and never replaces T3 Code's.
@@ -102,22 +108,22 @@ On Ubuntu 22.04 and later, AppImages need FUSE 2 first: `sudo apt install libfus
 ### Android (arm64)
 
 1. Download the `.apk` on your phone and open it. Allow installs from your browser or file manager when Android asks.
-2. Or from a computer: `adb install t3code-pm-<version>-arm64.apk`.
+2. Or from a computer: `adb install PM3code-<version>-arm64.apk`.
 
-It installs as **T3 Code PM**, next to the official T3 Code app. Then [connect it to your computer](#connect-your-phone).
+It installs as **PM3code**, next to the official T3 Code app. Then [connect it to your computer](#connect-your-phone).
 
 ### iOS
 
-There is no iOS app. The official T3 Code iOS app can still connect to a T3 Code PM server; PMs show there as plain threads.
+There is no iOS app. The official T3 Code iOS app can still connect to a PM3code server; PMs show there as plain threads.
 
 ## Runs beside T3 Code
 
-T3 Code PM is a separate app with its own name, its own `t3-pm` command, and its own data folder, `~/.t3-pm`. It never reads or writes the official app's `~/.t3`, so you can keep both installed and switch freely.
+PM3code installs as its own app, with its own name, its own `t3-pm` command, and its own data folder, `~/.t3-pm`. It never reads or writes the official app's `~/.t3`, so you can keep both installed and switch freely.
 
 - **Bring your threads over:** quit both apps, then copy `~/.t3/userdata/statev2.sqlite` into `~/.t3-pm/userdata/`.
 - **Go back:** open the official T3 Code. It never saw `~/.t3-pm`, so there is nothing to undo. To take your fork threads with you, copy the same file the other way while both apps are closed. PMs open there as plain threads.
 - **Remove it:** delete the app and `~/.t3-pm`.
-- **Updates:** the app does not update itself. Download new versions from [Releases](https://github.com/maddada/t3code-pm/releases).
+- **Updates:** the app does not update itself. Download new versions from [Releases](https://github.com/maddada/pm3code/releases).
 
 A new PM's first turn runs on Claude Opus at high effort. Each later PM starts on the model the previous one used, and you can change a PM's model in its composer.
 
@@ -135,7 +141,7 @@ T3 Connect sign-in does not work in the fork's APK: T3's sign-in only accepts T3
 
 ## Unofficial
 
-This is a personal fork. It is not made or supported by the T3 Code team, so please report fork bugs [here](https://github.com/maddada/t3code-pm/issues), not upstream.
+This is a personal fork. It is not made or supported by the T3 Code team, so please report fork bugs [here](https://github.com/maddada/pm3code/issues), not upstream.
 
 It tracks upstream T3 Code closely and is rebased onto upstream `main` regularly. Everything outside Project Managers is upstream's work: for T3 Code itself, see the [upstream README](https://github.com/pingdotgg/t3code#readme) and [docs](./docs/README.md).
 
@@ -144,7 +150,7 @@ It tracks upstream T3 Code closely and is rebased onto upstream `main` regularly
 ```sh
 vp i
 vp run dev                      # server and web, state in the worktree's .t3
-vp run dist:desktop:dmg:arm64   # T3 Code PM for Apple Silicon
+vp run dist:desktop:dmg:arm64   # PM3code for Apple Silicon
 scripts/sync-upstream.sh        # rebase onto upstream main and run the checks
 ```
 

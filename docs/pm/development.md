@@ -1,4 +1,4 @@
-# T3 Code PM: development notes
+# PM3code: development notes
 
 For what the fork is and how to install it, see the [README](../../README.md). The design is in
 [PM_DESIGN.md](../../PM_DESIGN.md). PM code lives in `apps/*/src/pm`, `apps/server/src/pm` and
@@ -22,7 +22,7 @@ the Ghostex coordinator playbook (`packages/pm/src/playbook.ts`).
 ```sh
 vp i
 vp run dev                      # server + web, state in this checkout's .t3 when it is a worktree
-vp run dist:desktop:dmg:arm64   # "T3 Code PM" for Apple Silicon, ad-hoc signed
+vp run dist:desktop:dmg:arm64   # "PM3code" for Apple Silicon, ad-hoc signed
 vp run dist:desktop:win:x64     # Windows installer
 vp run dist:desktop:linux       # Linux AppImage
 ```
@@ -31,9 +31,11 @@ A plain clone shares `~/.t3/dev` in dev mode; isolate it with
 `vp run migrate-dev-db --base-dir <clone>/.t3` and `vp run dev --home-dir <clone>/.t3`.
 The free `Replay (dev)` provider has a `pm` scenario that drives the real `pm_*` tools.
 
-The desktop app is **T3 Code PM** (`com.t3codepm.desktop`, URL scheme `t3code-pm`, command
+The desktop app is **PM3code** (`com.t3codepm.desktop`, URL scheme `t3code-pm`, command
 `t3-pm`). It keeps its data in `~/.t3-pm` and its Electron profile in
-`~/Library/Application Support/t3code-pm`, and has no update feed. Each new ad-hoc signed macOS
+`~/Library/Application Support/t3code-pm`, and has no update feed. Its ids, folders, scheme and command keep the
+older `t3code-pm` spelling on purpose: installs from 0.1.0 and 0.2.0, which were named T3 Code PM,
+keep their data. Each new ad-hoc signed macOS
 build has a new signature, which is why macOS asks again for the "t3code-pm Safe Storage" keychain
 item after an update.
 
@@ -41,7 +43,7 @@ The resource monitor needs Rust 1.95 or newer when building.
 
 ## Building the Android APK
 
-The APK is **T3 Code PM** (`com.t3codepm.app`). It installs beside the official app, never takes
+The APK is **PM3code** (`com.t3codepm.app`). It installs beside the official app, never takes
 upstream's over-the-air updates, and talks to any T3 server; PM views show only on a fork server.
 Building it needs a JDK 17 and the Android SDK:
 
