@@ -1428,7 +1428,7 @@ const make = Effect.gen(function* () {
         state: state === "limited" ? "idle" : state,
         limitResetAt:
           state === "limited" && shell !== null
-            ? new Date(usageLimitResetOf(shell)!).toISOString()
+            ? DateTime.formatIso(DateTime.makeUnsafe(usageLimitResetOf(shell)!))
             : null,
         linkedAt: worker.linkedAt,
         resolvedAt: worker.resolvedAt,

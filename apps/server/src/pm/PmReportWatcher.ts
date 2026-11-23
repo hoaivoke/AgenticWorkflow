@@ -129,14 +129,14 @@ const make = Effect.gen(function* () {
   const stopped = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell, runId: string) => {
     const reset = usageLimitResetOf(shell);
     if (reset !== null) {
-      const at = new Date(reset).toISOString();
+      const at = DateTime.formatIso(DateTime.makeUnsafe(reset));
       return report({
         worker,
         shell,
         kind: "stopped",
         dedupeKey: `run:${runId}`,
         body: `It paused at a usage limit, which resets at ${at}. It is not stuck: T3 Code carries it on after the reset. Do nothing unless a later report says it could not.`,
-        line: `Paused at a usage limit until ${at}`,
+        line: "Paused at a usage limit",
       });
     }
     return report({
