@@ -1,5 +1,4 @@
 import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
-import { GHOSTEX_THEME } from "../pm/ghostexTheme"; // t3code-pm:
 import { msg, T, useGT, useMessages } from "gt-react";
 import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 
@@ -46,7 +45,7 @@ function useThemeCards() {
   const seen = new Set<string>();
   return [
     ...STANDARD_THEME_CARDS.map((card) => ({ ...card, id: null })),
-    ...[...BUILT_IN_THEMES, GHOSTEX_THEME /* t3code-pm: */, ...customThemes, ...environmentThemes]
+    ...[...BUILT_IN_THEMES, ...customThemes, ...environmentThemes]
       .filter((definition) => {
         if (seen.has(definition.id)) return false;
         seen.add(definition.id);

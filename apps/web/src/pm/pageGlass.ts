@@ -1,15 +1,14 @@
 // t3code-pm: Ghostex's Live page on an Art theme (visual_page_modal/glass.rs): the window's art,
-// blurred a further 30 points of the screen, under one tint that folds the art's 45% dimming into
-// the work area's 67% tint (both from ghostexTheme.css).
+// blurred a further 30 points of the screen, under one tint. The art and tint come from the
+// theme's custom CSS (`--pm-page-art`, `--pm-page-tint`), as docs/pm/theme/pm3code-ghostex.css sets.
 import type { PmPageGlass } from "@t3tools/pm";
-
-import polarNight from "./assets/ghostex-polar-night.webp";
 
 const PICTURE_BLUR_POINTS = 30;
 const PICTURE_WIDTH = 960;
-const TINT = "rgba(8, 9, 11, 0.82)";
+const DEFAULT_TINT = "rgba(8, 9, 11, 0.82)";
+const ART_URL = /^url\(\s*["']?(data:image\/[^"')]+)["']?\s*\)$/;
 
-let softened: Promise<string | null> | null = null;
+const softened = new Map<string, Promise<string | null>>();
 
 const soften = (src: string) =>
   new Promise<string | null>((resolve) => {
@@ -35,9 +34,18 @@ const soften = (src: string) =>
     image.src = src;
   });
 
-/** The glass a Live page gets while the Ghostex theme paints its art, else null (dusk and dawn). */
+/** The glass a Live page gets while the theme's CSS names an art picture, else null (dusk and dawn). */
 export function pmPageGlass(): Promise<PmPageGlass | null> {
-  if (document.documentElement.dataset.themeId !== "ghostex") return Promise.resolve(null);
-  softened ??= soften(polarNight);
-  return softened.then((picture) => (picture === null ? null : { picture, tint: TINT }));
+  const style = getComputedStyle(document.documentElement);
+  const art = ART_URL.exec(style.getPropertyValue("--pm-page-art").trim())?.[1];
+  if (art === undefined) return Promise.resolve(null);
+  const tint = style.getPropertyValue("--pm-page-tint").trim() || DEFAULT_TINT;
+  let picture = softened.get(art);
+  if (picture === undefined) {
+    picture = soften(art);
+    softened.set(art, picture);
+  }
+  return picture.then((softenedArt) =>
+    softenedArt === null ? null : { picture: softenedArt, tint },
+  );
 }
