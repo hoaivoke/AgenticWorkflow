@@ -27,7 +27,8 @@ export const PM_SHOWN_STATUS_ORDER: ReadonlyArray<PmShownItemStatus> = [
 
 export type PmAskState = "open" | "answered" | "done" | "withdrawn" | "dismissed";
 
-export type PmWorkerState = "running" | "waiting" | "idle" | "resolved";
+/** `limited`: stopped at a usage limit that has not reset yet; T3 Code carries it on after. */
+export type PmWorkerState = "running" | "limited" | "waiting" | "idle" | "resolved";
 
 export type PmWaitOn =
   | { readonly kind: "item"; readonly itemNo: number }
@@ -70,7 +71,7 @@ export function derivePmItemStatus(input: PmStatusInput): PmShownItemStatus {
   const openAsks = input.asks.filter((ask) => ask.state === "open");
   if (openAsks.some((ask) => ask.holds)) return "blocked";
   if (input.workers.includes("waiting")) return "needs_you";
-  if (input.workers.includes("running")) return "in_progress";
+  if (input.workers.includes("running") || input.workers.includes("limited")) return "in_progress";
   if (input.waits.some((wait) => isOpenWait(wait, input))) return "waiting";
   if (input.status === "moving") {
     if (input.touchedRecently) return "in_progress";
@@ -143,6 +144,22 @@ export const formatPmAnswerMessage = (input: {
   readonly answer: string;
 }) =>
   `${input.itemNo === null ? "" : `${formatItemTag(input.itemNo)} `}${formatAskTag(input.askNo)}: ${input.answer}`;
+
+const QUOTED = /"[^"]*"|\u201c[^\u201d]*\u201d|`[^`]*`/g;
+const ITEM_TAG = /(?<![\p{L}\p{N}\-_/.@#])[Ww]([1-9]\d*)(?![\p{L}\p{N}\-_/]|\.[\p{L}\p{N}])/gu;
+
+/**
+ * Bare work-item tags (`W34`) outside quotes and backticks that name one of `itemNos`, in order,
+ * once each. Only existing items count, so `W3C`, `Windows`, `W-2` or `/w34` never match.
+ */
+export function bareItemTags(text: string, itemNos: ReadonlyArray<number>): ReadonlyArray<number> {
+  const found: Array<number> = [];
+  for (const match of text.replace(QUOTED, " ").matchAll(ITEM_TAG)) {
+    const itemNo = Number(match[1]);
+    if (itemNos.includes(itemNo) && !found.includes(itemNo)) found.push(itemNo);
+  }
+  return found;
+}
 
 // Ghostex refuses now/wait lines that hand work to the user; those belong in an ask.
 const USER_HANDOFF =

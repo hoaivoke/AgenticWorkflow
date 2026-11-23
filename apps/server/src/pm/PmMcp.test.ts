@@ -212,8 +212,17 @@ describe("pm_* tools", () => {
       expect(list).toContain("W1 Checkout redesign: Done");
       // W2's wait on W1 cleared when W1 finished.
       expect(list).toContain("W2 Release notes: In progress");
+      // In progress only because the PM touched it this turn: nobody's once the turn ends.
+      const check = (yield* callAs(pm, "pm_item_list", { check: true })).result ?? "";
+      expect(check).toContain("Turn check: 1 to fix before you end your turn:");
+      expect(check).toContain("In progress on you, no worker on it");
+      expect(check).toContain("    W2 Release notes\n");
+      expect(check).not.toContain("W1");
       yield* callAs(pm, "pm_item_update", { item: "W2", status: "later", reason: "After launch" });
       expect((yield* callAs(pm, "pm_item_list", {})).result).toContain("W2 Release notes: Later");
+      expect((yield* callAs(pm, "pm_item_list", { check: true })).result).toBe(
+        "Turn check: all clear. nothing in progress.",
+      );
       yield* callAs(pm, "pm_item_update", { item: "W2", status: "drop" });
       expect((yield* callAs(pm, "pm_item_list", {})).result).not.toContain("W2");
       yield* callAs(pm, "pm_item_update", { item: "W2", status: "restore" });
@@ -234,6 +243,12 @@ describe("pm_* tools", () => {
       expect(
         yield* callAs(pm, "pm_ask", { item: "W1", title: "Ship Q3 build?", detail: "x" }),
       ).toMatchObject({ message: "Leave the Q tag out of the title." });
+      expect(
+        yield* callAs(pm, "pm_ask", { item: "W1", title: "Ship W1 today?", detail: "x" }),
+      ).toMatchObject({
+        message:
+          'Work-item tags (W1) are tool handles, not how to talk to the user. Name what the work is in plain words instead: W1 ("Launch").',
+      });
       expect(
         (yield* callAs(pm, "pm_ask", {
           item: "W1",

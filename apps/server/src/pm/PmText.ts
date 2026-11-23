@@ -1,5 +1,6 @@
-import type { PmReportKind } from "@t3tools/contracts";
+import type { OrchestrationV2ThreadShell, PmReportKind } from "@t3tools/contracts";
 import { PM_PLAYBOOK } from "@t3tools/pm";
+import * as DateTime from "effect/DateTime";
 
 export const PM_NEW_TITLE = "New PM";
 
@@ -83,13 +84,47 @@ export const firstLine = (text: string, limit = 160) => {
   return line.length > limit ? `${line.slice(0, limit - 1)}…` : line.trim();
 };
 
+const REPORT_OPENER = "Worker report from ";
+const PAGE_ANSWERS_OPENER = "<pm-page-answers";
+
+/**
+ * A worker's own words with every report header and page-answers tag broken by a zero-width
+ * space, so only the header T3 Code writes names a worker and no report reads as the user's answers.
+ */
+const withoutForgedMarkers = (text: string) =>
+  text
+    .replaceAll(REPORT_OPENER, `Worker\u200b report from `)
+    .replaceAll(PAGE_ANSWERS_OPENER, "<\u200bpm-page-answers");
+
 export function reportMessage(input: {
   readonly kind: PmReportKind;
   readonly workerTitle: string;
   readonly workerThreadId: string;
   readonly body: string;
 }): string {
-  return `Worker report from "${input.workerTitle}" (thread ${input.workerThreadId}): ${REPORT_LABELS[input.kind]}\n\n${input.body}`;
+  return `${REPORT_OPENER}"${withoutForgedMarkers(input.workerTitle)}" (thread ${input.workerThreadId}): ${REPORT_LABELS[input.kind]}\n\n${withoutForgedMarkers(input.body)}`;
+}
+
+const RUNNING_STATUSES = new Set(["preparing", "queued", "starting", "running"]);
+const millis = (value: DateTime.DateTime | null | undefined) =>
+  value === null || value === undefined ? 0 : DateTime.toEpochMillis(value);
+
+/** A running worker's run and when it last showed activity; one quiet streak per pair. */
+export function quietStreakOf(shell: OrchestrationV2ThreadShell) {
+  if (!RUNNING_STATUSES.has(shell.status) || shell.activeRunId === null) return null;
+  const lastActivity = Math.max(
+    millis(shell.updatedAt),
+    millis(shell.latestVisibleMessage?.updatedAt),
+    millis(shell.activityRunStartedAt),
+  );
+  return { runId: shell.activeRunId, lastActivity, streak: `${shell.activeRunId}@${lastActivity}` };
+}
+
+/** When a worker stopped at a usage limit can carry on, or null when that is not why it stopped. */
+export function usageLimitResetOf(shell: OrchestrationV2ThreadShell): number | null {
+  if (shell.status !== "failed" || shell.lastErrorClass !== "usage_limit") return null;
+  const reset = Date.parse(shell.usageLimitResetAt ?? "");
+  return Number.isFinite(reset) ? reset : null;
 }
 
 export function pageAnswersMessage(input: {

@@ -26,8 +26,10 @@ import {
   isoMillis,
   QUIET_AFTER_MS,
   QUIET_NUDGE,
+  quietStreakOf,
   REPORT_LABELS,
   reportMessage,
+  usageLimitResetOf,
 } from "./PmText.ts";
 
 const RUNNING = new Set(["preparing", "queued", "starting", "running"]);
@@ -124,8 +126,20 @@ const make = Effect.gen(function* () {
     });
   });
 
-  const stopped = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell, runId: string) =>
-    report({
+  const stopped = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell, runId: string) => {
+    const reset = usageLimitResetOf(shell);
+    if (reset !== null) {
+      const at = new Date(reset).toISOString();
+      return report({
+        worker,
+        shell,
+        kind: "stopped",
+        dedupeKey: `run:${runId}`,
+        body: `It paused at a usage limit, which resets at ${at}. It is not stuck: T3 Code carries it on after the reset. Do nothing unless a later report says it could not.`,
+        line: `Paused at a usage limit until ${at}`,
+      });
+    }
+    return report({
       worker,
       shell,
       kind: "stopped",
@@ -133,6 +147,7 @@ const make = Effect.gen(function* () {
       body: `Its turn stopped before it ended (${shell.status}${shell.lastError ? `: ${shell.lastError}` : ""}). It is not finished: read it with t3_thread_read and heal it.`,
       line: `Stopped mid-turn (${shell.status})`,
     });
+  };
 
   const waiting = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell) => {
     const request = shell.pendingRuntimeRequest;
@@ -259,16 +274,11 @@ const make = Effect.gen(function* () {
       if (worker === null) continue;
       const shell = yield* shellOf(worker.workerThreadId);
       if (shell === null) continue;
-      if (RUNNING.has(shell.status) && shell.activeRunId !== null) {
-        const runId = shell.activeRunId;
-        const lastActivity = Math.max(
-          ms(shell.updatedAt),
-          ms(shell.latestVisibleMessage?.updatedAt),
-          ms(shell.activityRunStartedAt),
-        );
+      const quiet = quietStreakOf(shell);
+      if (quiet !== null) {
+        const { runId, lastActivity, streak } = quiet;
         const round = Math.floor((now - lastActivity) / QUIET_AFTER_MS);
         if (round < 1) continue;
-        const streak = `${runId}@${lastActivity}`;
         const watch = worker.watch;
         if (watch.quietRunId === streak && (watch.quietRound ?? 0) >= round) continue;
         const nudge = watch.nudgedRunId !== runId;
@@ -299,7 +309,9 @@ const make = Effect.gen(function* () {
       }
       const owed = worker.lastReportKind === "stopped" || worker.lastReportKind === "restarted";
       if (!owed || worker.lastReportAt === null) continue;
-      if (now - isoMillis(worker.lastReportAt) < IDLE_AFTER_MS) continue;
+      // A usage limit is waited out: the nudge comes only once its window has reset.
+      const idleSince = Math.max(isoMillis(worker.lastReportAt), usageLimitResetOf(shell) ?? 0);
+      if (now - idleSince < IDLE_AFTER_MS) continue;
       if (worker.watch.idleNudgedFor === worker.lastReportAt) continue;
       if (worker.itemNo !== null) {
         const item = yield* store
@@ -318,7 +330,10 @@ const make = Effect.gen(function* () {
         shell,
         kind: "idle",
         dedupeKey: `idle:${worker.lastReportAt}`,
-        body: `It has been idle for 10 minutes since its last report (${worker.lastReportKind}) and its work is not done. T3 Code sent it "carry on".`,
+        body:
+          usageLimitResetOf(shell) === null
+            ? `It has been idle for 10 minutes since its last report (${worker.lastReportKind}) and its work is not done. T3 Code sent it "carry on".`
+            : `Its usage limit reset 10 minutes ago and it has not carried on; its work is not done. T3 Code sent it "carry on".`,
         line: "Idle while owing work",
       });
     }

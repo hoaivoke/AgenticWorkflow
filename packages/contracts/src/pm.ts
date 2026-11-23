@@ -123,6 +123,8 @@ export const PmWorker = Schema.Struct({
   lastReportKind: Schema.NullOr(PmReportKind),
   lastReportAt: Schema.NullOr(Schema.String),
   lastReportLine: Schema.NullOr(Schema.String),
+  /** Set while the worker waits out a usage limit; T3 Code carries it on after this time. */
+  limitResetAt: Schema.optional(Schema.NullOr(Schema.String)),
 });
 export type PmWorker = typeof PmWorker.Type;
 

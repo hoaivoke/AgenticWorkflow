@@ -90,7 +90,9 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
   pm_item_update: McpToolAccess.writesWithCapability(({ step_done, ...input }) =>
     asPm((service, pm) => service.itemUpdate(pm, { ...input, stepDone: step_done })),
   ),
-  pm_item_list: McpToolAccess.reads(() => asPm((service, pm) => service.itemList(pm))),
+  pm_item_list: McpToolAccess.reads((input) =>
+    asPm((service, pm) => service.itemList(pm, input.check === true)),
+  ),
   pm_ask: McpToolAccess.writesWithCapability((input) =>
     asPm((service, pm) => service.ask(pm, input)),
   ),

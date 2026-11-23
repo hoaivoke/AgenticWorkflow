@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import {
+  bareItemTags,
   derivePmItemStatus,
   formatPmAnswerMessage,
   handsWorkToUser,
@@ -47,6 +48,11 @@ describe("derivePmItemStatus", () => {
     ],
     ["a waiting worker needs the user", { workers: ["running", "waiting"] }, "needs_you"],
     ["a running worker is in progress", { workers: ["running"] }, "in_progress"],
+    [
+      "a worker waiting out a usage limit stays in progress",
+      { workers: ["limited"] },
+      "in_progress",
+    ],
     ["an open text wait is waiting", { waits: [{ kind: "text", text: "CI" }] }, "waiting"],
     [
       "a wait on a settled ask clears",
@@ -110,6 +116,15 @@ describe("tags and answers", () => {
       "W4 Q3: iPhone only",
     );
     expect(formatPmAnswerMessage({ itemNo: null, askNo: 3, answer: "Yes" })).toBe("Q3: Yes");
+  });
+
+  it("finds bare tags of existing items, never quoted ones or look-alikes", () => {
+    expect(bareItemTags("Rebuild with W34, w37 and W34 again?", [34, 37])).toEqual([34, 37]);
+    expect(bareItemTags("Ship W9?", [34])).toEqual([]);
+    expect(
+      bareItemTags('Is "W34" or `W34` the W3C, W-2, W34-b, /w34 or W34.dev one?', [3, 34]),
+    ).toEqual([]);
+    expect(bareItemTags("W34. Then ship.", [34])).toEqual([34]);
   });
 
   it("refuses lines that hand work to the user", () => {

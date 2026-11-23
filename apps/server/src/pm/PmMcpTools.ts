@@ -141,9 +141,10 @@ const PmItemUpdateTool = pmTool(
     reason: Schema.optional(Schema.String),
   },
 );
-const PmItemListTool = pmToolWithoutParameters(
+const PmItemListTool = pmTool(
   "pm_item_list",
-  "Your work items with their status. Check it before ending each turn.",
+  "Your work items with their status. Before ending each turn call it with `check: true`: only what to fix first (In progress with nobody on it, Not being worked on, workers not moving after the nudge), or one all-clear line.",
+  { check: Schema.optional(Schema.Boolean) },
 );
 const PmAskTool = pmTool(
   "pm_ask",

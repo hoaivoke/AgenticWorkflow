@@ -31,6 +31,7 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 import {
+  bareItemTags,
   derivePmItemStatus,
   diffPmParagraphs,
   formatAskTag,
@@ -72,6 +73,8 @@ import {
   pageAnswersMessage,
   PM_NEW_TITLE,
   PM_SETUP_MESSAGE,
+  quietStreakOf,
+  usageLimitResetOf,
   workerBrief,
 } from "./PmText.ts";
 import { pmVisibility } from "./PmVisibility.ts";
@@ -105,12 +108,24 @@ const RUNNING_STATUSES = new Set(["preparing", "queued", "starting", "running"])
 function workerStateOf(
   worker: Pick<PmWorkerRow, "resolvedAt">,
   shell: OrchestrationV2ThreadShell | null,
+  nowMs: number,
 ): PmWorkerState {
   if (worker.resolvedAt !== null || shell === null) return "resolved";
   if (shell.pendingRuntimeRequest !== null || shell.status === "waiting") return "waiting";
   if (RUNNING_STATUSES.has(shell.status)) return "running";
+  if ((usageLimitResetOf(shell) ?? 0) > nowMs) return "limited";
   return "idle";
 }
+
+/** Still not moving after the watcher's nudge: the streak it reported is the one it is on. */
+const isQuiet = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell | null) => {
+  const quiet = shell === null ? null : quietStreakOf(shell);
+  return (
+    quiet !== null &&
+    worker.watch.nudgedRunId === quiet.runId &&
+    worker.watch.quietRunId === quiet.streak
+  );
+};
 
 const waitOf = (wait: PmWaitRow): PmWaitOn =>
   wait.onKind === "text"
@@ -746,10 +761,16 @@ const make = Effect.gen(function* () {
       store.listAsks(pm.threadId),
       store.listWorkers(pm.threadId),
     ]);
+    const nowMs = yield* Clock.currentTimeMillis;
     const workerStates = yield* Effect.forEach(workers, (worker) =>
       (worker.resolvedAt !== null ? Effect.succeed(null) : shellOf(worker.workerThreadId)).pipe(
         Effect.orElseSucceed(() => null),
-        Effect.map((shell) => ({ worker, shell, state: workerStateOf(worker, shell) })),
+        Effect.map((shell) => ({
+          worker,
+          shell,
+          state: workerStateOf(worker, shell, nowMs),
+          quiet: isQuiet(worker, shell),
+        })),
       ),
     );
     const itemsByNo = new Map(items.map((item) => [item.itemNo, item]));
@@ -773,9 +794,17 @@ const make = Effect.gen(function* () {
         touchedRecently: item.updatedAt >= floor,
         ...ctx,
       });
+      const onIt = workerStates.filter(
+        (entry) => entry.worker.itemNo === item.itemNo && entry.state !== "resolved",
+      );
       return {
         item,
         shownStatus,
+        /** Nobody's once the PM's turn ends: no running or limited worker keeps it moving. */
+        onlyThePm:
+          shownStatus === "in_progress" &&
+          !onIt.some((entry) => entry.state === "running" || entry.state === "limited"),
+        quietWorkers: onIt.filter((entry) => entry.quiet && entry.state === "running"),
         steps: steps.filter((step) => step.itemNo === item.itemNo),
         waits: waits
           .filter((wait) => wait.itemNo === item.itemNo)
@@ -787,6 +816,62 @@ const make = Effect.gen(function* () {
     });
     return { derived, asks, workerStates };
   });
+
+  /** Ghostex's `item list --check`: only what to fix before the turn ends, or one all-clear line. */
+  const turnCheck = (derived: Effect.Success<ReturnType<typeof deriveItems>>["derived"]) => {
+    const kinds = [
+      {
+        heading: "Not being worked on (nobody on it)",
+        fix: 'Done? pm_item_update with status "done"; else give it a wait, a pm_ask, or work on it.',
+        entries: derived.filter((entry) => entry.shownStatus === "not_worked_on"),
+        detail: () => "",
+      },
+      {
+        heading: "In progress on you, no worker on it (nobody's once your turn ends)",
+        fix: 'pm_item_update with status "done" or a wait, a pm_ask, or start a worker on it.',
+        entries: derived.filter((entry) => entry.onlyThePm),
+        detail: () => "",
+      },
+      {
+        heading: "A worker on it is not moving, even after T3 Code nudged it",
+        fix: 'Heal it: read the worker with t3_thread_read (see "While workers run").',
+        entries: derived.filter((entry) => entry.quietWorkers.length > 0),
+        detail: (entry: (typeof derived)[number]) =>
+          entry.quietWorkers
+            .map((worker) => `"${worker.shell?.title ?? worker.worker.workerThreadId}"`)
+            .join(", "),
+      },
+    ].filter((kind) => kind.entries.length > 0);
+    if (kinds.length === 0) {
+      const count = (status: PmShownItemStatus) =>
+        derived.filter((entry) => entry.shownStatus === status).length;
+      const parts = [
+        count("in_progress") === 0
+          ? "nothing in progress"
+          : `${count("in_progress")} in progress (each on a running worker)`,
+        ...(
+          [
+            ["waiting", "waiting"],
+            ["needs_you", "need you (each has its ask)"],
+            ["blocked", "blocked on you"],
+          ] as const
+        ).flatMap(([status, words]) => (count(status) > 0 ? [`${count(status)} ${words}`] : [])),
+      ];
+      return `Turn check: all clear. ${parts.join(", ")}.`;
+    }
+    const total = kinds.reduce((sum, kind) => sum + kind.entries.length, 0);
+    return [
+      `Turn check: ${total} to fix before you end your turn:`,
+      ...kinds.flatMap((kind) => [
+        `  ${kind.heading}:`,
+        ...kind.entries.map((entry) => {
+          const detail = kind.detail(entry);
+          return `    ${formatItemTag(entry.item.itemNo)} ${entry.item.title}${detail ? ` (${detail})` : ""}`;
+        }),
+        `    -> ${kind.fix}`,
+      ]),
+    ].join("\n");
+  };
 
   const STATUS_LABELS: Record<PmShownItemStatus, string> = {
     needs_you: "Needs you",
@@ -802,9 +887,9 @@ const make = Effect.gen(function* () {
   const itemLines = (derived: Effect.Success<ReturnType<typeof deriveItems>>["derived"]) =>
     derived
       .filter(({ shownStatus }) => shownStatus !== "dropped")
-      .map(({ item, shownStatus, steps, waits }) => {
+      .map(({ item, shownStatus, steps, waits, quietWorkers }) => {
         const lines = [
-          `${formatItemTag(item.itemNo)} ${item.title}: ${STATUS_LABELS[shownStatus]}`,
+          `${formatItemTag(item.itemNo)} ${item.title}: ${STATUS_LABELS[shownStatus]}${quietWorkers.length > 0 ? ` (quiet: ${quietWorkers.map((entry) => `"${entry.shell?.title ?? entry.worker.workerThreadId}"`).join(", ")} not moving after the nudge)` : ""}`,
         ];
         if (item.nowLine) lines.push(`  now: ${item.nowLine}`);
         if (item.doneLine) lines.push(`  done: ${item.doneLine}`);
@@ -821,11 +906,15 @@ const make = Effect.gen(function* () {
       })
       .join("\n");
 
-  const itemList = (pm: string) =>
+  const itemList = (pm: string, check = false) =>
     tool(pm, (row) =>
       deriveItems(row).pipe(
         Effect.map(({ derived }) =>
-          derived.length === 0 ? "No work items yet." : itemLines(derived),
+          check
+            ? turnCheck(derived)
+            : derived.length === 0
+              ? "No work items yet."
+              : itemLines(derived),
         ),
       ),
     );
@@ -865,8 +954,8 @@ const make = Effect.gen(function* () {
             : workerStates
                 .filter((entry) => entry.state !== "resolved")
                 .map(
-                  ({ worker, shell: workerShell, state }) =>
-                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}`,
+                  ({ worker, shell: workerShell, state, quiet }) =>
+                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : quiet && state === "running" ? "running, quiet after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}`,
                 )),
         ];
         return lines.join("\n");
@@ -880,6 +969,15 @@ const make = Effect.gen(function* () {
         if (title.length === 0)
           return yield* invalid("An ask needs a title that names its subject.");
         if (/\bQ\d+\b/.test(title)) return yield* invalid("Leave the Q tag out of the title.");
+        const items = yield* store.listItems(pm);
+        const bare = bareItemTags(
+          title,
+          items.map((entry) => entry.itemNo),
+        ).map((itemNo) => items.find((entry) => entry.itemNo === itemNo)!);
+        if (bare.length > 0)
+          return yield* invalid(
+            `Work-item tags (${bare.map((entry) => formatItemTag(entry.itemNo)).join(", ")}) are tool handles, not how to talk to the user. Name what the work is in plain words instead: ${bare.map((entry) => `${formatItemTag(entry.itemNo)} ("${entry.title}")`).join(", ")}.`,
+          );
         if (input.detail.trim().length === 0)
           return yield* invalid("An ask always has a detail: what it is about and why you ask.");
         const item = yield* parseItemRef(pm, input.item);
@@ -1323,10 +1421,15 @@ const make = Effect.gen(function* () {
         ...askRow,
         answerMessageId: answerMessageId === null ? null : MessageId.make(answerMessageId),
       })),
-      workers: workerStates.map(({ worker, state }) => ({
+      workers: workerStates.map(({ worker, shell, state }) => ({
         threadId: ThreadId.make(worker.workerThreadId),
         itemNo: worker.itemNo,
-        state,
+        // `limited` stays off the wire so older fork clients still decode; the reset time says it.
+        state: state === "limited" ? "idle" : state,
+        limitResetAt:
+          state === "limited" && shell !== null
+            ? new Date(usageLimitResetOf(shell)!).toISOString()
+            : null,
         linkedAt: worker.linkedAt,
         resolvedAt: worker.resolvedAt,
         lastReportKind: worker.lastReportKind,
