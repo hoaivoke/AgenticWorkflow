@@ -230,3 +230,41 @@ export function parsePmPageAnswers(text: string): PmPageAnswers | null {
 /** Copy text for an ask row: `W4 Q3`, or `Q3` without an item. */
 export const pmAskTag = (ask: Pick<PmAsk, "itemNo" | "askNo">) =>
   `${ask.itemNo === null ? "" : `W${ask.itemNo} `}Q${ask.askNo}`;
+
+export type PmWorkerDot = "idle" | "working" | "finished" | "question" | "blocker";
+/** Least urgent first: Ghostex's red blocker > pink question > blue finished > amber working > grey. */
+const DOT_URGENCY: ReadonlyArray<PmWorkerDot> = [
+  "idle",
+  "working",
+  "finished",
+  "question",
+  "blocker",
+];
+
+/** A worker's one status dot in a folded PM row. A usage-limit wait ends by itself, so it is calm. */
+export function pmWorkerDot(shell: {
+  readonly hasPendingApprovals: boolean;
+  readonly hasPendingUserInput: boolean;
+  readonly runtime: {
+    readonly status: string;
+    readonly lastErrorClass?: string | null | undefined;
+  } | null;
+}): PmWorkerDot {
+  const status = shell.runtime?.status ?? "idle";
+  if (shell.hasPendingApprovals) return "blocker";
+  if (
+    (status === "failed" || status === "interrupted" || status === "cancelled") &&
+    shell.runtime?.lastErrorClass !== "usage_limit"
+  )
+    return "blocker";
+  if (shell.hasPendingUserInput) return "question";
+  if (status === "completed") return "finished";
+  if (["preparing", "queued", "starting", "running", "waiting"].includes(status)) return "working";
+  return "idle";
+}
+
+/** One dot per kind present, back to front, so the most urgent is drawn on top. */
+export const pmDotStack = (dots: Iterable<PmWorkerDot>): ReadonlyArray<PmWorkerDot> => {
+  const present = new Set(dots);
+  return DOT_URGENCY.filter((dot) => present.has(dot));
+};

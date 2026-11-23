@@ -15,8 +15,10 @@ import {
   parsePmReportNotification,
   pmAskTag,
   pmDock,
+  pmDotStack,
   pmFirst,
   pmItemGroups,
+  pmWorkerDot,
   pmWorkerListKeys,
   withPmWorkers,
 } from "./logic.ts";
@@ -233,5 +235,39 @@ describe("pmAskTag", () => {
   it("copies an ask as its tags", () => {
     expect(pmAskTag({ itemNo: 4, askNo: 3 })).toBe("W4 Q3");
     expect(pmAskTag({ itemNo: null, askNo: 3 })).toBe("Q3");
+  });
+});
+
+describe("pmWorkerDot and pmDotStack", () => {
+  const shell = (
+    status: string,
+    extra: { approval?: boolean; input?: boolean; lastErrorClass?: string } = {},
+  ) => ({
+    hasPendingApprovals: extra.approval === true,
+    hasPendingUserInput: extra.input === true,
+    runtime: { status, lastErrorClass: extra.lastErrorClass ?? null },
+  });
+
+  it("picks each worker's most urgent dot; a usage-limit stop stays calm", () => {
+    expect(
+      [
+        shell("running", { approval: true }),
+        shell("failed"),
+        shell("failed", { lastErrorClass: "usage_limit" }),
+        shell("waiting", { input: true }),
+        shell("completed"),
+        shell("running"),
+        { hasPendingApprovals: false, hasPendingUserInput: false, runtime: null },
+      ].map(pmWorkerDot),
+    ).toEqual(["blocker", "blocker", "idle", "question", "finished", "working", "idle"]);
+  });
+
+  it("stacks one dot per kind with the most urgent in front", () => {
+    expect(pmDotStack(["working", "question", "working", "idle", "finished"])).toEqual([
+      "idle",
+      "working",
+      "finished",
+      "question",
+    ]);
   });
 });

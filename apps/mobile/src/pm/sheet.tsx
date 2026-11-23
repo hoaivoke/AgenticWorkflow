@@ -180,6 +180,15 @@ function WorkersTab(props: { readonly target: Target; readonly detail: PmThreadD
       <Text className="text-xs text-foreground-muted" numberOfLines={2}>
         {[
           worker.itemNo === null ? null : `W${worker.itemNo}`,
+          worker.limitResetAt
+            ? gt("Resumes after {time}", {
+                time: new Date(worker.limitResetAt).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }),
+                $context: "a worker paused at a usage limit carries on after this time",
+              })
+            : null,
           worker.lastReportLine ?? worker.state,
         ]
           .filter(Boolean)

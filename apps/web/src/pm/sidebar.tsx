@@ -2,7 +2,7 @@ import type { EnvironmentId, PmSummary, ProjectId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/models";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useGT } from "gt-react";
 import {
   BriefcaseIcon,
@@ -18,10 +18,10 @@ import { Button } from "../components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 import { cn } from "../lib/utils";
 import { useThreadShells } from "../state/entities";
-import { buildThreadRouteParams } from "../threadRoutes";
+import { buildThreadRouteParams, isThreadRoutePathname } from "../threadRoutes";
 import { formatRelativeTime } from "../timestampFormat";
 import { createPmAndOpen } from "./actions";
-import { pmFirst } from "@t3tools/pm/client";
+import { type PmWorkerDot, pmDotStack, pmFirst, pmWorkerDot } from "@t3tools/pm/client";
 import { pmKey, usePmIndex } from "./state";
 
 type SidebarThread = Pick<EnvironmentThreadShell, "environmentId" | "id">;
@@ -178,6 +178,33 @@ function workerStatus(
   };
 }
 
+// Ghostex's status colours: red blocker, pink question, blue finished, amber working, grey.
+const DOT_COLOR: Record<PmWorkerDot, string> = {
+  blocker: "bg-[#f87171]",
+  question: "bg-[#f472b6]",
+  finished: "bg-[#95d7f6]",
+  working: "bg-[#f5a524]",
+  idle: "bg-muted-foreground/50",
+};
+
+/** A folded PM's workers as one overlapping stack, the most urgent dot on top. */
+function PmDotStack(props: { readonly dots: ReadonlyArray<PmWorkerDot> }) {
+  return (
+    <span aria-hidden className="ms-auto flex items-center">
+      {props.dots.map((dot, index) => (
+        <span
+          key={dot}
+          className={cn(
+            "size-2 rounded-full ring-2 ring-sidebar",
+            DOT_COLOR[dot],
+            index > 0 && "-ms-1",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
 const foldedPms = new Set<string>();
 
 /** A PM's workers, nested under its row; one call per sidebar row, nothing for other threads. */
@@ -195,6 +222,7 @@ function PmWorkerRows(props: { readonly pm: SidebarThread }) {
 function PmWorkerList(props: { readonly pm: SidebarThread }) {
   const gt = useGT();
   const navigate = useNavigate();
+  const router = useRouter();
   const index = usePmIndex();
   const shells = useThreadShells();
   const key = pmKey(props.pm.environmentId, props.pm.id);
@@ -215,6 +243,18 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
     if (folded) foldedPms.delete(key);
     else foldedPms.add(key);
     setFolded(!folded);
+    // As in Ghostex: folding away the open worker opens its PM, so the open chat stays in view.
+    const pathname = router.state.location.pathname;
+    if (
+      !folded &&
+      workers.some((worker) =>
+        isThreadRoutePathname(pathname, scopeThreadRef(worker.environmentId, worker.id)),
+      )
+    )
+      void navigate({
+        to: "/$environmentId/$threadId",
+        params: buildThreadRouteParams(scopeThreadRef(props.pm.environmentId, props.pm.id)),
+      });
   };
   return (
     <div className="ms-3 border-border/60 border-s ps-1" data-pm-workers={key}>
@@ -229,7 +269,9 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
         ) : (
           <ChevronDownIcon aria-hidden className="size-3" />
         )}
+        <UsersRoundIcon aria-hidden className="size-3 text-primary/80" />
         {gt("{count, plural, one {# worker} other {# workers}}", { count: workers.length })}
+        {folded ? <PmDotStack dots={pmDotStack(workers.map(pmWorkerDot))} /> : null}
       </button>
       {folded
         ? null

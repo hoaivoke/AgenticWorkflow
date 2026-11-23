@@ -108,8 +108,12 @@ function PageWindow(props: { readonly threadRef: ThreadRef; readonly pageId: str
       data-pm-page-window=""
       role="dialog"
       aria-label={page?.title ?? gt("Live page")}
-      className="absolute inset-x-6 top-4 bottom-28 z-30 flex resize flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl dark:border-white/10"
-      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+      className="absolute inset-x-6 top-4 bottom-28 z-30 flex resize flex-col overflow-hidden rounded-2xl border border-border/70 shadow-2xl dark:border-white/10"
+      style={{
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        // The kit's page edge colours, so the floating page meets the window without a seam.
+        backgroundColor: "light-dark(#f0f0f0, #131313)",
+      }}
     >
       {/* The page is floating (withPmPageTheme): it leaves this band free at its top. */}
       <div

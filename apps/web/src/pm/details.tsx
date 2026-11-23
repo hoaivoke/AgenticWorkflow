@@ -15,12 +15,14 @@ import {
 import { useState } from "react";
 
 import { ThreadDetailsSection } from "../components/chat/ThreadDetailsSection";
+import { useClientSettings } from "../hooks/useSettings";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { cn } from "../lib/utils";
 import { useThreadShells } from "../state/entities";
 import { buildThreadRouteParams } from "../threadRoutes";
+import { formatShortTimestamp } from "../timestampFormat";
 import { runPmCommand } from "./actions";
 import { savePmMission } from "./mission";
 import { pmItemGroups } from "@t3tools/pm/client";
@@ -162,6 +164,23 @@ function PmManagerSection(props: {
   );
 }
 
+/** Ghostex's calm "hold" tone: a usage-limit wait T3 Code ends by itself, not a problem. */
+const LIMIT_PILL_TONE = {
+  color: "#7fa1c4",
+  borderColor: "rgb(127 161 196 / 0.3)",
+  backgroundColor: "rgb(127 161 196 / 0.1)",
+};
+
+function useResumeLabel() {
+  const gt = useGT();
+  const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
+  return (resetAt: string) =>
+    gt("Resumes after {time}", {
+      time: formatShortTimestamp(resetAt, timestampFormat),
+      $context: "a worker paused at a usage limit carries on after this time",
+    });
+}
+
 const STATUS_DOT: Record<string, string> = {
   needs_you: "bg-warning",
   blocked: "bg-destructive",
@@ -284,6 +303,11 @@ function PmItemCard(props: {
   const links = props.detail.links.filter((link) => link.itemNo === item.itemNo);
   const steps = item.steps.filter((step) => !step.chore);
   const doneSteps = steps.filter((step) => step.done).length;
+  const resumeLabel = useResumeLabel();
+  const limitResets = props.detail.workers.flatMap((worker) =>
+    worker.itemNo === item.itemNo && worker.limitResetAt ? [worker.limitResetAt] : [],
+  );
+  const resetAt = limitResets.toSorted()[0] ?? null;
   return (
     <div className="mx-1 mb-1.5 rounded-lg border border-border/70 bg-card/60 px-2.5 py-2 text-xs">
       <button
@@ -301,8 +325,16 @@ function PmItemCard(props: {
         </span>
         <span className="shrink-0 text-muted-foreground">W{item.itemNo}</span>
       </button>
-      {steps.length > 0 || asks.length > 0 || links.length > 0 ? (
-        <div className="mt-1 flex flex-wrap gap-2 text-muted-foreground">
+      {steps.length > 0 || asks.length > 0 || links.length > 0 || resetAt !== null ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-muted-foreground">
+          {resetAt === null ? null : (
+            <span
+              className="inline-flex items-center rounded-full border px-1.5"
+              style={LIMIT_PILL_TONE}
+            >
+              {resumeLabel(resetAt)}
+            </span>
+          )}
           {steps.length > 0 ? (
             <span>{gt("{done} of {total} steps", { done: doneSteps, total: steps.length })}</span>
           ) : null}
@@ -381,14 +413,17 @@ function PmWorkersSection(props: {
   const gt = useGT();
   const navigate = useNavigate();
   const shells = useThreadShells();
+  const resumeLabel = useResumeLabel();
   const workers = props.detail.workers.filter((worker) => worker.state !== "resolved");
   if (workers.length === 0) return null;
-  const stateLabel = (state: string) =>
-    state === "running"
-      ? gt("Working", { $context: "thread status" })
-      : state === "waiting"
-        ? gt("Waiting for your answer")
-        : gt("Idle", { $context: "thread status" });
+  const stateLabel = (worker: (typeof workers)[number]) =>
+    worker.limitResetAt
+      ? resumeLabel(worker.limitResetAt)
+      : worker.state === "running"
+        ? gt("Working", { $context: "thread status" })
+        : worker.state === "waiting"
+          ? gt("Waiting for your answer")
+          : gt("Idle", { $context: "thread status" });
   return (
     <ThreadDetailsSection
       headingId="pm-workers"
@@ -420,7 +455,7 @@ function PmWorkersSection(props: {
                 <span className="block truncate text-muted-foreground text-xs">
                   {[
                     worker.itemNo === null ? null : `W${worker.itemNo}`,
-                    stateLabel(worker.state),
+                    stateLabel(worker),
                     worker.lastReportLine,
                   ]
                     .filter(Boolean)
