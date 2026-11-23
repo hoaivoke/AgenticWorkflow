@@ -60,11 +60,11 @@ export function workerBrief(input: {
     "How to report:",
     "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. T3 Code passes it to the project manager.",
     "- Never message the project manager's thread yourself.",
-    "- When you need a decision you cannot make, ask it plainly in your final message and stop.",
+    '- When you need a decision you cannot make, ask it plainly in your final message and stop. Give each question a title that names its subject (never "it" or "this" alone) and a line on what it is about and why: the user reads it in the project manager\'s dock, not in your report.',
     "- Do not merge, push, delete branches or run destructive commands unless this brief asks for it.",
     "- Stop every background job you no longer need before your final report.",
     "- Start your report's sections with markers: ✅ Done, 🧪 Untested, ⚠️ Read this, 🛑 Blocked, ❓ Needs you.",
-    "- When you change or drive a UI, save a screenshot of every state (at least 1650x962) and link them in your report.",
+    "- If you drove an app or a browser, save a screenshot of every state of the UI as it changes (before, each step, after) and link them in your report. Never tiny: at least 1650x962, so size the window or viewport first. Take none when you did no GUI work.",
   );
   return lines.join("\n");
 }
