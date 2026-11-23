@@ -3975,7 +3975,8 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       "T3 Code is an open-source desktop app for coding agents. Work with your existing agent subscriptions, review code changes, and run commands in your projects. Connect from desktop, web, or mobile to continue working remotely.",
     license: "MIT",
     homepage: "https://t3.codes",
-    author: "T3 Tools",
+    // t3code-pm: electron-builder's company name, shown as the Windows uninstall entry's Publisher.
+    author: pmBuild(PM.productName, "T3 Tools"),
     main: "apps/desktop/dist-electron/boot.cjs",
     build: yield* createBuildConfig(
       options.platform,
