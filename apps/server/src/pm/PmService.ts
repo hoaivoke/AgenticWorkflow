@@ -117,14 +117,13 @@ function workerStateOf(
   return "idle";
 }
 
-/** Not moving, as Ghostex means it: still quiet a full round after the watcher's nudge. */
+/** Not moving, as Ghostex means it: still quiet a round after the watcher's nudge. */
 const isQuiet = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell | null) => {
   const quiet = shell === null ? null : quietStreakOf(shell);
   return (
     quiet !== null &&
     worker.watch.nudgedRunId === quiet.runId &&
-    worker.watch.quietRunId === quiet.streak &&
-    (worker.watch.quietRound ?? 0) >= 2
+    worker.watch.notMovingStreak === quiet.streak
   );
 };
 

@@ -277,8 +277,9 @@ const make = Effect.gen(function* () {
       const quiet = quietStreakOf(shell);
       let watch = worker.watch;
       // It moved again after it showed as not moving: clear that so clients drop the chip.
-      if ((watch.quietRound ?? 0) >= 2 && watch.quietRunId !== quiet?.streak) {
-        watch = { ...watch, quietRound: 0 };
+      if (watch.notMovingStreak !== undefined && watch.notMovingStreak !== quiet?.streak) {
+        const { notMovingStreak: _moved, ...rest } = watch;
+        watch = rest;
         yield* store.updateWatch(worker.workerThreadId, watch).pipe(Effect.ignore);
         yield* pm.changed(worker.pmThreadId);
       }
@@ -298,6 +299,8 @@ const make = Effect.gen(function* () {
             quietRunId: streak,
             quietRound: round,
             nudgedRunId: runId,
+            // The nudge counts as activity, so "still quiet" may be on a newer streak than it.
+            ...(nudge ? {} : { notMovingStreak: streak }),
           })
           .pipe(Effect.ignore);
         yield* report({
@@ -305,10 +308,9 @@ const make = Effect.gen(function* () {
           shell,
           kind: "quiet",
           dedupeKey: `quiet:${streak}:${round}`,
-          body:
-            round === 1 || nudge
-              ? "No new output for 8 minutes while its turn runs. T3 Code nudged it once. Read it with t3_thread_read: a build whose output still comes is not stuck."
-              : `Still no new output (${round * 8} minutes). Not nudged again: heal it if it hung.`,
+          body: nudge
+            ? "No new output for 8 minutes while its turn runs. T3 Code nudged it once. Read it with t3_thread_read: a build whose output still comes is not stuck."
+            : `Still no new output (${round * 8} minutes), even after T3 Code nudged it. Not nudged again: heal it if it hung.`,
           line: `Quiet for ${round * 8} min`,
         });
         continue;

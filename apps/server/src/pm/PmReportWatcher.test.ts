@@ -259,14 +259,18 @@ describe("PmReportWatcher", () => {
           const summary = (yield* service.summaries()).pms.find((entry) => entry.threadId === pm)!;
           return [detail.workers[0]!.notMoving, summary.notMovingWorkerThreadIds?.map(String)];
         });
-        // Just nudged is not yet "not moving": that waits a full round after the nudge.
+        // Just nudged is not yet "not moving": that waits a round after the nudge.
         expect((yield* service.itemList(pm)).result).not.toContain("quiet:");
         assert.deepStrictEqual(yield* notMoving, [false, []]);
+        // As in the app, the nudge message counts as activity and starts a new quiet streak.
+        world.shells.set(worker, { ...world.shells.get(worker)!, updatedAt: yield* DateTime.now });
         yield* TestClock.adjust("8 minutes");
         yield* watcher.sweep;
         const sent = reportsTo(world, pm);
         assert.lengthOf(sent, 2);
-        expect(sent[1]!.text).toContain("Still no new output (16 minutes). Not nudged again");
+        expect(sent[1]!.text).toContain(
+          "Still no new output (8 minutes), even after T3 Code nudged it. Not nudged again",
+        );
         assert.lengthOf(messagesTo(world, worker), 1);
         // Still In progress, never Blocked; the turn check names it for healing.
         expect((yield* service.itemList(pm)).result).toContain(

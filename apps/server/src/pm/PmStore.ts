@@ -29,6 +29,8 @@ export interface PmWorkerWatch {
   readonly quietRunId?: string;
   readonly quietRound?: number;
   readonly nudgedRunId?: string;
+  /** The quiet streak it is on when it was still quiet a round after the nudge: "Not moving". */
+  readonly notMovingStreak?: string;
   readonly idleNudgedFor?: string;
 }
 
