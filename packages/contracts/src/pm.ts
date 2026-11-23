@@ -49,6 +49,8 @@ export const PmSummary = Schema.Struct({
   runningWorkers: Schema.Number,
   rowState: PmRowState,
   workerThreadIds: Schema.Array(ThreadId),
+  /** Workers still not moving a full round after T3 Code nudged them. */
+  notMovingWorkerThreadIds: Schema.optional(Schema.Array(ThreadId)),
 });
 export type PmSummary = typeof PmSummary.Type;
 
@@ -125,6 +127,8 @@ export const PmWorker = Schema.Struct({
   lastReportLine: Schema.NullOr(Schema.String),
   /** Set while the worker waits out a usage limit; T3 Code carries it on after this time. */
   limitResetAt: Schema.optional(Schema.NullOr(Schema.String)),
+  /** Still not moving a full round after T3 Code nudged it. */
+  notMoving: Schema.optional(Schema.Boolean),
 });
 export type PmWorker = typeof PmWorker.Type;
 

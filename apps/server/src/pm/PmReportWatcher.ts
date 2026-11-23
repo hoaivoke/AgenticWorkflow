@@ -275,11 +275,17 @@ const make = Effect.gen(function* () {
       const shell = yield* shellOf(worker.workerThreadId);
       if (shell === null) continue;
       const quiet = quietStreakOf(shell);
+      let watch = worker.watch;
+      // It moved again after it showed as not moving: clear that so clients drop the chip.
+      if ((watch.quietRound ?? 0) >= 2 && watch.quietRunId !== quiet?.streak) {
+        watch = { ...watch, quietRound: 0 };
+        yield* store.updateWatch(worker.workerThreadId, watch).pipe(Effect.ignore);
+        yield* pm.changed(worker.pmThreadId);
+      }
       if (quiet !== null) {
         const { runId, lastActivity, streak } = quiet;
         const round = Math.floor((now - lastActivity) / QUIET_AFTER_MS);
         if (round < 1) continue;
-        const watch = worker.watch;
         if (watch.quietRunId === streak && (watch.quietRound ?? 0) >= round) continue;
         const nudge = watch.nudgedRunId !== runId;
         if (nudge)
@@ -312,7 +318,7 @@ const make = Effect.gen(function* () {
       // A usage limit is waited out: the nudge comes only once its window has reset.
       const idleSince = Math.max(isoMillis(worker.lastReportAt), usageLimitResetOf(shell) ?? 0);
       if (now - idleSince < IDLE_AFTER_MS) continue;
-      if (worker.watch.idleNudgedFor === worker.lastReportAt) continue;
+      if (watch.idleNudgedFor === worker.lastReportAt) continue;
       if (worker.itemNo !== null) {
         const item = yield* store
           .getItem(worker.pmThreadId, worker.itemNo)
@@ -320,7 +326,7 @@ const make = Effect.gen(function* () {
         if (item !== null && (item.status === "finished" || item.status === "dropped")) continue;
       }
       yield* store
-        .updateWatch(worker.workerThreadId, { ...worker.watch, idleNudgedFor: worker.lastReportAt })
+        .updateWatch(worker.workerThreadId, { ...watch, idleNudgedFor: worker.lastReportAt })
         .pipe(Effect.ignore);
       yield* pm
         .nudgeWorker(worker.workerThreadId, `idle-nudge:${worker.lastReportAt}`, IDLE_NUDGE)

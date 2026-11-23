@@ -253,6 +253,15 @@ describe("PmReportWatcher", () => {
           [QUIET_NUDGE],
         );
         assert.lengthOf(reportsTo(world, pm), 1);
+        const service = yield* PmService;
+        const notMoving = Effect.gen(function* () {
+          const detail = (yield* service.detail(pm))!;
+          const summary = (yield* service.summaries()).pms.find((entry) => entry.threadId === pm)!;
+          return [detail.workers[0]!.notMoving, summary.notMovingWorkerThreadIds?.map(String)];
+        });
+        // Just nudged is not yet "not moving": that waits a full round after the nudge.
+        expect((yield* service.itemList(pm)).result).not.toContain("quiet:");
+        assert.deepStrictEqual(yield* notMoving, [false, []]);
         yield* TestClock.adjust("8 minutes");
         yield* watcher.sweep;
         const sent = reportsTo(world, pm);
@@ -260,13 +269,17 @@ describe("PmReportWatcher", () => {
         expect(sent[1]!.text).toContain("Still no new output (16 minutes). Not nudged again");
         assert.lengthOf(messagesTo(world, worker), 1);
         // Still In progress, never Blocked; the turn check names it for healing.
-        const service = yield* PmService;
         expect((yield* service.itemList(pm)).result).toContain(
           'W1 Pairing: In progress (quiet: "Fix pairing" not moving after the nudge)',
         );
         expect((yield* service.itemList(pm, true)).result).toContain(
           'A worker on it is not moving, even after T3 Code nudged it:\n    W1 Pairing ("Fix pairing")',
         );
+        assert.deepStrictEqual(yield* notMoving, [true, [worker]]);
+        // It moves again: the next sweep clears the chip.
+        world.shells.set(worker, { ...world.shells.get(worker)!, updatedAt: yield* DateTime.now });
+        yield* watcher.sweep;
+        assert.deepStrictEqual(yield* notMoving, [false, []]);
       }).pipe(Effect.provide(layerPmWithWatcher(world).pipe(Layer.provideMerge(harness))));
     },
   );

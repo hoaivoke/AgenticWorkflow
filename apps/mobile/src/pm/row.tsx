@@ -11,6 +11,7 @@ import { SymbolView } from "../components/ui/AppSymbol";
 import { cn } from "../lib/cn";
 import { useThreadShells } from "../state/entities";
 import { createPm } from "./actions";
+import { PmNotMovingChip } from "./notMovingChip";
 import { pmWorkerPreview } from "./pm.logic";
 import { usePmIndex, usePmSummary } from "./state";
 
@@ -44,6 +45,7 @@ export function PmRowCounts(props: {
   );
   const workers = shells.filter((shell) => workerKeys.has(pmKey(shell.environmentId, shell.id)));
   const preview = pmWorkerPreview(workers, (worker) => threadRuntimeIsActive(worker.runtime));
+  const notMoving = new Set<string>(summary.notMovingWorkerThreadIds ?? []);
   const status =
     summary.rowState === "blocked"
       ? { text: gt("Blocked"), className: "text-danger-foreground" }
@@ -85,7 +87,9 @@ export function PmRowCounts(props: {
           <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
             {worker.title}
           </Text>
-          {threadRuntimeIsActive(worker.runtime) ? (
+          {notMoving.has(worker.id) ? (
+            <PmNotMovingChip />
+          ) : threadRuntimeIsActive(worker.runtime) ? (
             <Text className="text-xs text-primary-text">{gt("Working")}</Text>
           ) : null}
         </Pressable>

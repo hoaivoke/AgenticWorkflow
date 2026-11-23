@@ -117,13 +117,14 @@ function workerStateOf(
   return "idle";
 }
 
-/** Still not moving after the watcher's nudge: the streak it reported is the one it is on. */
+/** Not moving, as Ghostex means it: still quiet a full round after the watcher's nudge. */
 const isQuiet = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell | null) => {
   const quiet = shell === null ? null : quietStreakOf(shell);
   return (
     quiet !== null &&
     worker.watch.nudgedRunId === quiet.runId &&
-    worker.watch.quietRunId === quiet.streak
+    worker.watch.quietRunId === quiet.streak &&
+    (worker.watch.quietRound ?? 0) >= 2
   );
 };
 
@@ -1421,7 +1422,7 @@ const make = Effect.gen(function* () {
         ...askRow,
         answerMessageId: answerMessageId === null ? null : MessageId.make(answerMessageId),
       })),
-      workers: workerStates.map(({ worker, shell, state }) => ({
+      workers: workerStates.map(({ worker, shell, state, quiet }) => ({
         threadId: ThreadId.make(worker.workerThreadId),
         itemNo: worker.itemNo,
         // `limited` stays off the wire so older fork clients still decode; the reset time says it.
@@ -1430,6 +1431,7 @@ const make = Effect.gen(function* () {
           state === "limited" && shell !== null
             ? DateTime.formatIso(DateTime.makeUnsafe(usageLimitResetOf(shell)!))
             : null,
+        notMoving: quiet && state === "running",
         linkedAt: worker.linkedAt,
         resolvedAt: worker.resolvedAt,
         lastReportKind: worker.lastReportKind,
@@ -1491,6 +1493,9 @@ const make = Effect.gen(function* () {
         runningWorkers: running,
         rowState: blocked ? "blocked" : needsYou ? "needs_you" : running > 0 ? "running" : "idle",
         workerThreadIds: live.map((entry) => ThreadId.make(entry.worker.workerThreadId)),
+        notMovingWorkerThreadIds: live
+          .filter((entry) => entry.quiet && entry.state === "running")
+          .map((entry) => ThreadId.make(entry.worker.workerThreadId)),
       });
     }
     return { enabled: true, pms: result } satisfies PmSubscribeEvent;

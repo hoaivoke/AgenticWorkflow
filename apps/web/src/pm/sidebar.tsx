@@ -23,6 +23,7 @@ import { formatRelativeTime } from "../timestampFormat";
 import { createPmAndOpen } from "./actions";
 import { type PmWorkerDot, pmDotStack, pmFirst, pmWorkerDot } from "@t3tools/pm/client";
 import { pmKey, usePmIndex } from "./state";
+import { PmNotMovingChip } from "./notMovingChip";
 
 type SidebarThread = Pick<EnvironmentThreadShell, "environmentId" | "id">;
 
@@ -239,6 +240,7 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
       (shell): shell is EnvironmentThreadShell => shell !== undefined && shell.archivedAt === null,
     );
   if (workers.length === 0) return null;
+  const notMoving = new Set<string>(summary.notMovingWorkerThreadIds ?? []);
   const toggle = () => {
     if (folded) foldedPms.delete(key);
     else foldedPms.add(key);
@@ -271,7 +273,14 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
         )}
         <UsersRoundIcon aria-hidden className="size-3 text-primary/80" />
         {gt("{count, plural, one {# worker} other {# workers}}", { count: workers.length })}
-        {folded ? <PmDotStack dots={pmDotStack(workers.map(pmWorkerDot))} /> : null}
+        {folded ? (
+          <PmDotStack
+            dots={pmDotStack(
+              // As in Ghostex, a worker not moving after its nudge is the red dot.
+              workers.map((worker) => (notMoving.has(worker.id) ? "blocker" : pmWorkerDot(worker))),
+            )}
+          />
+        ) : null}
       </button>
       {folded
         ? null
@@ -293,7 +302,11 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
                 }
               >
                 <span className="min-w-0 flex-1 truncate">{worker.title}</span>
-                <span className={cn("shrink-0 text-2xs", status.className)}>{status.label}</span>
+                {notMoving.has(worker.id) ? (
+                  <PmNotMovingChip />
+                ) : (
+                  <span className={cn("shrink-0 text-2xs", status.className)}>{status.label}</span>
+                )}
               </button>
             );
           })}

@@ -28,6 +28,7 @@ import { savePmMission } from "./mission";
 import { pmItemGroups } from "@t3tools/pm/client";
 import { pmCommands, pmKey, usePmSummary, usePmThreadDetail } from "./state";
 import { openPmPage, usePmFold } from "./uiState";
+import { PmNotMovingChip } from "./notMovingChip";
 
 type ThreadRef = { readonly environmentId: EnvironmentId; readonly threadId: ThreadId };
 
@@ -451,7 +452,10 @@ function PmWorkersSection(props: {
               }
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm">{shell?.title ?? worker.threadId}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-sm">{shell?.title ?? worker.threadId}</span>
+                  {worker.notMoving ? <PmNotMovingChip /> : null}
+                </span>
                 <span className="block truncate text-muted-foreground text-xs">
                   {[
                     worker.itemNo === null ? null : `W${worker.itemNo}`,

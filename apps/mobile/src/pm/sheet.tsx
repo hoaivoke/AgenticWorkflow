@@ -21,6 +21,7 @@ import { cn } from "../lib/cn";
 import { useThreadShells } from "../state/entities";
 import { useOpenLinkedThread } from "../features/threads/useOpenLinkedThread";
 import { runPm } from "./actions";
+import { PmNotMovingChip } from "./notMovingChip";
 import type { PmSheetTab } from "./pm.logic";
 import { pmCommands, usePmThreadDetail } from "./state";
 
@@ -174,9 +175,12 @@ function WorkersTab(props: { readonly target: Target; readonly detail: PmThreadD
       className="gap-1 rounded-xl border border-border bg-card px-3 py-2.5"
       onPress={() => open({ environmentId: props.target.environmentId, threadId: worker.threadId })}
     >
-      <Text className="text-sm text-foreground" numberOfLines={1}>
-        {titles.get(pmKey(props.target.environmentId, worker.threadId)) ?? worker.threadId}
-      </Text>
+      <View className="flex-row items-center gap-2">
+        <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+          {titles.get(pmKey(props.target.environmentId, worker.threadId)) ?? worker.threadId}
+        </Text>
+        {worker.notMoving ? <PmNotMovingChip /> : null}
+      </View>
       <Text className="text-xs text-foreground-muted" numberOfLines={2}>
         {[
           worker.itemNo === null ? null : `W${worker.itemNo}`,
