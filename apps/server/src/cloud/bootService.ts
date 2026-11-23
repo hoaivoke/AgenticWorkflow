@@ -1255,7 +1255,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
     // t3code-pm: the default runtime download is upstream's `t3`, which would serve this home
     // without PMs. The fork publishes no runtime, so only an explicit mirror can install one.
     if (pmDesktop(true, false) && releaseBaseUrl === undefined) {
-      return yield* new PinnedRuntimeInstallError({
+      return yield* new BootServiceCommandError({
         step: `finding a ${PM.productName} runtime: ${PM.productName} publishes none yet, so the background service is not available`,
       });
     }
