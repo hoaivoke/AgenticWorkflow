@@ -194,7 +194,7 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
         )}
       >
         {/* oxlint-disable-next-line t3code/no-untranslated-copy -- product wordmark */}
-        {"Code"}
+        {"Code PM" /* t3code-pm: the fork's name */}
       </span>
     </span>
   );
