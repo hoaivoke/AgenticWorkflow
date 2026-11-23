@@ -8,6 +8,7 @@ import { Button } from "../components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../components/ui/menu";
 import { m } from "../i18n/messages";
 import { runPmCommand } from "./actions";
+import { pmPageGlass } from "./pageGlass";
 import { pmCommands, pmKey } from "./state";
 import { closePmPage, useOpenPmPage } from "./uiState";
 
@@ -33,15 +34,18 @@ function PageWindow(props: { readonly threadRef: ThreadRef; readonly pageId: str
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the page over the WebSocket when the window opens
   useEffect(() => {
     let cancelled = false;
-    void runPmCommand(
-      pmCommands.pageGet,
-      { environmentId, input: { pageId: props.pageId } },
-      m(msg("Could not open the page")),
-    ).then((loaded) => {
+    void Promise.all([
+      runPmCommand(
+        pmCommands.pageGet,
+        { environmentId, input: { pageId: props.pageId } },
+        m(msg("Could not open the page")),
+      ),
+      pmPageGlass(),
+    ]).then(([loaded, glass]) => {
       if (!cancelled && loaded !== null)
         setPage({
           title: loaded.title,
-          html: withPmPageTheme(loaded.html, isDark() ? "dark" : "light"),
+          html: withPmPageTheme(loaded.html, isDark() ? "dark" : "light", "frame", glass),
         });
     });
     return () => {

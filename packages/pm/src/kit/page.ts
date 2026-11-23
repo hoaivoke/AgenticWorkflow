@@ -88,11 +88,30 @@ export const withPmPageTheme = (
   html: string,
   theme: "light" | "dark",
   host: "frame" | "native" = "frame",
+  glass?: PmPageGlass | null,
 ) =>
   html.replace(
     PM_PAGE_THEME_SLOT,
-    `<script>var d=document.documentElement;d.setAttribute("data-gx-theme","${theme}");${host === "frame" ? 'd.setAttribute("data-gx-floating","");' : ""}</script>${host === "native" ? NATIVE_BRIDGE : ""}`,
+    `<script>var d=document.documentElement;d.setAttribute("data-gx-theme","${theme}");${host === "frame" ? 'd.setAttribute("data-gx-floating","");' : ""}${glassScript(glass)}</script>${host === "native" ? NATIVE_BRIDGE : ""}`,
   );
+
+/**
+ * Ghostex's glass page: the app's artwork as a picture behind the page and the tint over it for
+ * the dark look (`--gx-glass-tint-dark`); the light look keeps the kit's own tint.
+ */
+export interface PmPageGlass {
+  /** A `data:` image, already blurred. */
+  readonly picture: string;
+  /** A CSS `rgb()` or `rgba()` colour. */
+  readonly tint: string;
+}
+
+const glassScript = (glass: PmPageGlass | null | undefined) =>
+  glass &&
+  /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(glass.picture) &&
+  /^rgba?\([\d.,\s]+\)$/.test(glass.tint)
+    ? `d.setAttribute("data-gx-glass","");d.style.setProperty("--gx-glass-picture",'url("${glass.picture}")');d.style.setProperty("--gx-glass-tint-dark","${glass.tint}");`
+    : "";
 
 /** True when the answers are the "Mark as read" kind a page without questions sends. */
 export const isPmPageSeen = (answers: unknown): answers is { seen: true; reply?: string } =>

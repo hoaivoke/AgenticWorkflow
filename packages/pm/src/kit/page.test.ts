@@ -55,6 +55,24 @@ describe("withPmPageTheme", () => {
     expect(withPmPageTheme(html, "dark")).toContain('setAttribute("data-gx-theme","dark")');
     expect(withPmPageTheme(html, "dark")).not.toContain(PM_PAGE_THEME_SLOT);
     expect(withPmPageTheme(html, "dark")).not.toContain("ReactNativeWebView");
+    expect(withPmPageTheme(html, "dark")).not.toContain('setAttribute("data-gx-glass"');
+  });
+
+  it("paints a glass picture only when it is a data image, so nothing else reaches the script", () => {
+    const html = preparePmPage("<p>x</p>", state);
+    const glass = { picture: "data:image/jpeg;base64,AAAA", tint: "rgba(8, 9, 11, 0.82)" };
+    const painted = withPmPageTheme(html, "dark", "frame", glass);
+    expect(painted).toContain('setAttribute("data-gx-glass","")');
+    expect(painted).toContain('url("data:image/jpeg;base64,AAAA")');
+    expect(painted).toContain('"--gx-glass-tint-dark","rgba(8, 9, 11, 0.82)"');
+    for (const bad of [
+      { ...glass, picture: "https://example.com/a.jpg" },
+      { ...glass, picture: "data:image/jpeg;base64,AA\")');alert(1);//" },
+      { ...glass, tint: 'red");alert(1);//' },
+    ])
+      expect(withPmPageTheme(html, "dark", "frame", bad)).not.toContain(
+        'setAttribute("data-gx-glass"',
+      );
   });
 
   it("relays a native host's submissions to the app before the kit's own script runs", () => {
