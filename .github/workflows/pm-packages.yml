@@ -20,7 +20,7 @@ permissions:
 jobs:
   build_bundle:
     name: Build JS bundle
-    if: github.repository == 'maddada/t3code-pm'
+    if: github.repository == 'maddada/pm3code'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -153,7 +153,7 @@ jobs:
           test -f "$HOME/.t3-pm/userdata/statev2.sqlite"
           test -d "$XDG_CONFIG_HOME/t3code-pm"
           grep -q 'x-scheme-handler/t3code-pm;' "$XDG_DATA_HOME/applications/com.t3codepm.T3CodePM.desktop"
-          grep -q 'Name=T3 Code PM$' "$XDG_DATA_HOME/applications/com.t3codepm.T3CodePM.desktop"
+          grep -q 'Name=PM3code$' "$XDG_DATA_HOME/applications/com.t3codepm.T3CodePM.desktop"
           if [[ "$(official)" != "$before" ]]; then
             echo "::error::The fork changed the official install's files."
             diff <(echo "$before") <(official) || true
@@ -184,7 +184,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $uninstallRoot = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
-          function Entries { Get-ChildItem $uninstallRoot -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like "T3 Code*" } }
+          function Entries { Get-ChildItem $uninstallRoot -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like "T3 Code*" -or $_.DisplayName -like "PM3code*" } }
           function Folder($entry) { Split-Path ($entry.UninstallString -replace '^"([^"]+)".*$', '$1') }
           function Show($title) { Write-Host "--- $title"; Entries | Format-List PSChildName, DisplayName, DisplayVersion, Publisher, UninstallString | Out-String | Write-Host }
 
@@ -193,7 +193,7 @@ jobs:
           Write-Host "Official: $($official.Name)  Fork: $($fork.Name)"
           Start-Process $official.FullName -ArgumentList "/S" -Wait
           Show "after the official install"
-          $officialEntry = Entries | Where-Object { $_.DisplayName -notlike "T3 Code PM*" } | Select-Object -First 1
+          $officialEntry = Entries | Where-Object { $_.DisplayName -notlike "PM3code*" } | Select-Object -First 1
           if (-not $officialEntry) { throw "The official installer left no uninstall entry." }
           $officialFolder = Folder $officialEntry
           # A silent install may start the app; stop it so it cannot write while we compare.
@@ -211,8 +211,8 @@ jobs:
 
           Start-Process $fork.FullName -ArgumentList "/S" -Wait
           Show "after the fork install"
-          $forkEntry = Entries | Where-Object { $_.DisplayName -like "T3 Code PM*" } | Select-Object -First 1
-          if (-not $forkEntry) { throw "The fork installer left no 'T3 Code PM' uninstall entry." }
+          $forkEntry = Entries | Where-Object { $_.DisplayName -like "PM3code*" } | Select-Object -First 1
+          if (-not $forkEntry) { throw "The fork installer left no 'PM3code' uninstall entry." }
           if ($forkEntry.PSChildName -eq $officialEntry.PSChildName) { throw "The fork reused the official uninstall key." }
           $forkFolder = Folder $forkEntry
           Write-Host "Official folder: $officialFolder  Fork folder: $forkFolder"
@@ -220,8 +220,8 @@ jobs:
           Start-Sleep -Seconds 5
           Get-Process | Where-Object { $_.Path -like "$forkFolder*" } | Stop-Process -Force -ErrorAction SilentlyContinue
           $startMenu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
-          Write-Host "--- Start menu"; Get-ChildItem $startMenu -Filter "T3 Code*" | ForEach-Object { Write-Host $_.Name }
-          if (-not (Test-Path "$startMenu\T3 Code PM.lnk")) { throw "No 'T3 Code PM' Start menu shortcut." }
+          Write-Host "--- Start menu"; Get-ChildItem $startMenu -Filter "*Code*" | ForEach-Object { Write-Host $_.Name }
+          if (-not (Test-Path "$startMenu\PM3code.lnk")) { throw "No 'PM3code' Start menu shortcut." }
 
           $exe = Get-ChildItem $forkFolder -Filter "*.exe" | Where-Object { $_.Name -notlike "Uninstall*" } | Select-Object -First 1
           Write-Host "Launching $($exe.FullName)"
@@ -240,7 +240,7 @@ jobs:
           Write-Host "t3code-pm:// handler: $protocol"
           $officialProtocol = (Get-ItemProperty "HKCU:\Software\Classes\t3code\shell\open\command" -ErrorAction SilentlyContinue).'(default)'
           Write-Host "t3code:// handler: $officialProtocol"
-          if ($officialProtocol -and $officialProtocol -like "*T3 Code PM*") { throw "The fork took over the official t3code:// handler." }
+          if ($officialProtocol -and $officialProtocol -like "*PM3code*") { throw "The fork took over the official t3code:// handler." }
 
           $uninstall = $forkEntry.UninstallString -replace '^"([^"]+)".*$', '$1'
           Start-Process $uninstall -ArgumentList "/S" -Wait

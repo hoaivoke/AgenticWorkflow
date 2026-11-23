@@ -211,7 +211,7 @@ const make = Effect.gen(function* () {
       : Effect.fail(
           new PmError({
             code: "disabled",
-            message: "Project Managers (t3code-pm) are turned off in Settings.",
+            message: "Project Managers (PM3code) are turned off in Settings.",
           }),
         ),
   );

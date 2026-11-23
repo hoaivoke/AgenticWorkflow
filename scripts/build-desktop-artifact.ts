@@ -2829,10 +2829,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: pmBuild(
-      "T3-Code-PM-${version}-${arch}.${ext}",
-      "T3-Code-${version}-${arch}.${ext}",
-    ), // t3code-pm:
+    artifactName: pmBuild("PM3code-${version}-${arch}.${ext}", "T3-Code-${version}-${arch}.${ext}"), // t3code-pm:
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,

@@ -41,6 +41,7 @@ rm -rf android/app/build/generated/assets/react android/app/build/generated/asse
 
 mkdir -p "$out_dir"
 version="$(node -p "require('./android/app/build/outputs/apk/release/output-metadata.json').elements[0].versionName")"
-apk="$out_dir/t3code-pm-$version.apk"
+abi_tag="${abis//-v8a/}"
+apk="$out_dir/PM3code-$version-${abi_tag//,/-}.apk"
 cp android/app/build/outputs/apk/release/app-release.apk "$apk"
 echo "$apk"

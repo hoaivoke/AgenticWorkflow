@@ -26,7 +26,7 @@ export function PmSettingsSection(props: { readonly environmentId: EnvironmentId
     >
       <ListToggleRow
         icon="list.number"
-        label={gt("Project managers (t3code-pm)")}
+        label={gt("Project managers (PM3code)")}
         value={query.data.enabled}
         onValueChange={async (enabled) => {
           const saved = await runPm(
