@@ -38,13 +38,17 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 **A dock of questions.** The PM's questions (Q1, Q2, ...) sit above the chat box. Pick an answer in one click (the PM's pick has a star), or snooze, dismiss, or copy a question's tag.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/dock.png" width="80%" alt="The dock above the chat box with two questions and a Live page, each with one-click answers" />
+  <img src="./docs/pm/screenshots/dock.png" width="80%" alt="The dock above the chat box with two questions with one-click answers and two Live pages" />
 </p>
 
 **Live pages.** When a question needs more than a button, the PM publishes a page that opens in a pop-up window over the chat. Your choices go straight back to the PM.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/live-page.png" width="100%" alt="A Live page pop-up asking which view the dashboard should open on, with a recommended choice" />
+  <img src="./docs/pm/screenshots/live-page-designs.png" width="100%" alt="A Live page comparing three designs for the dashboard's empty state side by side, each with a Pick button, and the question below them" />
+</p>
+
+<p align="center">
+  <img src="./docs/pm/screenshots/live-page-charts.png" width="100%" alt="A Live page with two charts comparing polling and streaming for the dashboard's live numbers, and a question with a recommended choice" />
 </p>
 
 **One sidebar.** A PM's row shows its status and counts, with its workers nested under it. Hover it for the mission and a summary.
@@ -67,6 +71,8 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 **Any agent.** The PM drives its work through T3's MCP tools, so it runs on any agent that gets them: Claude, Codex, Cursor, OpenCode, Pi, Muse Code and ACP agents. Workers can use any agent T3 Code supports.
 
 **One switch.** Settings, Project managers turns the whole feature off (on the phone: Settings, Environments, your environment, Project managers). PM threads then show as normal threads, and nothing is deleted.
+
+**The Ghostex look.** The screenshots use a theme of frosted glass over Ghostex's Polar Night art. It's one CSS file: in Settings, Appearance, choose **Create theme**, set it to Dark, open **Custom CSS**, paste [pm3code-ghostex.css](./docs/pm/theme/pm3code-ghostex.css), and create the theme. Web and desktop only.
 
 ## Install
 
