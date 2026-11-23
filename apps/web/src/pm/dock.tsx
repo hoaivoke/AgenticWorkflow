@@ -286,7 +286,11 @@ function PmAskRow(props: {
     });
   };
   return (
-    <div className="group/pm-ask flex items-start gap-2 px-3 py-1.5" data-pm-ask={ask.askNo}>
+    // The answers wrap under the title when they leave it less than 12rem, as on a phone.
+    <div
+      className="group/pm-ask flex flex-wrap items-start gap-x-2 gap-y-1 px-3 py-1.5"
+      data-pm-ask={ask.askNo}
+    >
       <MessageCircleQuestionIcon
         aria-hidden
         className={cn(
@@ -294,13 +298,13 @@ function PmAskRow(props: {
           ask.holds ? "text-destructive" : "text-warning-foreground",
         )}
       />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 grow basis-48">
         <div className="truncate">{ask.title}</div>
         {ask.detail ? (
           <div className="line-clamp-2 text-muted-foreground text-xs">{ask.detail}</div>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
         {answers.map((choice) => (
           <Button
             key={choice}
