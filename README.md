@@ -2,9 +2,7 @@
   <img src="./assets/prod/t3-black-web-icon-192x192.png" width="80" height="80" alt="T3 Code logo" />
 </p>
 
-<h1 align="center">PM3code</h1>
-
-<p align="center"><strong>PMs Mod for T3code</strong></p>
+<h1 align="center">PM3code - PMs Mod for T3code</h1>
 
 <p align="center">T3 Code with project managers in your sidebar.</p>
 
