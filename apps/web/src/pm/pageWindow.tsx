@@ -108,21 +108,23 @@ function PageWindow(props: { readonly threadRef: ThreadRef; readonly pageId: str
       data-pm-page-window=""
       role="dialog"
       aria-label={page?.title ?? gt("Live page")}
-      className="absolute inset-x-6 top-4 bottom-28 z-30 flex resize flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl"
+      className="absolute inset-x-6 top-4 bottom-28 z-30 flex resize flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl dark:border-white/10"
       style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
     >
+      {/* The page is floating (withPmPageTheme): it leaves this band free at its top. */}
       <div
-        className="flex h-9 shrink-0 cursor-grab items-center gap-1.5 bg-card px-2.5"
+        className="absolute inset-x-0 top-0 z-10 flex h-9 cursor-grab items-center justify-end gap-1.5 px-2.5"
         onPointerDown={startDrag}
       >
-        <Button
-          size="icon-xs"
-          variant="glass"
-          aria-label={gt("Close")}
-          onClick={() => closePmPage()}
-        >
-          <XIcon />
-        </Button>
+        <Menu>
+          <MenuTrigger render={<Button size="icon-xs" variant="glass" aria-label={gt("More")} />}>
+            <MoreHorizontalIcon />
+          </MenuTrigger>
+          <MenuPopup side="bottom" align="end">
+            <MenuItem onClick={exportPage}>{gt("Export page")}</MenuItem>
+            <MenuItem onClick={openInBrowser}>{gt("Open in browser")}</MenuItem>
+          </MenuPopup>
+        </Menu>
         <Button
           size="icon-xs"
           variant="glass"
@@ -131,18 +133,14 @@ function PageWindow(props: { readonly threadRef: ThreadRef; readonly pageId: str
         >
           <EyeOffIcon />
         </Button>
-        <Menu>
-          <MenuTrigger render={<Button size="icon-xs" variant="glass" aria-label={gt("More")} />}>
-            <MoreHorizontalIcon />
-          </MenuTrigger>
-          <MenuPopup side="bottom" align="start">
-            <MenuItem onClick={exportPage}>{gt("Export page")}</MenuItem>
-            <MenuItem onClick={openInBrowser}>{gt("Open in browser")}</MenuItem>
-          </MenuPopup>
-        </Menu>
-        <span className="min-w-0 flex-1 truncate text-center text-muted-foreground text-xs">
-          {page?.title}
-        </span>
+        <Button
+          size="icon-xs"
+          variant="glass"
+          aria-label={gt("Close")}
+          onClick={() => closePmPage()}
+        >
+          <XIcon />
+        </Button>
       </div>
       {page === null ? (
         <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">

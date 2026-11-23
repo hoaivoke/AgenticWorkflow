@@ -39,6 +39,17 @@ submit:function(answers){return new Promise(function(resolve,reject){var id=next
 __draft:function(part){return draft[part]===undefined?null:draft[part];},__saveDraft:save,__pending:function(){return null;},__flush:function(){return true;},
 __state:function(s){st=s;var ready=function(){note();};if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",ready);else ready();}};})();</script>`;
 
+/**
+ * The fork's page look, after the kit's theme and as weak as it (`:where`), so a page's own CSS
+ * still wins. Light: Ghostex's light tokens (theme.rs `light_tokens!`), which the generated kit
+ * lacks. Dark: a flat near-black page, like Ghostex's page window over its dimmed wallpaper.
+ */
+const PAGE_LOOK =
+  '<style id="pm-page-look">' +
+  ":where(:root[data-gx-theme=light]){color-scheme:light;--background:#f0f0f0;--foreground:#262626;--muted:#f1f1f1;--muted-foreground:#626262;--card:#ffffff;--card-foreground:#262626;--border:rgba(0,0,0,0.14);--input:rgba(0,0,0,0.16);--ring:#737373;--primary:#2563eb;--primary-foreground:#ffffff;--accent:#e9e9e9;--accent-foreground:#262626;--destructive:#b91c1c;--warning:#b45309;--success:#047857;--info:#0369a1;--code-background:#f6f8fa;--code-foreground:#1f2328;--chart-1:#2563eb;--chart-2:#d97706;--chart-3:#059669;--chart-4:#db2777;--chart-5:#7c3aed;--chart-6:#0891b2;--gx-bg:#f0f0f0;--gx-surface:rgba(255,255,255,0.55);--gx-raised:rgba(255,255,255,0.78);--gx-line:rgba(51,51,51,0.09);--gx-line-strong:rgba(51,51,51,0.15);--gx-fg:#18181b;--gx-text:#3f3f46;--gx-muted:#71717b;--gx-accent:#2563eb;--gx-warn:#a16207;--gx-good:#047857;--gx-bad:#b91c1c;--gx-code-bg:rgba(255,255,255,0.62);--gx-pick:#262626;--gx-card:rgba(255,255,255,0.62);--gx-footer:rgba(255,255,255,0.68);--gx-option:rgba(255,255,255,0.5);--gx-card-border:rgba(67,67,67,0.13);--gx-option-border:rgba(67,67,67,0.1);--gx-glass-shadow:0 14px 36px rgba(89,89,89,0.12);--gx-glass-dim:var(--gx-glass-tint-light,rgba(247,247,247,0.7));--gx-backdrop:radial-gradient(60% 50% at 85% 100%,rgba(185,185,185,0.28),transparent 70%),radial-gradient(55% 45% at 5% 0%,rgba(165,165,165,0.3),transparent 70%),linear-gradient(180deg,#f0f0f0 0%,#eeeeee 45%,#eeeeee 100%);--gx-backdrop-top:#f0f0f0;--gx-card-muted:#71717b;--gx-control:#18181b;--gx-tip-bg:rgba(252,252,252,0.78);--gx-tip-fg:#292929;--gx-tip-border:rgba(67,67,67,0.14);--gx-tip-shadow:0 10px 28px rgba(89,89,89,0.18)}" +
+  ":where(:root[data-gx-theme=dark]){--background:#0e0e0f;--gx-bg:#0e0e0f;--gx-backdrop:linear-gradient(180deg,#0e0e0f 0%,#0f0f10 60%,#111112 100%);--gx-backdrop-top:#0e0e0f;--gx-card:rgba(22,22,24,0.7);--gx-footer:rgba(22,22,24,0.78);--gx-tip-bg:rgba(20,20,22,0.9)}" +
+  "</style>";
+
 /** Where a client may put a script that sets `data-gx-theme` before the kit reads it. */
 export const PM_PAGE_THEME_SLOT = "<!--pm-page-theme-->";
 
@@ -56,6 +67,7 @@ export function preparePmPage(html: string, state: PmPageState): string {
     `<meta http-equiv="Content-Security-Policy" content="${PAGE_POLICY}">`,
     PM_PAGE_THEME_SLOT,
     GX_THEME_STYLE,
+    PAGE_LOOK,
     GX_PAGE_BOOTSTRAP,
     PAGE_API,
     `<script>window.ghostex.__state(${escapeScriptJson(state)});</script>`,
@@ -81,7 +93,8 @@ const NATIVE_BRIDGE = `<script>addEventListener("message",function(e){var d=e.da
 
 /**
  * Sets the page's theme before the kit reads it (a `srcdoc` frame has no URL fragment to carry
- * it), and for a native WebView host adds the answer relay.
+ * it), and for a native WebView host adds the answer relay. A web frame is a floating page: its
+ * window's controls sit over the page's top band, as in Ghostex's page window.
  */
 export const withPmPageTheme = (
   html: string,
@@ -90,7 +103,7 @@ export const withPmPageTheme = (
 ) =>
   html.replace(
     PM_PAGE_THEME_SLOT,
-    `<script>document.documentElement.setAttribute("data-gx-theme","${theme}");</script>${host === "native" ? NATIVE_BRIDGE : ""}`,
+    `<script>var d=document.documentElement;d.setAttribute("data-gx-theme","${theme}");${host === "frame" ? 'd.setAttribute("data-gx-floating","");' : ""}</script>${host === "native" ? NATIVE_BRIDGE : ""}`,
   );
 
 /** True when the answers are the "Mark as seen" kind a page without questions sends. */
