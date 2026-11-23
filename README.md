@@ -44,7 +44,7 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 **Live pages.** When a question needs more than a button, the PM publishes a page that opens in a pop-up window over the chat. Your choices go straight back to the PM.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/live-page-designs.png" width="100%" alt="A Live page comparing three designs for the dashboard's empty state side by side, each with a Pick button, and the question below them" />
+  <img src="./docs/pm/screenshots/live-page-designs.png" width="100%" alt="A Live page comparing three designs for the dashboard's top card side by side, each with a Pick button, and the question below them" />
 </p>
 
 <p align="center">

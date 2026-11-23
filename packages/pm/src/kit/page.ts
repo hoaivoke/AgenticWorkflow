@@ -92,8 +92,11 @@ export const withPmPageTheme = (
 ) =>
   html.replace(
     PM_PAGE_THEME_SLOT,
-    `<script>var d=document.documentElement;d.setAttribute("data-gx-theme","${theme}");${host === "frame" ? 'd.setAttribute("data-gx-floating","");' : ""}${glassScript(glass)}</script>${host === "native" ? NATIVE_BRIDGE : ""}`,
+    `<script>var d=document.documentElement;d.setAttribute("data-gx-theme","${theme}");${host === "frame" ? 'd.setAttribute("data-gx-floating","");' : ""}${glassScript(glass)}</script>${GLASS_LOOK}${host === "native" ? NATIVE_BRIDGE : ""}`,
   );
+
+// Over the art, the kit's grey card fills read as solid slabs; light ones let the blurred art through.
+const GLASS_LOOK = `<style id="pm-page-glass">:root[data-gx-glass][data-gx-theme=dark]{--gx-card:rgba(255,255,255,0.06);--gx-card-border:rgba(255,255,255,0.14);--gx-option:rgba(255,255,255,0.045);--gx-option-border:rgba(255,255,255,0.1);--gx-footer:rgba(255,255,255,0.07);--gx-surface:rgba(255,255,255,0.07);--gx-glass-shadow:inset 0 1px 0 rgba(255,255,255,0.07),0 16px 40px rgba(0,0,0,0.28)}:root[data-gx-glass][data-gx-theme=dark] .gx-callout{background:color-mix(in srgb,var(--gx-tone,var(--gx-accent)) 12%,transparent);border:1px solid color-mix(in srgb,var(--gx-tone,var(--gx-accent)) 24%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.15);backdrop-filter:blur(22px) saturate(1.15)}</style>`;
 
 /**
  * Ghostex's glass page: the app's artwork as a picture behind the page and the tint over it for

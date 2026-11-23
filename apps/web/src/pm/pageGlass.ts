@@ -5,7 +5,7 @@ import type { PmPageGlass } from "@t3tools/pm";
 
 const PICTURE_BLUR_POINTS = 30;
 const PICTURE_WIDTH = 960;
-const DEFAULT_TINT = "rgba(8, 9, 11, 0.82)";
+const DEFAULT_TINT = "rgba(8, 9, 11, 0.6)";
 const ART_URL = /^url\(\s*["']?(data:image\/[^"')]+)["']?\s*\)$/;
 
 const softened = new Map<string, Promise<string | null>>();
