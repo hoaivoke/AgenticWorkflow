@@ -1,0 +1,16 @@
+/* t3code-pm: the Ghostex theme's wallpaper and see-through panels. One static image, no animation. */
+html[data-theme-id="ghostex"] body {
+  background: #08080a url("./assets/ghostex-wallpaper.webp") center / cover no-repeat;
+}
+
+html[data-theme-id="ghostex"] [data-slot="sidebar-inner"] {
+  background-color: rgb(10 10 12 / 0.58);
+}
+
+html[data-theme-id="ghostex"] [data-slot="sidebar-inset"] {
+  background-color: rgb(9 9 11 / 0.72);
+}
+
+html[data-theme-id="ghostex"] [data-slot="sidebar-inset"] .bg-background {
+  background-color: transparent;
+}
