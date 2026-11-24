@@ -606,6 +606,21 @@ const make = Effect.gen(function* () {
       rows("listAsks", sql`SELECT * FROM pm_asks WHERE pm_thread_id = ${pm} ORDER BY ask_no`).pipe(
         Effect.map((found) => found.map(toAsk)),
       ),
+    /** Open asks with a snooze time, across PMs, so the sweep can wake the ones now due. */
+    listSnoozedAsks: () =>
+      rows(
+        "listSnoozedAsks",
+        sql`SELECT pm_thread_id, ask_no, snoozed_until FROM pm_asks
+            WHERE state = 'open' AND snoozed_until IS NOT NULL`,
+      ).pipe(
+        Effect.map((found) =>
+          found.map((row) => ({
+            pmThreadId: String(row.pm_thread_id),
+            askNo: Number(row.ask_no),
+            snoozedUntil: String(row.snoozed_until),
+          })),
+        ),
+      ),
     updateAsk: (pm: string, askNo: number, patch: PmAskPatch) =>
       exec(
         "updateAsk",

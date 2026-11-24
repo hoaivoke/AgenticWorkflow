@@ -94,6 +94,9 @@ const conflict = (message: string) => new PmError({ code: "conflict", message })
 const unavailable = (message: string) => () => new PmError({ code: "unavailable", message });
 
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso));
+
+const isSnoozed = (ask: { readonly snoozedUntil: string | null }, nowMs: number) =>
+  ask.snoozedUntil !== null && Date.parse(ask.snoozedUntil) > nowMs;
 /** Unique enough for ids that also carry the PM or worker they belong to. */
 const newId = Effect.gen(function* () {
   const ms = yield* Clock.currentTimeMillis;
@@ -1069,6 +1072,18 @@ const make = Effect.gen(function* () {
     yield* changed(pm);
   });
 
+  /**
+   * Clears snoozes that are due, so a woken ask counts as Needs you again on every client without
+   * waiting for some other change (Ghostex 48247ad15).
+   */
+  const wakeSnoozedAsks = Effect.fn("PmService.wakeSnoozedAsks")(function* () {
+    const nowMs = yield* Clock.currentTimeMillis;
+    const due = (yield* store.listSnoozedAsks()).filter((ask) => !isSnoozed(ask, nowMs));
+    for (const ask of due)
+      yield* store.updateAsk(ask.pmThreadId, ask.askNo, { snoozed_until: null });
+    for (const pm of new Set(due.map((ask) => ask.pmThreadId))) yield* changed(pm);
+  });
+
   const dismissAsk = Effect.fn("PmService.dismissAsk")(function* (pm: string, askNo: number) {
     yield* requirePm(pm);
     const target = yield* askRef(pm, askNo);
@@ -1524,13 +1539,18 @@ const make = Effect.gen(function* () {
     const on = yield* isEnabled;
     if (!on) return { enabled: false, pms: [] } satisfies PmSubscribeEvent;
     const pms = yield* store.listPms(projectId);
+    const nowMs = yield* Clock.currentTimeMillis;
     const result: Array<PmSummary> = [];
     for (const row of pms) {
       const { derived, asks, workerStates } = yield* deriveItems(row);
       const live = workerStates.filter((entry) => entry.state !== "resolved");
       const openAsks = asks.filter((entry) => entry.state === "open").length;
       const blocked = derived.some((entry) => entry.shownStatus === "blocked");
-      const needsYou = openAsks > 0 || live.some((entry) => entry.state === "waiting");
+      // As in Ghostex, a snoozed ask is not Needs you until it wakes.
+      const awakeAsks = asks.filter(
+        (entry) => entry.state === "open" && !isSnoozed(entry, nowMs),
+      ).length;
+      const needsYou = awakeAsks > 0 || live.some((entry) => entry.state === "waiting");
       const running = live.filter((entry) => entry.state === "running").length;
       result.push({
         threadId: ThreadId.make(row.threadId),
@@ -1702,6 +1722,7 @@ const make = Effect.gen(function* () {
     nextTag,
     answerAsk,
     snoozeAsk,
+    wakeSnoozedAsks,
     dismissAsk,
     undoDismissAsk,
     startWorker,

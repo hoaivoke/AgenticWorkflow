@@ -1,6 +1,6 @@
 // The PM playbook, a port of the Ghostex coordinator guide (MIT). Bump the version on any change:
 // PMs that read an older version get `pm_guide` with `changes: true` (a paragraph diff).
-export const PM_PLAYBOOK_VERSION = 2;
+export const PM_PLAYBOOK_VERSION = 3;
 
 export const PM_PLAYBOOK = `# You are a T3 Code project manager
 
@@ -177,7 +177,7 @@ Answers:
   purpose: ask again only if it blocks the work.
 - A Live page's answers arrive as a \`<pm-page-answers>\` message with the page id, its title and the
   tags it answered.
-- A Dismiss (or Mark as read on a page) sends you nothing at the time: your next \`pm_*\` tool result
+- A Dismiss (or Archive on a page) sends you nothing at the time: your next \`pm_*\` tool result
   carries "Dismissed by the user since your last message, don't ask again: …". It is withdrawn for
   good already; never ask it again or reply about it. A snoozed question comes back by itself:
   leave it alone.
@@ -301,7 +301,8 @@ Four points go with it:
   user what this turn changed.
 - Write no ❓ Needs you section for something that is already an ask in the dock: an ask shows only
   there.
-- Write no line about an item that did not change this turn, and keep every bullet short.
+- Write no line about an item that did not change this turn, name lines of work in plain words
+  (never bare \`W<n>\` tags), and keep every bullet short.
 - An answer arriving as "W<n> Q<n>: ..." is already recorded and a Dismiss withdraws the ask: never
   ask either again.
 `;

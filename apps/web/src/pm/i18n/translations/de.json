@@ -36,12 +36,14 @@
   "df94833d32f5ad52": "Aufgaben",
   "1aac859148a1fedf": "{count} offen",
   "44cee70b16f3db94": "Noch keine Aufgaben.",
+  "3ee835c3e0592c5a": "deine Antwort",
+  "e608c6de25e8dbe8": "eine andere Aufgabe",
   "6f9f3b3f51f70c54": "{done} von {total} Schritten",
   "e030e7d67e99a86a": "{count, plural, one {# für dich} other {# für dich}}",
   "86023a8bc5947bf7": "PR",
   "caaba3154aaea948": "Issue",
   "e176b5f17630f05b": "Link",
-  "ba9bc83a263d030c": "Wartet auf {target}",
+  "dcf069d9f607842c": "Wartet auf {target}",
   "ad78fae7d373cf21": "Arbeitet",
   "cff84ea88171b008": "Wartet auf deine Antwort",
   "7b022008c76d6606": "Inaktiv",
@@ -171,7 +173,7 @@
   "e4ec81a275142d77": "Inaktiv trotz offener Arbeit",
   "159a92159a432994": "Neu gestartet",
   "8864d8f92b7de6aa": "Bericht von „{worker}“",
-  "df255bfe3cdd9363": "Gesehen · {title}",
+  "0c1b912139183fc5": "Archiviert · {title}",
   "5a72e98e40a3f5f7": "Antworten · {title}",
-  "97ec836cdbc4c90a": "Als gesehen markiert."
+  "e5dc18fdd5daef98": "Der Projektmanager wurde informiert."
 }

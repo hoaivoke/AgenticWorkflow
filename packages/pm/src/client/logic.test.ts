@@ -17,6 +17,7 @@ import {
   pmDotStack,
   pmFirst,
   pmItemGroups,
+  pmWaitTarget,
   pmWorkerDot,
   pmWorkerListKeys,
   withPmWorkers,
@@ -344,11 +345,43 @@ describe("pmWorkerDot and pmDotStack", () => {
   });
 
   it("stacks one dot per kind with the most urgent in front", () => {
+    expect(pmDotStack(["question", "idle", "finished", "blocker"])).toEqual([
+      "idle",
+      "finished",
+      "question",
+      "blocker",
+    ]);
+  });
+
+  it("holds a finished worker's blue dot while another worker is working", () => {
     expect(pmDotStack(["working", "question", "working", "idle", "finished"])).toEqual([
       "idle",
       "working",
-      "finished",
       "question",
     ]);
+  });
+});
+
+describe("pmWaitTarget", () => {
+  const items = [{ itemNo: 3, title: "Checkout fix" }];
+
+  it("names another item by its title and a question as the user's answer, never a tag", () => {
+    expect(pmWaitTarget({ onKind: "item", onRef: "3" }, items)).toEqual({
+      kind: "item",
+      title: "Checkout fix",
+    });
+    expect(pmWaitTarget({ onKind: "item", onRef: "9" }, items)).toEqual({
+      kind: "item",
+      title: null,
+    });
+    expect(pmWaitTarget({ onKind: "ask", onRef: "4" }, items)).toEqual({ kind: "answer" });
+  });
+
+  it("drops a redundant waiting-on lead from words", () => {
+    expect(pmWaitTarget({ onKind: "text", onRef: "Waiting on the App Store review" }, [])).toEqual({
+      kind: "text",
+      text: "the App Store review",
+    });
+    expect(pmWaitTarget({ onKind: "text", onRef: "CI" }, [])).toEqual({ kind: "text", text: "CI" });
   });
 });

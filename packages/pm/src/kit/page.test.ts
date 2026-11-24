@@ -85,7 +85,7 @@ describe("withPmPageTheme", () => {
 });
 
 describe("isPmPageSeen", () => {
-  it("tells the Mark as read answers from question answers", () => {
+  it("tells the Archive answers from question answers", () => {
     expect(isPmPageSeen({ seen: true, reply: "ok" })).toBe(true);
     expect(isPmPageSeen({ Q1: "A" })).toBe(false);
     expect(isPmPageSeen(null)).toBe(false);
