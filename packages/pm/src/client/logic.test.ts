@@ -200,31 +200,43 @@ describe("pmInbox", () => {
     expect(result.archiveAll?.pageIds).toEqual(["b", "a", "old"]);
   });
 
-  it("keeps this turn's finished items in Done until archived, and the last hour's answers", () => {
+  it("keeps this turn's finished work and the last hour's answers in Recent, newest first", () => {
     const finished = { status: "finished" as const, shownStatus: "done" as const };
-    const result = inbox({
-      items: [
-        item(1, { ...finished, finishedAt: at(5) }),
-        item(2, { ...finished, finishedAt: at(60) }),
-        item(3, { ...finished, finishedAt: at(10), archivedAt: at(2) }),
-        // Finished again after an archive: back in Done.
-        item(4, { ...finished, finishedAt: at(1), archivedAt: at(20) }),
-      ],
-      asks: [
-        ask(1, { state: "answered", answer: "Yes", settledAt: at(5) }),
-        ask(2, { state: "done", answer: "Done", settledAt: at(10) }),
-        ask(3, { state: "answered", answer: "No", settledAt: at(90) }),
-        ask(4, { state: "dismissed", settledAt: at(1) }),
-        // Mark answered: the canned answer is no outcome worth a pill.
-        ask(5, { state: "answered", answer: "I answered this in the chat.", settledAt: at(7) }),
-      ],
-      pages: [page("p", { state: "answered", settledAt: at(3) })],
-    });
-    expect(result.done.map((row) => row.item.itemNo)).toEqual([4, 1]);
-    expect(result.answered.map((row) => [row.key, row.outcome])).toEqual([
+    const result = pmInbox(
+      {
+        items: [
+          item(1, { ...finished, finishedAt: at(5) }),
+          item(2, { ...finished, finishedAt: at(60) }),
+          item(3, { ...finished, finishedAt: at(10), archivedAt: at(2) }),
+          // Finished again after an archive: back in Recent.
+          item(4, { ...finished, finishedAt: at(1), archivedAt: at(20) }),
+        ],
+        asks: [
+          ask(1, { state: "answered", answer: "Yes", settledAt: at(5) }),
+          ask(2, { state: "done", answer: "Done", settledAt: at(10) }),
+          ask(3, { state: "answered", answer: "No", settledAt: at(90) }),
+          ask(4, { state: "dismissed", settledAt: at(1) }),
+          // Mark answered: the canned answer is no outcome worth a pill.
+          ask(5, { state: "answered", answer: "I answered this in the chat.", settledAt: at(7) }),
+          ask(6, { state: "answered", answer: "Handled", settledAt: at(8) }),
+          // Archived from Recent on this client.
+          ask(7, { state: "answered", answer: "Ship", settledAt: at(4) }),
+        ],
+        pages: [page("p", { state: "answered", settledAt: at(3) })],
+        turnStartedAt: at(30),
+      },
+      NOW,
+      new Set(["answered:ask:7"]),
+    );
+    expect(
+      result.recent.map((row) => [row.key, row.kind === "handled" ? row.outcome : null]),
+    ).toEqual([
+      ["done:4", null],
       ["answered:page:p", null],
+      ["done:1", null],
       ["answered:ask:1", "Yes"],
       ["answered:ask:5", null],
+      ["answered:ask:6", null],
       ["answered:ask:2", null],
     ]);
   });

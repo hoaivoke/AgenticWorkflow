@@ -10,6 +10,18 @@
   line-height: 22.75px;
 }
 
+/* Ghostex's two greys: `card_muted` (read titles, previews, count words, drawer chevrons) sits
+   between the text and `muted` (ages, drawer names, "N more"). */
+@utility pm-card-muted {
+  color: color-mix(in srgb, var(--foreground) 50%, var(--muted-foreground));
+}
+
+/* The description line under a title: 0.93 of the body size. */
+@utility pm-inbox-preview {
+  font-size: 13.02px;
+  line-height: 20px;
+}
+
 /* One title line tall: the mark and the age sit on the title's middle. */
 @utility pm-inbox-line {
   height: 22.75px;
@@ -56,15 +68,23 @@
   }
 }
 
+/* A Recent row's answer pill: 0.88 of the body size, quiet. */
 @utility pm-inbox-outcome {
-  background: color-mix(in srgb, #2fa865 14%, transparent);
-  color: #2fa865;
+  border-radius: 5px;
+  font-size: 12.32px;
+  color: var(--muted-foreground);
 }
 
-/* 0.9 of the body size: the Archive all summary and the Handled outcome pill. */
+/* 0.9 of the body size: the Archive all summary and the quiet bordered buttons. */
 @utility pm-inbox-note {
-  font-size: 12.5px;
+  font-size: 12.6px;
   line-height: 20px;
+}
+
+/* 0.92 of the body size: the Inbox's own Archive all button. */
+@utility pm-inbox-footer {
+  font-size: 12.88px;
+  line-height: 22.75px;
 }
 
 /* The header bar's hover, which steps aside while a count chip under it is hovered. */

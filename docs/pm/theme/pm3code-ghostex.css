@@ -161,14 +161,14 @@ body {
   --chat-composer-highlight: transparent !important;
 }
 
-/* The Inbox over the composer: the composer's radius, glass hairlines inside, and buttons that
-   are glass too rather than grey slabs. Rows, drawers and footers stay clear over the glass. */
+/* The Inbox over the composer: Ghostex's 12px dock radius, glass hairlines inside, and buttons
+   that are glass too rather than grey slabs. Rows, drawers and footers stay clear over the glass. */
 [data-pm-inbox] {
-  border-radius: 1rem !important;
+  border-radius: 12px !important;
 }
 [data-pm-inbox] [data-pm-inbox-head] {
-  border-top-left-radius: 1rem !important;
-  border-top-right-radius: 1rem !important;
+  border-top-left-radius: 11px !important;
+  border-top-right-radius: 11px !important;
   border-color: var(--pm-glass-border) !important;
   background: rgb(255 255 255 / 0.025) !important;
 }

@@ -56,6 +56,40 @@ export const usePmDockHidden = (key: string): ReadonlySet<string> | null => {
     : null;
 };
 
+/** Recent rows archived here, per PM: answers have no server-side archive, as in Ghostex. */
+const recentArchivedAtom = Atom.make<ReadonlyMap<string, ReadonlySet<string>>>(new Map()).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("pm-recent-archived"),
+);
+
+const recentArchived = (key: string): ReadonlySet<string> =>
+  appAtomRegistry.get(recentArchivedAtom).get(key) ?? new Set();
+
+export const setPmRecentArchived = (
+  key: string,
+  keys: ReadonlyArray<string>,
+  archived: boolean,
+) => {
+  const next = new Set(recentArchived(key));
+  for (const one of keys) {
+    if (archived) next.add(one);
+    else next.delete(one);
+  }
+  appAtomRegistry.set(
+    recentArchivedAtom,
+    new Map(appAtomRegistry.get(recentArchivedAtom)).set(key, next),
+  );
+};
+
+const NONE: ReadonlySet<string> = new Set();
+
+export const usePmRecentArchived = (key: string): ReadonlySet<string> => {
+  const archived: unknown = useAtomValue(recentArchivedAtom);
+  return archived instanceof Map
+    ? ((archived.get(key) as ReadonlySet<string> | undefined) ?? NONE)
+    : NONE;
+};
+
 export const usePmFold = (key: string, fallback: boolean) => {
   const folds: unknown = useAtomValue(foldsAtom);
   const value =

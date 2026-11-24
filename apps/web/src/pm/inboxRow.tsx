@@ -132,7 +132,7 @@ const PLAIN_BUTTON =
 const TEXT_BUTTON =
   "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-foreground/7 px-2.5 text-sm text-foreground hover:bg-foreground/12 disabled:pointer-events-none disabled:opacity-50";
 
-export function TextButton(props: {
+function TextButton(props: {
   readonly children: ReactNode;
   readonly onClick: () => void;
   readonly disabled?: boolean;
@@ -155,10 +155,44 @@ export function TextButton(props: {
   );
 }
 
+const QUIET_SIZE = {
+  /** A bundle row's Expand and Archive all. */
+  row: "px-2 py-0.5 pm-inbox-note leading-[22.75px]",
+  /** Recent's Archive all, on the drawer's line. */
+  drawer: "px-2 py-px pm-inbox-note leading-[18.75px]",
+  /** The Inbox's own Archive all, padded for its count. */
+  footer: "py-[3px] ps-[9px] pe-1.5 pm-inbox-footer",
+} as const;
+
+/** Ghostex's quiet bordered button: the Archive alls and a bundle's Expand. */
+export function QuietButton(props: {
+  readonly children: ReactNode;
+  readonly onClick: () => void;
+  readonly label?: string;
+  readonly size?: keyof typeof QUIET_SIZE;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={props.label}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onClick();
+      }}
+      className={cn(
+        "inline-flex shrink-0 cursor-default items-center gap-1.5 whitespace-nowrap rounded-md border border-foreground/10 bg-foreground/4 text-foreground hover:bg-foreground/9",
+        QUIET_SIZE[props.size ?? "row"],
+      )}
+    >
+      {props.children}
+    </button>
+  );
+}
+
 /** Ghostex's `count_badge`: an 18px circle for one digit, a pill for more. */
 export function CountBadge(props: { readonly count: number }) {
   return (
-    <span className="inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground/10 px-1 font-medium text-2xs text-foreground tabular-nums">
+    <span className="inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-foreground/10 px-1.25 font-medium text-2xs text-foreground/80 leading-none tabular-nums">
       {props.count}
     </span>
   );
@@ -435,10 +469,12 @@ function Answers(props: {
   readonly answers: ReadonlyArray<string>;
   readonly recommended: string | null;
   readonly context: RowContext;
+  /** Room, in the same rough units, that a Details button beside the answers takes. */
+  readonly beside?: number;
   readonly onAnswer: (answer: string) => void;
 }) {
   const gt = useGT();
-  const width = props.answers.reduce((sum, answer) => sum + answer.length + 4, 0);
+  const width = props.answers.reduce((sum, answer) => sum + answer.length + 4, props.beside ?? 0);
   const fits =
     props.answers.length <= (props.context.phone ? 2 : 3) &&
     width <= (props.context.phone ? 16 : 34);
@@ -628,9 +664,7 @@ export function InboxRowView(props: {
   const preview = props.nested
     ? ""
     : row.kind === "ask"
-      ? row.details
-        ? ""
-        : row.preview
+      ? row.preview
       : row.kind === "blocked"
         ? (row.item.nowLine ?? "")
         : row.kind === "finished"
@@ -642,15 +676,18 @@ export function InboxRowView(props: {
     // A finished row's Archive is its hover check; a bundle's page has no buttons.
   } else if (row.kind === "pages") {
     buttons.push(
-      <TextButton key="expand" onClick={() => setExpanded(!expanded)}>
+      <QuietButton key="expand" onClick={() => setExpanded(!expanded)}>
         {expanded ? gt("Collapse") : gt("Expand")}
-      </TextButton>,
+      </QuietButton>,
     );
     if (archiveRow)
       buttons.push(
-        <TextButton key="all" label={gt("Archive all pages")} onClick={archiveRow}>
-          {gt("Archive all")}
-        </TextButton>,
+        <Tooltip key="all">
+          <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+            <QuietButton onClick={archiveRow}>{gt("Archive all")}</QuietButton>
+          </TooltipTrigger>
+          <TooltipPopup side="top">{gt("Archive all pages")}</TooltipPopup>
+        </Tooltip>,
       );
   } else {
     if (!asks && archiveRow)
@@ -658,24 +695,36 @@ export function InboxRowView(props: {
         <IconButton key="archive" icon="check" label={gt("Archive")} onClick={archiveRow} />,
       );
     if (row.kind === "ask") {
+      // Ghostex keeps the answers on the row and puts a quiet Details beside them.
+      buttons.push(
+        <Answers
+          key="answers"
+          answers={row.todo ? [gt("Done", { $context: "answer to a to-do" })] : row.ask.answers}
+          recommended={row.ask.recommended}
+          context={context}
+          beside={row.details ? 11 : 0}
+          onAnswer={(answer) => void answerAsk(context.target, row.ask.askNo, answer)}
+        />,
+      );
       if (row.details)
         buttons.push(
-          <IconButton
-            key="details"
-            icon="details"
-            label={gt("Details")}
-            onClick={() => setAskOpen(true)}
-          />,
-        );
-      else
-        buttons.push(
-          <Answers
-            key="answers"
-            answers={row.todo ? [gt("Done", { $context: "answer to a to-do" })] : row.ask.answers}
-            recommended={row.ask.recommended}
-            context={context}
-            onAnswer={(answer) => void answerAsk(context.target, row.ask.askNo, answer)}
-          />,
+          <Tooltip key="details">
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setAskOpen(true);
+                  }}
+                  className="inline-flex h-7 shrink-0 cursor-default items-center rounded-lg border border-foreground/12 bg-foreground/5 px-2.75 pm-card-muted hover:bg-foreground/10 hover:text-foreground active:bg-foreground/15"
+                />
+              }
+            >
+              {gt("Details")}
+            </TooltipTrigger>
+            <TooltipPopup side="top">{gt("Details")}</TooltipPopup>
+          </Tooltip>,
         );
     }
     if (row.kind === "page")
@@ -752,7 +801,7 @@ export function InboxRowView(props: {
           <span
             className={cn(
               "pm-inbox-title min-w-0 flex-1 truncate",
-              row.unread ? "text-foreground" : "text-muted-foreground",
+              row.unread ? "text-foreground" : "pm-card-muted",
             )}
           >
             {title}
@@ -763,7 +812,7 @@ export function InboxRowView(props: {
           <div className="pm-inbox-line relative flex min-w-[26px] shrink-0 items-center justify-end">
             <span
               className={cn(
-                "whitespace-nowrap text-muted-foreground text-xs tabular-nums",
+                "whitespace-nowrap pm-inbox-title text-muted-foreground tabular-nums",
                 !props.nested && "group-hover/row:invisible",
                 !props.nested && slotShown && "invisible",
               )}
@@ -807,9 +856,7 @@ export function InboxRowView(props: {
           </div>
         </div>
         {preview ? (
-          <div className="truncate ps-5.75 pm-inbox-text text-muted-foreground leading-5">
-            {preview}
-          </div>
+          <div className="truncate ps-5.75 pm-inbox-preview pm-card-muted">{preview}</div>
         ) : null}
       </div>
       {props.nested ? null : <RowMenu row={row} context={context} anchor={more} />}

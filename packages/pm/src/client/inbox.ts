@@ -7,17 +7,17 @@ import * as DateTime from "effect/DateTime";
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
-/** How long an answered ask or page stays in the Answered drawer. */
-const ANSWERED_KEPT_MS = HOUR_MS;
-const ANSWERED_MAX = 12;
+/** How long an answered ask or page stays in the Recent drawer. */
+const HANDLED_KEPT_MS = HOUR_MS;
+const HANDLED_MAX = 12;
 /** A description this short and on one line is the row's second line, not Details. */
 const SHORT_DESCRIPTION = 90;
 /** Same-turn pages that only wait to be seen bundle once there are this many. */
 const BUNDLE_MIN = 2;
 const BUNDLE_WINDOW_MS = 2 * MINUTE_MS;
-/** The Handled drawer's pill only says something the drawer doesn't: no "answered" or "done". */
-const GENERIC_OUTCOME = /^(answered|done|i answered this in the chat\.?)?$/i;
-/** Mark answered's words, which the PM reads and the Handled drawer doesn't repeat. */
+/** A Recent row's pill only says something the drawer doesn't: no "answered", "handled" or "done". */
+const GENERIC_OUTCOME = /^(answered|handled|done|i answered this in the chat\.?)?$/i;
+/** Mark answered's words, which the PM reads and the Recent drawer doesn't repeat. */
 export const PM_ANSWERED_IN_CHAT = "I answered this in the chat.";
 
 export const PM_INBOX_LIMIT = 4;
@@ -64,7 +64,9 @@ export type PmInboxRow =
   | (RowBase & { readonly kind: "blocked"; readonly item: PmItem })
   | (RowBase & { readonly kind: "finished"; readonly item: PmItem });
 
-export interface PmInboxAnswered {
+/** An ask or page answered in the last hour: one quiet line in the Recent drawer. */
+export interface PmInboxHandled {
+  readonly kind: "handled";
   readonly key: string;
   readonly title: string;
   /** The answer picked, when it says more than "answered", "done" or Mark answered. */
@@ -85,11 +87,13 @@ export interface PmInbox {
     readonly pageIds: ReadonlyArray<string>;
     readonly askNos: ReadonlyArray<number>;
   } | null;
-  /** What the PM's newest turn finished, in the Done drawer. */
-  readonly done: ReadonlyArray<PmInboxRow & { readonly kind: "finished" }>;
   readonly snoozed: ReadonlyArray<PmInboxRow>;
-  readonly answered: ReadonlyArray<PmInboxAnswered>;
+  /** Ghostex's Recent drawer: what the PM's newest turn finished and what was answered in the
+   * last hour, newest first. */
+  readonly recent: ReadonlyArray<PmInboxRecent>;
 }
+
+export type PmInboxRecent = (PmInboxRow & { readonly kind: "finished" }) | PmInboxHandled;
 
 // Hermes (the phone) has no `toSorted`.
 const sorted = <A>(items: ReadonlyArray<A>, order: (a: A, b: A) => number): Array<A> =>
@@ -208,6 +212,8 @@ export function pmInbox(
     readonly turnStartedAt?: string | null | undefined;
   },
   now: number,
+  /** Recent rows this client archived (Ghostex keeps its `work_dock_dismissed` per client too). */
+  archived: ReadonlySet<string> = new Set(),
 ): PmInbox {
   const turnStartedAt = ms(input.turnStartedAt);
   const openAsks = input.asks.filter((ask) => ask.state === "open");
@@ -275,8 +281,8 @@ export function pmInbox(
     (a, b) => ms(a.snoozedUntil) - ms(b.snoozedUntil),
   );
 
-  const recently = (at: string | null | undefined) => now - ms(at) <= ANSWERED_KEPT_MS;
-  const answered: Array<PmInboxAnswered> = sorted<PmInboxAnswered>(
+  const recently = (at: string | null | undefined) => now - ms(at) <= HANDLED_KEPT_MS;
+  const handled = sorted<PmInboxHandled>(
     [
       ...input.asks
         .filter(
@@ -285,6 +291,7 @@ export function pmInbox(
         .map((ask) => {
           const words = ask.answer?.trim() ?? "";
           return {
+            kind: "handled" as const,
             key: `answered:ask:${ask.askNo}`,
             title: ask.title,
             outcome: GENERIC_OUTCOME.test(words) ? null : words,
@@ -295,6 +302,7 @@ export function pmInbox(
       ...input.pages
         .filter((page) => page.state === "answered" && recently(page.settledAt))
         .map((page) => ({
+          kind: "handled" as const,
           key: `answered:page:${page.pageId}`,
           title: page.title,
           outcome: null,
@@ -303,7 +311,9 @@ export function pmInbox(
         })),
     ],
     (a, b) => ms(b.at) - ms(a.at),
-  ).slice(0, ANSWERED_MAX);
+  )
+    .filter((row) => !archived.has(row.key))
+    .slice(0, HANDLED_MAX);
 
   return {
     rows,
@@ -323,9 +333,8 @@ export function pmInbox(
     },
     archiveAll:
       seenOnlyPages.length + todos.length >= 2 ? { pageIds: seenOnlyPages, askNos: todos } : null,
-    done,
     snoozed,
-    answered,
+    recent: sorted<PmInboxRecent>([...done, ...handled], (a, b) => ms(b.at) - ms(a.at)),
   };
 }
 

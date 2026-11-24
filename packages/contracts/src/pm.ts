@@ -157,7 +157,7 @@ export const PmPageSummary = Schema.Struct({
   /** First opened by the user: the Inbox draws an opened page's row as read. */
   openedAt: Schema.optional(Schema.NullOr(Schema.String)),
   snoozedUntil: Schema.optional(Schema.NullOr(Schema.String)),
-  /** When it was answered or marked seen, for the Inbox's Answered drawer. */
+  /** When it was answered or marked seen, for the Inbox's Recent drawer. */
   settledAt: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
@@ -176,7 +176,7 @@ export const PmThreadDetail = Schema.Struct({
   projectId: ProjectId,
   mission: Schema.String,
   instructions: Schema.String,
-  /** When the PM's newest turn started: the Inbox's Done drawer holds what it finished. */
+  /** When the PM's newest turn started: the Inbox's Recent drawer holds what it finished. */
   turnStartedAt: Schema.optional(Schema.NullOr(Schema.String)),
   memory: Schema.Array(PmMemoryNote),
   items: Schema.Array(PmItem),

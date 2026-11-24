@@ -6,7 +6,7 @@ import {
   PM_SNOOZE_HOURS,
   pmAskTag,
   type PmInbox,
-  type PmInboxAnswered,
+  type PmInboxHandled,
   type PmInboxMark,
   type PmInboxRow,
   pmInbox,
@@ -31,7 +31,6 @@ import IconHelpCircle from "@tabler/icons-react-native/IconHelpCircle";
 import IconInbox from "@tabler/icons-react-native/IconInbox";
 import IconLayoutBoardSplit from "@tabler/icons-react-native/IconLayoutBoardSplit";
 import IconMessageCircleCheck from "@tabler/icons-react-native/IconMessageCircleCheck";
-import IconMessageQuestion from "@tabler/icons-react-native/IconMessageQuestion";
 import IconMoon from "@tabler/icons-react-native/IconMoon";
 import IconStack from "@tabler/icons-react-native/IconStack";
 import IconStarFilled from "@tabler/icons-react-native/IconStarFilled";
@@ -63,6 +62,7 @@ import {
   answerAsk,
   archive,
   archiveDone,
+  archiveRecent,
   type InboxTarget,
   type InboxUndo,
   markPageOpened,
@@ -140,15 +140,21 @@ function Dock(props: { readonly target: InboxTarget; readonly draftKey: string |
   const [hiddenRows, setHiddenRows] = useState<ReadonlySet<string> | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [undo, setUndo] = useState<(InboxUndo & { readonly id: number }) | null>(null);
+  // Recent rows archived on this phone: answers have no server-side archive, as in Ghostex.
+  const [archived, setArchived] = useState<ReadonlySet<string>>(() => new Set());
   if (detail === null) return null;
-  const inbox = pmInbox(detail, now);
+  const inbox = pmInbox(detail, now, archived);
+  const setHandled = (keys: ReadonlyArray<string>, on: boolean) =>
+    setArchived((current) => {
+      const next = new Set(current);
+      for (const key of keys) {
+        if (on) next.add(key);
+        else next.delete(key);
+      }
+      return next;
+    });
   const content =
-    inbox.rows.length +
-      inbox.done.length +
-      inbox.snoozed.length +
-      inbox.answered.length +
-      (undo ? 1 : 0) >
-    0;
+    inbox.rows.length + inbox.snoozed.length + inbox.recent.length > 0 || undo !== null;
   // Ghostex's `work_dock_hidden`: folded only while every row now was there when it was folded.
   const folded =
     content &&
@@ -181,6 +187,7 @@ function Dock(props: { readonly target: InboxTarget; readonly draftKey: string |
   const openWork = () => navigation.navigate("PmSheet", props.target);
   const { counts } = inbox;
   const quiet = counts.pings + counts.blocked + counts.inProgress === 0;
+  const more = inbox.rows.length > PM_INBOX_PHONE_LIMIT;
 
   return (
     <View
@@ -199,11 +206,11 @@ function Dock(props: { readonly target: InboxTarget; readonly draftKey: string |
           content && !folded && "border-b border-border bg-subtle",
         )}
       >
-        <View className="mr-1.5 flex-row items-center gap-[5px]">
+        <View className={cn("flex-row items-center gap-[5px]", (!quiet || !content) && "mr-1.5")}>
           <IconInbox size={14} color={typeof foreground === "string" ? foreground : mutedColor} />
           <Text className="text-[13px] font-t3-semibold text-foreground">{gt("Inbox")}</Text>
         </View>
-        {quiet ? (
+        {quiet && !content ? (
           <Text className="text-[13px] text-foreground-muted" numberOfLines={1}>
             {gt("Nothing in progress")}
           </Text>
@@ -261,68 +268,64 @@ function Dock(props: { readonly target: InboxTarget; readonly draftKey: string |
           {shown.map((row) => (
             <InboxRow key={row.key} row={row} context={context} />
           ))}
-          {moreParts.length > 0 && !showAll ? (
-            <MoreLine onPress={() => setShowAll(true)}>{moreParts.join(" · ")}</MoreLine>
-          ) : null}
-          {showAll && inbox.rows.length > PM_INBOX_PHONE_LIMIT ? (
-            <MoreLine onPress={() => setShowAll(false)}>{gt("Show fewer")}</MoreLine>
-          ) : null}
-          {inbox.archiveAll ? (
-            <ArchiveAll
-              inbox={inbox}
-              onPress={() => void archive(props.target, inbox.archiveAll ?? {}).then(onUndo)}
-            />
+          {/* Ghostex's foot: "N more" (or Show fewer) shares a line with Archive all; with nothing
+              hidden, Archive all sits alone under a hairline. */}
+          {more || inbox.archiveAll ? (
+            <View
+              className={cn(
+                "flex-row items-center gap-2 pr-2",
+                more ? "pb-1.5 pt-0.5" : "mt-0.5 border-t border-border pb-1 pt-[5px] pl-2",
+              )}
+            >
+              {more ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showAll }}
+                  hitSlop={8}
+                  className="shrink pl-[31px]"
+                  onPress={() => setShowAll(!showAll)}
+                >
+                  <Text className="text-sm text-foreground-muted" numberOfLines={1}>
+                    {showAll ? gt("Show fewer") : moreParts.join(" · ")}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {inbox.archiveAll ? (
+                <ArchiveAll
+                  inbox={inbox}
+                  summary={!more}
+                  onPress={() => void archive(props.target, inbox.archiveAll ?? {}).then(onUndo)}
+                />
+              ) : null}
+            </View>
           ) : null}
           {undo ? (
-            <View className="mt-0.5 h-10 flex-row items-center gap-2 border-t border-border pl-2 pr-0.5">
+            <View className="mt-1 flex-row items-center gap-2 rounded-lg border border-border bg-subtle px-2 py-1.5">
               <IconArchive size={13} color={mutedColor} />
-              <Text className="flex-1 text-sm text-foreground-muted">
+              <Text className="flex-1 text-[13.5px] text-foreground" numberOfLines={1}>
                 {gt("Archived {count}", { count: undo.count })}
               </Text>
-              <TextButton
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={8}
+                className="rounded-md border border-border bg-subtle px-2.5 py-[3px]"
                 onPress={() => {
                   setUndo(null);
                   void undo.undo();
                 }}
               >
-                {gt("Undo")}
-              </TextButton>
+                <Text className="text-[13px] font-t3-semibold text-foreground">{gt("Undo")}</Text>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={gt("Close")}
-                className="size-7 items-center justify-center"
+                accessibilityLabel={gt("Dismiss")}
+                hitSlop={8}
+                className="size-[22px] items-center justify-center rounded-[5px]"
                 onPress={() => setUndo(null)}
               >
-                <IconX size={14} color={mutedColor} />
+                <IconX size={12} color={mutedColor} />
               </Pressable>
             </View>
-          ) : null}
-          {inbox.done.length > 0 ? (
-            <Drawer
-              icon={IconCircleCheck}
-              color={GREEN}
-              muted={mutedColor}
-              label={gt("Done", { $context: "Inbox drawer of finished work" })}
-              count={inbox.done.length}
-              action={
-                inbox.done.length >= 2 ? (
-                  <TextButton
-                    onPress={() =>
-                      void archiveDone(
-                        props.target,
-                        inbox.done.map((row) => row.item.itemNo),
-                      ).then(onUndo)
-                    }
-                  >
-                    {gt("Archive all")}
-                  </TextButton>
-                ) : null
-              }
-            >
-              {inbox.done.map((row) => (
-                <InboxRow key={row.key} row={row} context={context} drawer />
-              ))}
-            </Drawer>
           ) : null}
           {inbox.snoozed.length > 0 ? (
             <Drawer
@@ -337,17 +340,33 @@ function Dock(props: { readonly target: InboxTarget; readonly draftKey: string |
               ))}
             </Drawer>
           ) : null}
-          {inbox.answered.length > 0 ? (
+          {inbox.recent.length > 0 ? (
             <Drawer
-              icon={IconMessageCircleCheck}
+              icon={IconCircleCheck}
               color={GREEN}
               muted={mutedColor}
-              label={gt("Handled", { $context: "Inbox drawer of questions already answered" })}
-              count={inbox.answered.length}
+              label={gt("Recent", {
+                $context: "Inbox drawer of finished work and answered questions",
+              })}
+              count={inbox.recent.length}
+              action={
+                <QuietButton
+                  label={gt("Archive all, {count}", { count: inbox.recent.length })}
+                  onPress={() =>
+                    void archiveRecent(props.target, inbox.recent, setHandled).then(onUndo)
+                  }
+                >
+                  {gt("Archive all")}
+                </QuietButton>
+              }
             >
-              {inbox.answered.map((row) => (
-                <HandledRow key={row.key} row={row} now={now} />
-              ))}
+              {inbox.recent.map((row) =>
+                row.kind === "finished" ? (
+                  <InboxRow key={row.key} row={row} context={context} drawer />
+                ) : (
+                  <HandledRow key={row.key} row={row} now={now} />
+                ),
+              )}
             </Drawer>
           ) : null}
         </ScrollView>
@@ -416,25 +435,45 @@ function IconPress(props: {
   );
 }
 
-function CountBadge(props: { readonly count: number }) {
+/** Ghostex's quiet bordered button: the Archive alls and a bundle's Expand. */
+function QuietButton(props: {
+  readonly onPress: () => void;
+  readonly label?: string;
+  readonly children: ReactNode;
+}) {
   return (
-    <View className="h-[18px] min-w-[18px] items-center justify-center rounded-full bg-subtle px-1">
-      <Text className="text-[11px] font-t3-medium text-foreground">{props.count}</Text>
-    </View>
-  );
-}
-
-function MoreLine(props: { readonly onPress: () => void; readonly children: ReactNode }) {
-  return (
-    <Pressable accessibilityRole="button" className="py-1.5 pl-[31px] pr-2" onPress={props.onPress}>
-      <Text className="text-sm text-foreground-muted" numberOfLines={1}>
-        {props.children}
-      </Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={props.label}
+      hitSlop={6}
+      className="flex-row items-center gap-1.5 rounded-md border border-border bg-subtle px-2 py-[3px]"
+      onPress={(event) => {
+        event.stopPropagation();
+        props.onPress();
+      }}
+    >
+      {typeof props.children === "string" ? (
+        <Text className="text-[12.5px] text-foreground">{props.children}</Text>
+      ) : (
+        props.children
+      )}
     </Pressable>
   );
 }
 
-function ArchiveAll(props: { readonly inbox: PmInbox; readonly onPress: () => void }) {
+function CountBadge(props: { readonly count: number }) {
+  return (
+    <View className="h-[18px] min-w-[18px] items-center justify-center rounded-full bg-subtle px-1">
+      <Text className="text-[11px] font-t3-medium text-foreground opacity-80">{props.count}</Text>
+    </View>
+  );
+}
+
+function ArchiveAll(props: {
+  readonly inbox: PmInbox;
+  readonly summary: boolean;
+  readonly onPress: () => void;
+}) {
   const gt = useGT();
   const pages = props.inbox.archiveAll?.pageIds.length ?? 0;
   const todos = props.inbox.archiveAll?.askNos.length ?? 0;
@@ -445,49 +484,57 @@ function ArchiveAll(props: { readonly inbox: PmInbox; readonly onPress: () => vo
     .filter(Boolean)
     .join(" · ");
   return (
-    <View className="mt-0.5 flex-row items-center gap-2 border-t border-border px-2 pb-1 pt-[5px]">
+    <>
       <Text className="flex-1 text-[12.5px] text-foreground-muted" numberOfLines={1}>
-        {summary}
+        {props.summary ? summary : ""}
       </Text>
-      <TextButton onPress={props.onPress}>
-        <Text className="text-sm text-foreground">{gt("Archive all")}</Text>
+      <QuietButton
+        label={gt("Archive all, {count}", { count: pages + todos })}
+        onPress={props.onPress}
+      >
+        <Text className="text-[13px] text-foreground">{gt("Archive all")}</Text>
         <CountBadge count={pages + todos} />
-      </TextButton>
-    </View>
+      </QuietButton>
+    </>
   );
 }
 
+/** Snoozed or Recent under the rows: Ghostex's drawer line, folded until tapped. */
 function Drawer(props: {
   readonly icon: Icon;
   readonly color: string;
   readonly muted: string;
   readonly label: string;
   readonly count: number;
+  /** Shown on the line while the drawer is open. */
   readonly action?: ReactNode;
   readonly children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const IconView = props.icon;
   return (
-    <View className="mt-0.5 border-t border-border">
-      <View className="h-9 flex-row items-center gap-2 pl-2 pr-0.5">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: open }}
-          className="flex-1 flex-row items-center gap-1.5"
-          onPress={() => setOpen(!open)}
-        >
-          <IconView size={13} color={props.color} />
-          <Text className="text-sm text-foreground-muted">{props.label}</Text>
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${props.label}, ${props.count}`}
+        accessibilityState={{ expanded: open }}
+        className="flex-row items-center gap-2.5 rounded-lg px-2 py-1.5"
+        onPress={() => setOpen(!open)}
+      >
+        <IconView size={13} color={props.color} />
+        <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+          <Text className="text-sm text-foreground-muted" numberOfLines={1}>
+            {props.label}
+          </Text>
           <CountBadge count={props.count} />
-          <View style={open ? undefined : { transform: [{ rotate: "-90deg" }] }}>
-            <IconChevronDown size={12} color={props.muted} />
-          </View>
-        </Pressable>
+        </View>
         {open ? props.action : null}
-      </View>
-      {open ? <View className="pb-0.5 opacity-[0.72]">{props.children}</View> : null}
-    </View>
+        <View style={open ? { transform: [{ rotate: "180deg" }] } : undefined}>
+          <IconChevronDown size={12} color={props.muted} />
+        </View>
+      </Pressable>
+      {open ? <View className="opacity-[0.72]">{props.children}</View> : null}
+    </>
   );
 }
 
@@ -507,22 +554,23 @@ function ageLabel(gt: ReturnType<typeof useGT>, at: string, now: number): string
   }
 }
 
-function HandledRow(props: { readonly row: PmInboxAnswered; readonly now: number }) {
+/** An answered ask or page in Recent: Ghostex's quiet line. */
+function HandledRow(props: { readonly row: PmInboxHandled; readonly now: number }) {
   const gt = useGT();
   return (
-    <View className="flex-row items-center gap-2 py-[5px] pl-6 pr-2">
-      <IconMessageCircleCheck size={12} color={`${GREEN}d9`} />
-      <Text className="flex-1 text-sm text-foreground-muted" numberOfLines={1}>
+    <View className="flex-row items-center gap-2.5 rounded-lg px-2 py-[5px]">
+      <IconMessageCircleCheck size={13} color={GREEN} />
+      <Text className="flex-1 text-[13.5px] text-foreground-muted" numberOfLines={1}>
         {props.row.title}
       </Text>
       {props.row.outcome ? (
-        <View className="max-w-[180px] rounded-full px-2" style={{ backgroundColor: `${GREEN}24` }}>
-          <Text className="text-[12.5px]" style={{ color: GREEN }} numberOfLines={1}>
+        <View className="max-w-[130px] rounded-[5px] bg-subtle px-1.5 py-px">
+          <Text className="text-xs text-foreground-muted" numberOfLines={1}>
             {props.row.outcome}
           </Text>
         </View>
       ) : null}
-      <Text className="text-xs text-foreground-muted">{ageLabel(gt, props.row.at, props.now)}</Text>
+      <Text className="text-sm text-foreground-muted">{ageLabel(gt, props.row.at, props.now)}</Text>
     </View>
   );
 }
@@ -684,9 +732,7 @@ function InboxRow(props: {
   const preview = props.nested
     ? ""
     : row.kind === "ask"
-      ? row.details
-        ? ""
-        : row.preview
+      ? row.preview
       : row.kind === "blocked"
         ? (row.item.nowLine ?? "")
         : row.kind === "finished"
@@ -779,9 +825,9 @@ function InboxRow(props: {
     // A finished row's Archive sits in its age slot; a bundle's page has no buttons.
   } else if (row.kind === "pages") {
     buttons.push(
-      <TextButton key="expand" onPress={() => setExpanded(!expanded)}>
+      <QuietButton key="expand" onPress={() => setExpanded(!expanded)}>
         {expanded ? gt("Collapse") : gt("Expand")}
-      </TextButton>,
+      </QuietButton>,
     );
   } else {
     if (!asks && archiveRow)
@@ -796,7 +842,9 @@ function InboxRow(props: {
       );
     if (row.kind === "ask") {
       const answers = row.todo ? [gt("Done", { $context: "answer to a to-do" })] : row.ask.answers;
-      const fits = !row.details && answers.length <= 2 && answers.join("").length <= 18;
+      // Ghostex keeps the answers on the row and a quiet Details beside them; answers too wide
+      // for the phone wait behind Details, in the ask's sheet.
+      const fits = answers.length <= 2 && answers.join("").length <= (row.details ? 10 : 18);
       if (fits)
         for (const answer of answers)
           buttons.push(
@@ -812,15 +860,17 @@ function InboxRow(props: {
               </View>
             </TextButton>,
           );
-      else
+      if (row.details || !fits)
         buttons.push(
-          <IconPress
+          <Pressable
             key="details"
-            icon={IconMessageQuestion}
-            label={gt("Details")}
-            color={context.muted}
+            accessibilityRole="button"
+            hitSlop={4}
+            className="h-[28px] items-center justify-center rounded-lg border border-border bg-subtle px-[11px]"
             onPress={() => openAsk(row.ask.askNo)}
-          />,
+          >
+            <Text className="text-sm text-foreground-muted">{gt("Details")}</Text>
+          </Pressable>,
         );
     }
     if (row.kind === "page")
@@ -898,7 +948,7 @@ function InboxRow(props: {
                 <View className="flex-row items-center gap-1.5">{buttons}</View>
               ) : null}
               <View className="min-w-[26px] flex-row items-center justify-end gap-1">
-                <Text className="text-xs text-foreground-muted">{age}</Text>
+                <Text className="text-sm text-foreground-muted">{age}</Text>
                 {props.nested ? null : row.kind === "finished" && archiveRow ? (
                   <IconPress
                     icon={IconCheck}

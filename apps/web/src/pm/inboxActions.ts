@@ -1,5 +1,5 @@
 import type { EnvironmentId, PmPageSummary, PmShownItemStatus, ThreadId } from "@t3tools/contracts";
-import { pmSnoozeUntil, type PmInboxRow } from "@t3tools/pm/client";
+import { pmSnoozeUntil, type PmInboxRecent, type PmInboxRow } from "@t3tools/pm/client";
 import { msg } from "gt-react";
 
 import { readComposerDraftPrompt, useComposerDraftStore } from "../composerDraftStore";
@@ -7,7 +7,7 @@ import { m } from "../i18n/messages";
 import { selectThreadPanelOpen, useRightPanelStore } from "../rightPanelStore";
 import { runPmCommand } from "./actions";
 import { pmCommands, pmKey } from "./state";
-import { openPmPage, setPmFold } from "./uiState";
+import { openPmPage, setPmFold, setPmRecentArchived } from "./uiState";
 
 export interface InboxTarget {
   readonly environmentId: EnvironmentId;
@@ -146,6 +146,26 @@ export async function archiveDone(
     );
   if ((await run(true)) === null) return null;
   return { count: items.length, undo: async () => void (await run(false)) };
+}
+
+/** Recent's Archive all: finished work is archived on the server, answers only here. */
+export async function archiveRecent(
+  target: InboxTarget,
+  recent: ReadonlyArray<PmInboxRecent>,
+): Promise<InboxUndo | null> {
+  const items = recent.flatMap((row) => (row.kind === "finished" ? [row.item.itemNo] : []));
+  const handled = recent.flatMap((row) => (row.kind === "handled" ? [row.key] : []));
+  const done = items.length > 0 ? await archiveDone(target, items) : null;
+  if (items.length > 0 && done === null) return null;
+  const key = pmKey(target.environmentId, target.threadId);
+  setPmRecentArchived(key, handled, true);
+  return {
+    count: recent.length,
+    undo: async () => {
+      setPmRecentArchived(key, handled, false);
+      await done?.undo();
+    },
+  };
 }
 
 /** The row's tag where the caret is: Ghostex's Mention in chat box. */
