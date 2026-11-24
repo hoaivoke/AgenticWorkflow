@@ -4,16 +4,21 @@ import { faviconUrlForOrigin, toolActivityFaviconUrl } from "./favicon.ts";
 
 describe("faviconUrlForOrigin", () => {
   it("sends only the public hostname and requested size, never the port", () => {
-    expect(faviconUrlForOrigin("https://github.com:8443/pingdotgg/t3code?private=query", 64)).toBe(
-      "https://www.google.com/s2/favicons?domain=github.com&sz=64",
-    );
+    expect(
+      faviconUrlForOrigin("https://github.com:8443/pingdotgg/t3code?private=query", 64, false),
+    ).toBe("https://www.google.com/s2/favicons?domain=github.com&sz=64");
+  });
+
+  // t3code-pm:
+  it("asks no favicon service in PM3code", () => {
+    expect(faviconUrlForOrigin("https://example.com/docs", 64)).toBeNull();
   });
 
   // regression: #5838 no favicon request for missing or non-http origins
   it.each([null, "invalid URL", "file:///tmp/private"])(
     "rejects an invalid or unsupported origin %s",
     (origin) => {
-      expect(faviconUrlForOrigin(origin)).toBeNull();
+      expect(faviconUrlForOrigin(origin, 32, false)).toBeNull();
     },
   );
 });

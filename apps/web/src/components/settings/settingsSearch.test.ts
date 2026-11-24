@@ -414,3 +414,20 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/appearance", "theme")).toBeNull();
   });
 });
+
+// t3code-pm:
+describe("PM3code settings search", () => {
+  it("offers neither T3's privacy policy nor OpenTelemetry export", () => {
+    const ids = filterAvailableSettingsSearchItems({
+      hasCloudPublicConfig: true,
+      hasEnvironment: true,
+      hasProviderSettingsEnvironment: true,
+      canManageLocalBackend: true,
+      isWslSettingsRowVisible: true,
+      hasThreadAutoSettlement: true,
+    }).map((item) => item.id);
+    expect(ids).toContain("diagnostics");
+    expect(ids).not.toContain("privacy-policy");
+    expect(ids).not.toContain("telemetry-export");
+  });
+});

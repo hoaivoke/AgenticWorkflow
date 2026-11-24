@@ -2,10 +2,10 @@ import Constants from "expo-constants";
 import { Observe } from "expo-observe";
 
 // Importing expo-observe installs its global JS error handler; reports leave only through the relay.
-const relayUrl: unknown = Constants.expoConfig?.extra?.relay?.url;
 const appVariant: unknown = Constants.expoConfig?.extra?.appVariant;
 
-export const crashReportingAvailable = typeof relayUrl === "string" && relayUrl.trim() !== "";
+// t3code-pm: PM3code sends no crash reports or launch timings, so Observe never dispatches.
+export const crashReportingAvailable = false as boolean;
 
 interface PromiseRejectionTracker {
   readonly enablePromiseRejectionTracker?: (options: {

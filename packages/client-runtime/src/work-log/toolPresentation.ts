@@ -1,3 +1,4 @@
+import { isFaviconServiceUrl } from "@t3tools/shared/favicon"; // t3code-pm:
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
 import { COMPUTER_USE_TOOL_SOURCE, dynamicToolSurface } from "@t3tools/shared/toolActivity";
 import type {
@@ -31,6 +32,7 @@ function imageUrl(value: unknown): string | undefined {
   if (!raw) return undefined;
   try {
     const url = new URL(raw);
+    if (isFaviconServiceUrl(url)) return undefined; // t3code-pm:
     return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "data:"
       ? url.href
       : undefined;

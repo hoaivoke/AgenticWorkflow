@@ -4,10 +4,16 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as OtlpResource from "effect/observability/OtlpResource";
 
+import { DEFAULT_SIGNAL_EXPORT } from "./observability.ts";
 import * as OtelEnvironment from "./otelEnvironment.ts";
 
+// t3code-pm: upstream's cases read upstream's exporter config.
+const upstreamLoad = OtelEnvironment.load.pipe(
+  Effect.provideService(OtelEnvironment.PmNoOtlpExport, false),
+);
+
 const load = (env: Record<string, string>) =>
-  OtelEnvironment.load.pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))));
+  upstreamLoad.pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))));
 
 const SPEC_OFF =
   "OTEL_SDK_DISABLED is set, so no telemetry is exported, whatever configured it; set T3CODE_OTEL_SDK_DISABLED=false to export anyway";
@@ -366,7 +372,7 @@ describe("OtelEnvironment", () => {
         const layerEnv = ConfigProvider.layer(
           ConfigProvider.fromEnv({ env: { OTEL_RESOURCE_ATTRIBUTES: raw } }),
         );
-        const otel = yield* OtelEnvironment.load.pipe(Effect.provide(layerEnv));
+        const otel = yield* upstreamLoad.pipe(Effect.provide(layerEnv));
         const resource = yield* OtlpResource.fromConfig({ serviceName: "t3" }).pipe(
           Effect.provide(
             Layer.provide(
@@ -428,3 +434,32 @@ describe("isRelayTracingEnabled", () => {
     }),
   );
 });
+
+// t3code-pm: no variable, setting or bootstrap URL makes PM3code export over OTLP.
+it.effect("PM3code resolves no OTLP endpoint for any signal", () =>
+  Effect.gen(function* () {
+    const otel = yield* OtelEnvironment.load.pipe(
+      Effect.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnv({
+            env: {
+              OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+              OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://127.0.0.1:4318/v1/traces",
+              T3CODE_OTEL_SDK_DISABLED: "false",
+            },
+          }),
+        ),
+      ),
+    );
+    for (const signal of ["traces", "metrics", "logs"] as const) {
+      assert.isUndefined(
+        OtelEnvironment.resolveSignalEndpoint(
+          otel,
+          signal,
+          { url: `http://127.0.0.1:4318/v1/${signal}`, export: DEFAULT_SIGNAL_EXPORT },
+          { bootstrapUrl: "http://127.0.0.1:4318/b", settingsUrl: "http://127.0.0.1:4318/s" },
+        ),
+      );
+    }
+  }),
+);

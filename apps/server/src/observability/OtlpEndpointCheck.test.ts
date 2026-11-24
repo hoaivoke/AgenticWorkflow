@@ -32,6 +32,7 @@ const checkWith = (
   status: number | null,
   overrides: Partial<ServerConfig.ServerConfig["Service"]> = {},
   httpClientLayer?: Layer.Layer<HttpClient.HttpClient>,
+  pmBuild = false, // t3code-pm: upstream's cases send the check
 ) => {
   const requests: Array<PostedRequest> = [];
   const httpClient = HttpClient.make((request, _url, signal) => {
@@ -56,11 +57,15 @@ const checkWith = (
       return ServerConfig.make({ ...config, ...overrides });
     }),
   ).pipe(Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-otlp-check-" })));
-  const layer = OtlpEndpointCheck.layer.pipe(
+  const checkLayer = OtlpEndpointCheck.layer.pipe(
     Layer.provide(httpClientLayer ?? Layer.succeed(HttpClient.HttpClient, httpClient)),
     Layer.provide(configLayer),
     Layer.provide(NodeServices.layer),
   );
+  // t3code-pm: the PM3code case runs the real default.
+  const layer = pmBuild
+    ? checkLayer
+    : checkLayer.pipe(Layer.provide(Layer.succeed(OtelEnvironment.PmNoOtlpExport, false)));
   return { requests, layer };
 };
 
@@ -71,6 +76,24 @@ const check = (input: Parameters<OtlpEndpointCheck.OtlpEndpointCheck["Service"][
   });
 
 describe("OtlpEndpointCheck", () => {
+  // t3code-pm:
+  it.effect("PM3code sends no check to any OTLP endpoint", () => {
+    const { requests, layer } = checkWith(
+      200,
+      { otlpTracesUrl: "https://collector.example.com/v1/traces" },
+      undefined,
+      true,
+    );
+    return Effect.gen(function* () {
+      const result = yield* check({
+        signal: "traces",
+        url: "https://collector.example.com/v1/traces",
+      });
+      assert.strictEqual(result._tag, "Unreachable");
+      assert.lengthOf(requests, 0);
+    }).pipe(Effect.provide(layer));
+  });
+
   it.effect("keeps T3 credentials paired with each running signal endpoint", () => {
     const signalExport = { ...DEFAULT_SIGNAL_EXPORT, headers: { "x-api-key": "secret" } };
     const { requests, layer } = checkWith(200, {

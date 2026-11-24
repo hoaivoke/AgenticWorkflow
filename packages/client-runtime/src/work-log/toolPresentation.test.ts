@@ -78,3 +78,25 @@ describe("extractToolActivityPresentation", () => {
     ).toEqual({});
   });
 });
+
+// t3code-pm:
+describe("PM3code tool icons", () => {
+  it("drops Google favicon-service icons a provider names", () => {
+    const toolSource = (icon: unknown) => ({
+      toolSource: { key: "mcp:firecrawl", name: "Firecrawl", kind: "integration", icon },
+    });
+    for (const logoUrl of [
+      "https://www.google.com/s2/favicons?domain=firecrawl.dev&sz=64",
+      "https://t2.gstatic.com/faviconV2?url=https://firecrawl.dev",
+    ]) {
+      expect(extractToolActivityPresentation(toolSource({ _tag: "themed-logo", logoUrl }))).toEqual(
+        { toolSource: { key: "mcp:firecrawl", name: "Firecrawl", kind: "integration" } },
+      );
+    }
+    expect(
+      extractToolActivityPresentation(
+        toolSource({ _tag: "themed-logo", logoUrl: "https://firecrawl.dev/logo.png" }),
+      ).toolSource?.icon,
+    ).toEqual({ _tag: "themed-logo", logoUrl: "https://firecrawl.dev/logo.png" });
+  });
+});

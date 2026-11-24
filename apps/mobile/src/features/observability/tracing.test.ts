@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import { vi } from "vite-plus/test";
 
 import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
+import { PmNoRelayTracing, withRelayClientTracing } from "@t3tools/shared/relayTracing";
 
 import * as Tracing from "./tracing";
 
@@ -58,5 +58,27 @@ it.effect("does not let OTLP serialization failures alter application effects", 
         );
       }),
     ),
+    Effect.provideService(PmNoRelayTracing, false), // t3code-pm: upstream's exporter
+  );
+});
+
+// t3code-pm: the PM3code app exports no traces, even when its build carries a traces token.
+it.effect("PM3code sends no relay traces", () => {
+  const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
+  const layerTracing = Tracing.layerFromConfig(
+    {
+      tracesUrl: "https://api.axiom.test/v1/traces",
+      tracesDataset: "mobile-traces",
+      tracesToken: "public-ingest-token",
+    },
+    { appVariant: "pm", serviceInstanceId: "test-instance", serviceVersion: "1.2.3" },
+  ).pipe(Layer.provide(layerRemoteHttpClient(fetchFn)));
+  const layerTracedApplication = Layer.effectDiscard(
+    Effect.void.pipe(Effect.withSpan("mobile.test.span"), withRelayClientTracing),
+  ).pipe(Layer.provide(layerTracing));
+
+  return Layer.build(layerTracedApplication).pipe(
+    Effect.scoped,
+    Effect.andThen(Effect.sync(() => expect(fetchFn).not.toHaveBeenCalled())),
   );
 });

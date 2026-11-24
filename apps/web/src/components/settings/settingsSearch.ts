@@ -17,7 +17,7 @@ import type { MessageResolver } from "../../i18n/messages";
 import { commandLabel } from "./KeybindingsSettings.logic";
 import type { ResolvedSettingsScope } from "./settingsScope";
 import * as Pm from "../../pm/settingsSearch"; // t3code-pm:
-import { PM_COLLECTS_USAGE_DATA } from "../../pm/usageData"; // t3code-pm:
+import { PM_COLLECTS_USAGE_DATA, PM_OFFERS_OTLP_EXPORT } from "../../pm/usageData"; // t3code-pm:
 
 export type SettingsPath =
   | "/settings/projects"
@@ -1649,7 +1649,10 @@ export function filterAvailableSettingsSearchItems(
   availability: SettingsSearchAvailability,
 ): ReadonlyArray<SettingsSearchItem> {
   const items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS.filter(
-    (item) => PM_COLLECTS_USAGE_DATA || item.id !== "privacy-policy", // t3code-pm:
+    // t3code-pm:
+    (item) =>
+      (PM_COLLECTS_USAGE_DATA || item.id !== "privacy-policy") &&
+      (PM_OFFERS_OTLP_EXPORT || item.id !== "telemetry-export"),
   );
   return items.filter(
     (item) =>

@@ -1,3 +1,9 @@
+# PM3code sends zero telemetry
+
+No analytics, no crash reports, no usage pings and no tracking IDs, from the desktop app, the server, the web app or the Android app. No setting or environment variable turns any of it on. Besides the agents and providers you use, it only makes the few feature calls listed under [Runs beside T3 Code](#runs-beside-t3-code), such as fetching the model list from GitHub.
+
+PM3code 0.2.1 and 0.2.2 sent usage analytics to T3 Code's account by default. 0.2.3 stopped that.
+
 <h1 align="center">PM3code - PMs Mod for T3code</h1>
 
 <p align="center">T3 Code with project managers in your sidebar.</p>
@@ -134,7 +140,7 @@ PM3code installs as its own app, with its own name, its own `t3-pm` command, and
 - **Go back:** open the official T3 Code. It never saw `~/.t3-pm`, so there is nothing to undo. To take your fork threads with you, copy the same file the other way while both apps are closed. PMs open there as plain threads.
 - **Remove it:** delete the app and `~/.t3-pm`.
 - **Updates:** the app does not update itself. Download new versions from [Releases](https://github.com/maddada/pm3code/releases).
-- **Usage data:** PM3code sends none. To send analytics to a PostHog project of your own, set `T3CODE_TELEMETRY_ENABLED=true`, `T3CODE_POSTHOG_KEY` and `T3CODE_POSTHOG_HOST`.
+- **Network:** besides your agents and providers, PM3code fetches the model list and token prices from GitHub, checks your agents' download sites for new versions (turn that off under **Settings > Updates**), and reaches Open VSX only when you browse themes. Links in chats show a generic icon, so no favicon service sees which sites you discuss. Logs and traces stay in files on your machine; nothing is exported over OpenTelemetry, whatever `OTEL_*` or `T3CODE_OTLP_*` variables say.
 
 A new PM's first turn runs on Claude Opus at high effort. Each later PM starts on the model the previous one used, and you can change a PM's model in its composer.
 

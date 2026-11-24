@@ -51,6 +51,7 @@ import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { TelemetryExportSettings } from "./TelemetryExportSettings";
+import { PM_OFFERS_OTLP_EXPORT } from "../../pm/usageData"; // t3code-pm:
 
 const NUMBER_FORMAT = new Intl.NumberFormat();
 
@@ -1442,7 +1443,9 @@ function DiagnosticsSettingsBody() {
           />
         )}
       </SettingsSection>
-      {exportFormEnvironmentId === environmentId && <TelemetryExportSettings />}
+      {PM_OFFERS_OTLP_EXPORT && exportFormEnvironmentId === environmentId && (
+        <TelemetryExportSettings />
+      )}
     </SettingsPageContainer>
   );
 }
