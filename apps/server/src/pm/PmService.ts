@@ -1073,15 +1073,17 @@ const make = Effect.gen(function* () {
   });
 
   /**
-   * Clears snoozes that are due, so a woken ask counts as Needs you again on every client without
-   * waiting for some other change (Ghostex 48247ad15).
+   * Clears ask and page snoozes that are due, so a woken row counts as Needs you again on every
+   * client without waiting for some other change (Ghostex 48247ad15, 51ba8d55e).
    */
-  const wakeSnoozedAsks = Effect.fn("PmService.wakeSnoozedAsks")(function* () {
+  const wakeSnoozed = Effect.fn("PmService.wakeSnoozed")(function* () {
     const nowMs = yield* Clock.currentTimeMillis;
-    const due = (yield* store.listSnoozedAsks()).filter((ask) => !isSnoozed(ask, nowMs));
-    for (const ask of due)
+    const asks = (yield* store.listSnoozedAsks()).filter((ask) => !isSnoozed(ask, nowMs));
+    const pages = (yield* store.listSnoozedPages()).filter((page) => !isSnoozed(page, nowMs));
+    for (const ask of asks)
       yield* store.updateAsk(ask.pmThreadId, ask.askNo, { snoozed_until: null });
-    for (const pm of new Set(due.map((ask) => ask.pmThreadId))) yield* changed(pm);
+    for (const page of pages) yield* store.updatePage(page.pageId, { snoozed_until: null });
+    for (const pm of new Set([...asks, ...pages].map((row) => row.pmThreadId))) yield* changed(pm);
   });
 
   const dismissAsk = Effect.fn("PmService.dismissAsk")(function* (pm: string, askNo: number) {
@@ -1722,7 +1724,7 @@ const make = Effect.gen(function* () {
     nextTag,
     answerAsk,
     snoozeAsk,
-    wakeSnoozedAsks,
+    wakeSnoozed,
     dismissAsk,
     undoDismissAsk,
     startWorker,

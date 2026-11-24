@@ -158,28 +158,36 @@ describe("asks from the dock", () => {
     }).pipe(Effect.provide(harness(world)));
   });
 
-  it.effect("a snoozed ask is not Needs you until it wakes; the sweep clears a due snooze", () => {
-    const world = makeWorld();
-    return Effect.gen(function* () {
-      const service = yield* PmService;
-      const pm = yield* createPm(world);
-      yield* withAsk(pm);
-      const rowState = Effect.map(service.summaries(), (event) => event.pms[0]!.rowState);
-      assert.strictEqual(yield* rowState, "needs_you");
-      const until = DateTime.formatIso(DateTime.add(yield* DateTime.now, { hours: 1 }));
-      yield* service.snoozeAsk(pm, 1, until);
-      assert.strictEqual(yield* rowState, "idle");
-      yield* service.wakeSnoozedAsks();
-      assert.strictEqual((yield* service.detail(pm))!.asks[0]!.snoozedUntil, until);
-      yield* TestClock.adjust("61 minutes");
-      assert.strictEqual(yield* rowState, "needs_you");
-      yield* service.wakeSnoozedAsks();
-      expect((yield* service.detail(pm))!.asks[0]).toMatchObject({
-        state: "open",
-        snoozedUntil: null,
-      });
-    }).pipe(Effect.provide(harness(world)));
-  });
+  it.effect(
+    "a snoozed ask is not Needs you until it wakes; the sweep clears due ask and page snoozes",
+    () => {
+      const world = makeWorld();
+      return Effect.gen(function* () {
+        const service = yield* PmService;
+        const pm = yield* createPm(world);
+        yield* withAsk(pm);
+        yield* service.pageShow(pm, { html: "<p>FYI</p>", title: "Plan", sourceName: "plan.html" });
+        const { pageId } = (yield* service.detail(pm))!.pages[0]!;
+        const rowState = Effect.map(service.summaries(), (event) => event.pms[0]!.rowState);
+        assert.strictEqual(yield* rowState, "needs_you");
+        const until = DateTime.formatIso(DateTime.add(yield* DateTime.now, { hours: 1 }));
+        yield* service.snoozeAsk(pm, 1, until);
+        yield* service.pageSnooze(pageId, until);
+        assert.strictEqual(yield* rowState, "idle");
+        yield* service.wakeSnoozed();
+        assert.strictEqual((yield* service.detail(pm))!.asks[0]!.snoozedUntil, until);
+        assert.strictEqual((yield* service.detail(pm))!.pages[0]!.snoozedUntil, until);
+        yield* TestClock.adjust("61 minutes");
+        assert.strictEqual(yield* rowState, "needs_you");
+        yield* service.wakeSnoozed();
+        expect((yield* service.detail(pm))!.asks[0]).toMatchObject({
+          state: "open",
+          snoozedUntil: null,
+        });
+        assert.isNull((yield* service.detail(pm))!.pages[0]!.snoozedUntil);
+      }).pipe(Effect.provide(harness(world)));
+    },
+  );
 
   it.effect("an ask the user changed shows in the open-asks note; the PM's own asks do not", () => {
     const world = makeWorld();

@@ -761,6 +761,21 @@ const make = Effect.gen(function* () {
         "listPages",
         sql`SELECT * FROM pm_pages WHERE pm_thread_id = ${pm} ORDER BY created_at`,
       ).pipe(Effect.map((found) => found.map(toPage))),
+    /** Open pages with a snooze time, across PMs, for the same sweep (Ghostex 51ba8d55e). */
+    listSnoozedPages: () =>
+      rows(
+        "listSnoozedPages",
+        sql`SELECT page_id, pm_thread_id, snoozed_until FROM pm_pages
+            WHERE state = 'open' AND snoozed_until IS NOT NULL`,
+      ).pipe(
+        Effect.map((found) =>
+          found.map((row) => ({
+            pageId: String(row.page_id),
+            pmThreadId: String(row.pm_thread_id),
+            snoozedUntil: String(row.snoozed_until),
+          })),
+        ),
+      ),
     updatePage: (pageId: string, patch: PmPagePatch) =>
       exec("updatePage", sql`UPDATE pm_pages SET ${sql.update(patch)} WHERE page_id = ${pageId}`),
     /** First submission wins: false when the page was no longer open. */
