@@ -25,6 +25,7 @@ import {
   type ThemeHalves,
   type ThemePreferenceMode,
 } from "../themePalette";
+import { PM_DEFAULT_THEME } from "../pm/ghostexTheme";
 
 type Theme = ThemePreference;
 type ThemeSnapshot = {
@@ -152,7 +153,8 @@ function readStoredFollowSystem(theme: Theme): boolean {
     if (raw === "false") return false;
   } catch {}
 
-  return theme === "system";
+  // t3code-pm: the unsaved Ghostex default follows the system like T3's stock default does.
+  return theme === "system" || theme === PM_DEFAULT_THEME;
 }
 
 function isThemePreferenceMode(value: string | null): value is ThemePreferenceMode {
@@ -199,6 +201,8 @@ export function readThemePreference(): Theme {
   if (raw !== null && isKnownThemePreference(raw)) {
     return canonicalThemePreference(raw);
   }
+  // t3code-pm: with no choice saved, PM3code starts on Ghostex; a saved choice still wins.
+  if (raw === null) return PM_DEFAULT_THEME;
   return DEFAULT_THEME_SNAPSHOT.theme;
 }
 

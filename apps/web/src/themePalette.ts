@@ -31,6 +31,7 @@ import {
 } from "./lib/contextChipAccents";
 
 import { m } from "./i18n/messages";
+import { PM_GHOSTEX_THEME } from "./pm/ghostexTheme";
 import { appAtomRegistry, subscribeAtomChanges } from "./rpc/atomRegistry";
 import { applyThemeBackground } from "./themeBackground";
 import { applyThemeCss } from "./themeCss";
@@ -370,7 +371,8 @@ function getEnvironmentThemes(): ReadonlyArray<ThemeDefinition> {
 }
 
 export function isReservedThemeId(themeId: string): boolean {
-  return RESERVED_THEME_IDS.has(themeId);
+  // t3code-pm: a saved theme cannot take the built-in Ghostex id.
+  return RESERVED_THEME_IDS.has(themeId) || themeId === PM_GHOSTEX_THEME.id;
 }
 
 export function getStoredCustomThemeCollection(
@@ -1226,7 +1228,11 @@ export function updateThemeColorFamily(
   }
 }
 
-const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = BUILT_IN_THEMES;
+// t3code-pm: Ghostex ships built in, ahead of T3's own.
+const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = [
+  PM_GHOSTEX_THEME,
+  ...BUILT_IN_THEMES,
+];
 
 export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | null {
   const themeId = themeIdFromPreference(theme);
