@@ -36,12 +36,14 @@
   "df94833d32f5ad52": "Itens de trabalho",
   "1aac859148a1fedf": "{count} abertos",
   "44cee70b16f3db94": "Ainda não há itens de trabalho.",
+  "3ee835c3e0592c5a": "sua resposta",
+  "e608c6de25e8dbe8": "outro item",
   "6f9f3b3f51f70c54": "{done} de {total} etapas",
   "e030e7d67e99a86a": "{count, plural, one {# para você} other {# para você}}",
   "86023a8bc5947bf7": "PR",
   "caaba3154aaea948": "Issue",
   "e176b5f17630f05b": "Link",
-  "ba9bc83a263d030c": "Aguarda {target}",
+  "dcf069d9f607842c": "Aguardando {target}",
   "ad78fae7d373cf21": "Trabalhando",
   "cff84ea88171b008": "Aguardando sua resposta",
   "7b022008c76d6606": "Ocioso",
@@ -122,7 +124,7 @@
   "e4ec81a275142d77": "Ocioso com trabalho pendente",
   "159a92159a432994": "Reiniciado",
   "8864d8f92b7de6aa": "Relatório de \"{worker}\"",
-  "df255bfe3cdd9363": "Visto · {title}",
+  "0c1b912139183fc5": "Arquivado · {title}",
   "5a72e98e40a3f5f7": "Respostas · {title}",
-  "97ec836cdbc4c90a": "Marcado como visto."
+  "e5dc18fdd5daef98": "O gerente de projeto foi avisado."
 }

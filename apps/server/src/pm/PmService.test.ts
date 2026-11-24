@@ -1,8 +1,10 @@
 import { assert, describe, expect, it } from "@effect/vitest";
 import { ProviderInstanceId, RunId } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { layerPm, makeWorld, messagesTo, PROJECT, type PmWorld } from "./Pm.testkit.ts";
@@ -153,6 +155,29 @@ describe("asks from the dock", () => {
       ask = (yield* service.detail(pm))!.asks[0]!;
       expect(ask).toMatchObject({ state: "open", snoozedUntil: null });
       assert.strictEqual((yield* service.detail(pm))!.items[0]!.shownStatus, "blocked");
+    }).pipe(Effect.provide(harness(world)));
+  });
+
+  it.effect("a snoozed ask is not Needs you until it wakes; the sweep clears a due snooze", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      const service = yield* PmService;
+      const pm = yield* createPm(world);
+      yield* withAsk(pm);
+      const rowState = Effect.map(service.summaries(), (event) => event.pms[0]!.rowState);
+      assert.strictEqual(yield* rowState, "needs_you");
+      const until = DateTime.formatIso(DateTime.add(yield* DateTime.now, { hours: 1 }));
+      yield* service.snoozeAsk(pm, 1, until);
+      assert.strictEqual(yield* rowState, "idle");
+      yield* service.wakeSnoozedAsks();
+      assert.strictEqual((yield* service.detail(pm))!.asks[0]!.snoozedUntil, until);
+      yield* TestClock.adjust("61 minutes");
+      assert.strictEqual(yield* rowState, "needs_you");
+      yield* service.wakeSnoozedAsks();
+      expect((yield* service.detail(pm))!.asks[0]).toMatchObject({
+        state: "open",
+        snoozedUntil: null,
+      });
     }).pipe(Effect.provide(harness(world)));
   });
 

@@ -25,7 +25,7 @@ import { buildThreadRouteParams } from "../threadRoutes";
 import { formatShortTimestamp } from "../timestampFormat";
 import { runPmCommand } from "./actions";
 import { savePmMission } from "./mission";
-import { pmItemGroups } from "@t3tools/pm/client";
+import { pmItemGroups, pmWaitTarget } from "@t3tools/pm/client";
 import { pmCommands, pmKey, usePmSummary, usePmThreadDetail } from "./state";
 import { openPmPage, usePmFold } from "./uiState";
 import { PmNotMovingChip } from "./notMovingChip";
@@ -309,6 +309,23 @@ function PmItemCard(props: {
     worker.itemNo === item.itemNo && worker.limitResetAt ? [worker.limitResetAt] : [],
   );
   const resetAt = limitResets.toSorted()[0] ?? null;
+  const openWaits = item.waits.filter((wait) => wait.open);
+  const waitWords = (wait: (typeof openWaits)[number]) => {
+    const target = pmWaitTarget(wait, props.detail.items);
+    if (target.kind === "text") return target.text;
+    if (target.kind === "answer")
+      return gt("your answer", { $context: "what a work item waits on" });
+    return target.title ?? gt("another item", { $context: "what a work item waits on" });
+  };
+  // As in Ghostex, a row under Waiting says what it waits on, without repeating "Waiting on".
+  const waitsLine =
+    item.shownStatus === "waiting" && openWaits.length > 0
+      ? openWaits
+          .map(waitWords)
+          .join(", ")
+          .replace(/^./u, (first) => first.toUpperCase())
+      : null;
+  const subline = item.doneLine ?? waitsLine ?? item.nowLine;
   return (
     <div className="mx-1 mb-1.5 rounded-lg border border-border/70 bg-card/60 px-2.5 py-2 text-xs">
       <button
@@ -318,11 +335,7 @@ function PmItemCard(props: {
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium text-foreground text-sm">{item.title}</span>
-          {item.nowLine || item.doneLine ? (
-            <span className="block truncate text-muted-foreground">
-              {item.doneLine ?? item.nowLine}
-            </span>
-          ) : null}
+          {subline ? <span className="block truncate text-muted-foreground">{subline}</span> : null}
         </span>
         <span className="shrink-0 text-muted-foreground">W{item.itemNo}</span>
       </button>
@@ -370,20 +383,13 @@ function PmItemCard(props: {
               <span className={cn(step.done && "text-muted-foreground")}>{step.text}</span>
             </div>
           ))}
-          {item.waits
-            .filter((wait) => wait.open)
-            .map((wait) => (
-              <div key={wait.number} className="text-muted-foreground">
-                {gt("Waits on {target}", {
-                  target:
-                    wait.onKind === "item"
-                      ? `W${wait.onRef}`
-                      : wait.onKind === "ask"
-                        ? `Q${wait.onRef}`
-                        : wait.onRef,
-                })}
-              </div>
-            ))}
+          {waitsLine === null
+            ? openWaits.map((wait) => (
+                <div key={wait.number} className="text-muted-foreground">
+                  {gt("Waiting on {target}", { target: waitWords(wait) })}
+                </div>
+              ))
+            : null}
           {asks.map((ask) => (
             <div key={ask.askNo} className="text-warning-foreground">
               Q{ask.askNo} {ask.title}

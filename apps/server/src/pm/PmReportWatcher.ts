@@ -264,6 +264,7 @@ const make = Effect.gen(function* () {
   /** Time-based reports: quiet while running, and idle while owing work. */
   const sweep = Effect.gen(function* () {
     if (!(yield* pm.isEnabled)) return;
+    yield* pm.wakeSnoozedAsks().pipe(Effect.ignore);
     const workers = (yield* store.listWorkers().pipe(Effect.orElseSucceed(() => []))).filter(
       (worker) => worker.resolvedAt === null,
     );

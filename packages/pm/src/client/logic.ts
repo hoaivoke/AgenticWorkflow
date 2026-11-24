@@ -263,8 +263,36 @@ export function pmWorkerDot(shell: {
   return "idle";
 }
 
-/** One dot per kind present, back to front, so the most urgent is drawn on top. */
+/**
+ * One dot per kind present, back to front, so the most urgent is drawn on top. As in Ghostex, a
+ * finished worker's blue dot waits while another worker is still working.
+ */
 export const pmDotStack = (dots: Iterable<PmWorkerDot>): ReadonlyArray<PmWorkerDot> => {
   const present = new Set(dots);
+  if (present.has("working")) present.delete("finished");
   return DOT_URGENCY.filter((dot) => present.has(dot));
 };
+
+/** What a wait is on, as the user reads it: never a bare `W<n>` or `Q<n>` tag. */
+export type PmWaitTarget =
+  | { readonly kind: "item"; readonly title: string | null }
+  | { readonly kind: "answer" }
+  | { readonly kind: "text"; readonly text: string };
+
+const WAIT_LEAD = /^(waiting|waits) (on|for)\s+/i;
+
+/** Another item by its title, a question as the user's answer, words without a "waiting on" lead. */
+export function pmWaitTarget(
+  wait: Pick<PmItem["waits"][number], "onKind" | "onRef">,
+  items: ReadonlyArray<Pick<PmItem, "itemNo" | "title">>,
+): PmWaitTarget {
+  if (wait.onKind === "item")
+    return {
+      kind: "item",
+      title: items.find((item) => String(item.itemNo) === wait.onRef)?.title ?? null,
+    };
+  if (wait.onKind === "ask") return { kind: "answer" };
+  const text = wait.onRef.trim();
+  const stripped = text.replace(WAIT_LEAD, "").trim();
+  return { kind: "text", text: stripped.length > 0 ? stripped : text };
+}
