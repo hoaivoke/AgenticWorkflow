@@ -10,7 +10,7 @@ on:
       version:
         description: App version baked into the packages
         required: true
-        default: "0.2.2"
+        default: "0.2.3"
 
 permissions:
   # release-desktop.yml's Windows job reads this run's artifact list to wait for the Linux CLI archive.
