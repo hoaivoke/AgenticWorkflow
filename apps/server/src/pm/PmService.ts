@@ -121,10 +121,19 @@ function workerStateOf(
   return "idle";
 }
 
-/** Not moving, as Ghostex means it: still quiet a round after the watcher's nudge. */
-const isQuiet = (worker: PmWorkerRow, shell: OrchestrationV2ThreadShell | null) => {
+const OWED_OR_NUDGED = new Set<PmReportKind>(["stopped", "restarted", "idle"]);
+
+/** Not moving, as Ghostex means it: still quiet a round after the nudge, or stopped again after it. */
+const isNotMoving = (
+  worker: PmWorkerRow,
+  shell: OrchestrationV2ThreadShell | null,
+  state: PmWorkerState,
+) => {
+  if (state === "idle")
+    return worker.lastReportAt !== null && worker.watch.stuckReportAt === worker.lastReportAt;
   const quiet = shell === null ? null : quietStreakOf(shell);
   return (
+    state === "running" &&
     quiet !== null &&
     worker.watch.nudgedRunId === quiet.runId &&
     worker.watch.notMovingStreak === quiet.streak
@@ -840,12 +849,10 @@ const make = Effect.gen(function* () {
     const workerStates = yield* Effect.forEach(workers, (worker) =>
       (worker.resolvedAt !== null ? Effect.succeed(null) : shellOf(worker.workerThreadId)).pipe(
         Effect.orElseSucceed(() => null),
-        Effect.map((shell) => ({
-          worker,
-          shell,
-          state: workerStateOf(worker, shell, nowMs),
-          quiet: isQuiet(worker, shell),
-        })),
+        Effect.map((shell) => {
+          const state = workerStateOf(worker, shell, nowMs);
+          return { worker, shell, state, notMoving: isNotMoving(worker, shell, state) };
+        }),
       ),
     );
     const itemsByNo = new Map(items.map((item) => [item.itemNo, item]));
@@ -879,7 +886,7 @@ const make = Effect.gen(function* () {
         onlyThePm:
           shownStatus === "in_progress" &&
           !onIt.some((entry) => entry.state === "running" || entry.state === "limited"),
-        quietWorkers: onIt.filter((entry) => entry.quiet && entry.state === "running"),
+        quietWorkers: onIt.filter((entry) => entry.notMoving),
         steps: steps.filter((step) => step.itemNo === item.itemNo),
         waits: waits
           .filter((wait) => wait.itemNo === item.itemNo)
@@ -1029,8 +1036,8 @@ const make = Effect.gen(function* () {
             : workerStates
                 .filter((entry) => entry.state !== "resolved")
                 .map(
-                  ({ worker, shell: workerShell, state, quiet }) =>
-                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : quiet && state === "running" ? "running, quiet after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}`,
+                  ({ worker, shell: workerShell, state, notMoving }) =>
+                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : notMoving && state === "running" ? "running, quiet after the nudge" : notMoving ? "stopped again after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}`,
                 )),
         ];
         return lines.join("\n");
@@ -1559,7 +1566,7 @@ const make = Effect.gen(function* () {
         ...askRow,
         answerMessageId: answerMessageId === null ? null : MessageId.make(answerMessageId),
       })),
-      workers: workerStates.map(({ worker, shell, state, quiet }) => ({
+      workers: workerStates.map(({ worker, shell, state, notMoving }) => ({
         threadId: ThreadId.make(worker.workerThreadId),
         itemNo: worker.itemNo,
         // `limited` stays off the wire so older fork clients still decode; the reset time says it.
@@ -1568,7 +1575,7 @@ const make = Effect.gen(function* () {
           state === "limited" && shell !== null
             ? DateTime.formatIso(DateTime.makeUnsafe(usageLimitResetOf(shell)!))
             : null,
-        notMoving: quiet && state === "running",
+        notMoving,
         linkedAt: worker.linkedAt,
         resolvedAt: worker.resolvedAt,
         lastReportKind: worker.lastReportKind,
@@ -1639,7 +1646,7 @@ const make = Effect.gen(function* () {
         rowState: blocked ? "blocked" : needsYou ? "needs_you" : running > 0 ? "running" : "idle",
         workerThreadIds: live.map((entry) => ThreadId.make(entry.worker.workerThreadId)),
         notMovingWorkerThreadIds: live
-          .filter((entry) => entry.quiet && entry.state === "running")
+          .filter((entry) => entry.notMoving)
           .map((entry) => ThreadId.make(entry.worker.workerThreadId)),
       });
     }
@@ -1738,6 +1745,14 @@ const make = Effect.gen(function* () {
       last_report_at: at,
       last_report_line: report.line,
     });
+    // It moved on (finished, waiting, running): a later stop earns a fresh carry-on nudge.
+    if (!OWED_OR_NUDGED.has(report.kind)) {
+      const worker = yield* store.getWorker(report.workerThreadId);
+      if (worker !== null && worker.watch.idleNudgedFor !== undefined) {
+        const { idleNudgedFor: _nudged, stuckReportAt: _stuck, ...watch } = worker.watch;
+        yield* store.updateWatch(report.workerThreadId, watch);
+      }
+    }
     yield* changed(report.pmThreadId);
   });
 

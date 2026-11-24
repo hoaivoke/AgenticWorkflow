@@ -35,10 +35,10 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 
 **Workers that report back.** When a worker finishes, needs an answer, goes quiet for 8 minutes, stops mid-turn, or restarts with the server, its PM gets a report and wakes up. Each report is delivered once, even across restarts.
 
-**An Inbox above the chat box.** The PM's questions (Q1, Q2, ...), its Live pages and its blocked work sit above the chat box, with counts at the top. Pick an answer in one click (the PM's pick has a star), snooze a row, or archive finished to-dos all at once. The Done, Snoozed and Handled drawers keep what the PM finished, what you put off, and what you already answered.
+**An Inbox above the chat box.** The PM's questions (Q1, Q2, ...), its Live pages and its blocked work sit above the chat box, with counts at the top. Pick an answer in one click (the PM's pick has a star), snooze a row, or archive finished to-dos all at once. The Snoozed drawer keeps what you put off, and the Recent drawer below it keeps what the PM finished and what you already answered.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/inbox.png" width="80%" alt="The Inbox above the chat box: counts, two Live pages, two questions with one-click answers, Archive all, and the Done, Snoozed and Handled drawers" />
+  <img src="./docs/pm/screenshots/inbox.png" width="80%" alt="The Inbox above the chat box: counts, two Live pages, two questions with one-click answers, Archive all, and the Snoozed and Recent drawers" />
 </p>
 
 **Live pages.** When a question needs more than a button, the PM publishes a page that opens in a pop-up window over the chat. Your choices go straight back to the PM.

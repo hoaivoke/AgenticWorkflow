@@ -32,6 +32,8 @@ export interface PmWorkerWatch {
   /** The quiet streak it is on when it was still quiet a round after the nudge: "Not moving". */
   readonly notMovingStreak?: string;
   readonly idleNudgedFor?: string;
+  /** The report it stopped with again after the carry-on nudge: "Not moving", never nudged again. */
+  readonly stuckReportAt?: string;
 }
 
 export interface PmWorkerRow {

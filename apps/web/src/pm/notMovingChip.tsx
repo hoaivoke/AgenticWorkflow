@@ -2,7 +2,7 @@ import { useGT } from "gt-react";
 
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 
-/** Ghostex's red "Not moving" chip: still quiet a full round after PM3code nudged it. */
+/** Ghostex's red "Not moving" chip: still quiet a round after PM3code nudged it, or stopped again after it. */
 export function PmNotMovingChip() {
   const gt = useGT();
   return (

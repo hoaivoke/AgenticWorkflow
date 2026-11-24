@@ -186,6 +186,8 @@ function InboxSurface(props: {
     <section
       data-pm-inbox={key}
       data-pm-inbox-rows={inbox.rows.length > 0 ? inbox.rows.length : undefined}
+      // Focus here must not expand the phone composer: it would shift the Inbox mid-tap.
+      data-chat-composer-collapsed-controls="true"
       aria-label={gt("Inbox")}
       tabIndex={-1}
       onKeyDown={onKeyDown}

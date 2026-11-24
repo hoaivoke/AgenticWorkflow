@@ -326,6 +326,33 @@ describe("PmReportWatcher", () => {
           messagesTo(world, worker).map((message) => message.text),
           [IDLE_NUDGE],
         );
+        // The nudge's run fails the same way (a removed model): no second nudge, one chip.
+        const service = yield* PmService;
+        const notMoving = Effect.map(service.detail(pm), (detail) => detail!.workers[0]!.notMoving);
+        yield* watcher.handle(
+          runUpdated(runOf(worker, "run-2", "failed", { completedAt: now }), yield* DateTime.now),
+        );
+        assert.lengthOf(reportsTo(world, pm), 3);
+        yield* watcher.sweep;
+        assert.isTrue(yield* notMoving);
+        yield* TestClock.adjust("30 minutes");
+        yield* watcher.sweep;
+        yield* watcher.sweep;
+        assert.lengthOf(messagesTo(world, worker), 1);
+        assert.lengthOf(reportsTo(world, pm), 3);
+        expect((yield* service.itemList(pm, true)).result).toContain(
+          'A worker on it is not moving, even after PM3code nudged it:\n    W1 Pairing ("Fix pairing")',
+        );
+        // It finishes after a manual fix: the chip clears, and a later stop gets a nudge again.
+        yield* watcher.handle(yield* finishWorker(world, worker, "run-3", "Done."));
+        assert.isFalse(yield* notMoving);
+        world.shells.set(worker, { ...world.shells.get(worker)!, status: "failed" });
+        yield* watcher.handle(
+          runUpdated(runOf(worker, "run-4", "failed", { completedAt: now }), yield* DateTime.now),
+        );
+        yield* TestClock.adjust("10 minutes");
+        yield* watcher.sweep;
+        assert.lengthOf(messagesTo(world, worker), 2);
       }).pipe(Effect.provide(layerPmWithWatcher(world).pipe(Layer.provideMerge(harness))));
     },
   );

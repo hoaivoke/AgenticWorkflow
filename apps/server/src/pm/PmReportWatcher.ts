@@ -318,6 +318,20 @@ const make = Effect.gen(function* () {
       }
       const owed = worker.lastReportKind === "stopped" || worker.lastReportKind === "restarted";
       if (!owed || worker.lastReportAt === null) continue;
+      if (watch.stuckReportAt === worker.lastReportAt) continue;
+      // It stopped again after the carry-on nudge (a removed model, a broken setup): another
+      // nudge only repeats the failure. A usage limit is different: it carries on after the reset.
+      if (
+        watch.idleNudgedFor !== undefined &&
+        watch.idleNudgedFor !== worker.lastReportAt &&
+        usageLimitResetOf(shell) === null
+      ) {
+        yield* store
+          .updateWatch(worker.workerThreadId, { ...watch, stuckReportAt: worker.lastReportAt })
+          .pipe(Effect.ignore);
+        yield* pm.changed(worker.pmThreadId);
+        continue;
+      }
       // A usage limit is waited out: the nudge comes only once its window has reset.
       const idleSince = Math.max(isoMillis(worker.lastReportAt), usageLimitResetOf(shell) ?? 0);
       if (now - idleSince < IDLE_AFTER_MS) continue;
