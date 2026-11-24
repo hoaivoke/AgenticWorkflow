@@ -1,13 +1,13 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import { ProviderInstanceId, RunId } from "@t3tools/contracts";
+import { ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
-import { layerPm, makeWorld, messagesTo, PROJECT, type PmWorld } from "./Pm.testkit.ts";
+import { layerPm, makeWorld, messagesTo, PROJECT, shellFor, type PmWorld } from "./Pm.testkit.ts";
 import { PmService } from "./PmService.ts";
-import { PAGE_ANSWERS_LIMIT, PM_NEW_TITLE } from "./PmText.ts";
+import { PAGE_ANSWERS_LIMIT, PM_CONVERT_MESSAGE, PM_NEW_TITLE } from "./PmText.ts";
 
 const harness = (world: PmWorld) =>
   layerPm(world).pipe(Layer.provideMerge(SqlitePersistence.layerMemory));
@@ -291,4 +291,68 @@ describe("the off switch", () => {
       assert.deepStrictEqual((yield* service.summaries()).pms, []);
     }).pipe(Effect.provide(harness(world)));
   });
+});
+
+describe("make this a PM, and back", () => {
+  const THREAD = "thread:plain";
+
+  it.effect("keeps the thread, sends the convert message, and launches nothing", () => {
+    const world = makeWorld();
+    world.shells.set(THREAD, shellFor(THREAD, { projectId: PROJECT }));
+    return Effect.gen(function* () {
+      const service = yield* PmService;
+      yield* service.convert(ThreadId.make(THREAD));
+      assert.lengthOf(world.launches, 0);
+      const [setup] = messagesTo(world, THREAD);
+      assert.strictEqual(setup?.text, PM_CONVERT_MESSAGE);
+      assert.deepStrictEqual(
+        (yield* service.summaries()).pms.map((pm) => pm.threadId),
+        [THREAD],
+      );
+      const again = yield* Effect.flip(service.convert(ThreadId.make(THREAD)));
+      assert.strictEqual(again.code, "conflict");
+    }).pipe(Effect.provide(harness(world)));
+  });
+
+  it.effect("waits for a running turn to finish", () => {
+    const world = makeWorld();
+    world.shells.set(THREAD, shellFor(THREAD, { projectId: PROJECT, status: "running" }));
+    return Effect.gen(function* () {
+      const service = yield* PmService;
+      const refused = yield* Effect.flip(service.convert(ThreadId.make(THREAD)));
+      assert.strictEqual(refused.code, "conflict");
+      assert.deepStrictEqual((yield* service.summaries()).pms, []);
+    }).pipe(Effect.provide(harness(world)));
+  });
+
+  it.effect(
+    "turning back waits for running workers, lets idle ones go, and a return restores the items",
+    () => {
+      const world = makeWorld();
+      world.shells.set(THREAD, shellFor(THREAD, { projectId: PROJECT }));
+      world.shells.set("thread:worker", shellFor("thread:worker", { projectId: PROJECT }));
+      return Effect.gen(function* () {
+        const service = yield* PmService;
+        yield* service.convert(ThreadId.make(THREAD));
+        yield* service.guide(THREAD, false);
+        yield* service.itemAdd(THREAD, { title: "Launch" });
+        yield* service.linkWorker(THREAD, { thread: "thread:worker", item: "W1" });
+
+        world.shells.set(
+          "thread:worker",
+          shellFor("thread:worker", { projectId: PROJECT, status: "running" }),
+        );
+        assert.strictEqual((yield* Effect.flip(service.revert(THREAD))).code, "conflict");
+
+        world.shells.set("thread:worker", shellFor("thread:worker", { projectId: PROJECT }));
+        yield* service.revert(THREAD);
+        assert.deepStrictEqual((yield* service.summaries()).pms, []);
+        assert.isNull(yield* service.detail(THREAD));
+
+        yield* service.convert(ThreadId.make(THREAD));
+        const summary = (yield* service.summaries()).pms[0]!;
+        expect(summary).toMatchObject({ threadId: THREAD, openItems: 1, workers: 0 });
+      }).pipe(Effect.provide(harness(world)));
+    },
+  );
 });

@@ -19,6 +19,12 @@ export const PM_SETUP_MESSAGE = [
   "Then reply with one short line asking the user for the brief. Start no work yet.",
 ].join(" ");
 
+export const PM_CONVERT_MESSAGE = [
+  "This thread is now a Project Manager (PM) thread for this project in T3 Code.",
+  "Call `pm_guide` now and follow it from here on; the conversation so far is your context.",
+  "Then reply with one short line saying what you understand the brief to be, or asking for it. Start no work yet.",
+].join(" ");
+
 export const QUIET_NUDGE =
   "T3: no new output from you for 8 minutes. Still working? Say what you're waiting on, or carry on.";
 export const IDLE_NUDGE =

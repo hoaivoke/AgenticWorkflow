@@ -14,19 +14,28 @@ export const pmMenuState = (
   projectLabel: string | null,
 ): PmThreadMenuState => {
   const index = pmIndexSnapshot.current;
+  const key = pmKey(thread.environmentId, thread.id);
   return {
     environmentId: thread.environmentId,
     threadId: thread.id,
     projectId: thread.projectId,
     projectLabel,
     enabled: index.enabled.has(thread.environmentId),
-    isPm: index.pms.has(pmKey(thread.environmentId, thread.id)),
+    isPm: index.pms.has(key),
+    isWorker: index.workerOf.has(key),
+    runningWorkers: index.pms.get(key)?.runningWorkers ?? 0,
   };
 };
 
 /** Handles a PM menu item; false for every other item. */
 export function handlePmThreadAction(action: string | null, state: PmThreadMenuState): boolean {
-  if (action !== "pm:new" && action !== "pm:edit-mission") return false;
+  if (
+    action !== "pm:new" &&
+    action !== "pm:edit-mission" &&
+    action !== "pm:make" &&
+    action !== "pm:revert"
+  )
+    return false;
   void import("./entryPoints").then((entryPoints) => entryPoints.runPmThreadAction(action, state));
   return true;
 }

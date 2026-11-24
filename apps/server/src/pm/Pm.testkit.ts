@@ -61,7 +61,7 @@ export const messagesTo = (world: PmWorld, threadId: string) =>
     command.type === "message.dispatch" && command.threadId === threadId ? [command] : [],
   );
 
-const layerFakes = (world: PmWorld) =>
+export const layerFakes = (world: PmWorld) =>
   Layer.mergeAll(
     Layer.mock(ThreadManagement.ThreadManagementService)({
       getThreadShell: (threadId) => Effect.sync(() => world.shells.get(threadId) ?? null),
@@ -116,7 +116,7 @@ const layerFakes = (world: PmWorld) =>
 
 /** PmService, its store and the fakes over the database in context, as one fresh server start. */
 export const layerPm = (world: PmWorld) =>
-  PmLayer.layer.pipe(Layer.provideMerge(layerFakes(world)));
+  PmLayer.layerCore.pipe(Layer.provideMerge(layerFakes(world)));
 
 export const layerPmWithWatcher = (world: PmWorld) =>
   PmReportWatcher.layer.pipe(Layer.provideMerge(layerPm(world)));

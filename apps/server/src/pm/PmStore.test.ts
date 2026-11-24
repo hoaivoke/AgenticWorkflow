@@ -47,7 +47,9 @@ describe("PM migrations", () => {
             "pm_memory",
             "pm_pages",
             "pm_reports",
+            "pm_retired_threads",
             "pm_settings",
+            "pm_t3_imported_threads",
             "pm_threads",
             "pm_workers",
           ].toSorted(),
@@ -71,7 +73,7 @@ describe("PM migrations", () => {
       `;
       assert.deepStrictEqual(
         pmLedger.map((row) => row.migration_id),
-        [1],
+        [1, 2],
       );
     }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
   );

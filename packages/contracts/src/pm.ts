@@ -191,6 +191,52 @@ export class PmError extends Schema.TaggedError<PmError>()("PmError", {
   message: Schema.String,
 }) {}
 
+export const PmT3ImportMode = Schema.Literals(["import", "replace"]);
+export type PmT3ImportMode = typeof PmT3ImportMode.Type;
+
+/** What Settings, Import from T3 Code shows before anything runs. */
+export const PmT3Status = Schema.Struct({
+  syncEnabled: Schema.Boolean,
+  lastLaunch: Schema.NullOr(
+    Schema.Struct({
+      at: Schema.String,
+      projectsAdded: Schema.Number,
+      settingsChanged: Schema.Number,
+      skipped: Schema.NullOr(Schema.String),
+    }),
+  ),
+  source: Schema.NullOr(
+    Schema.Struct({
+      home: Schema.String,
+      threads: Schema.Number,
+      projects: Schema.Number,
+      /** T3 Code's database is newer than this build: importing is refused. */
+      newer: Schema.Boolean,
+    }),
+  ),
+  pmThreads: Schema.Number,
+  importedThreads: Schema.Number,
+});
+export type PmT3Status = typeof PmT3Status.Type;
+
+export const PmT3ImportResult = Schema.Struct({
+  mode: PmT3ImportMode,
+  before: Schema.Struct({ pmThreads: Schema.Number, t3Threads: Schema.Number }),
+  after: Schema.Struct({ pmThreads: Schema.Number }),
+  imported: Schema.Number,
+  removed: Schema.Number,
+  skippedRunning: Schema.Number,
+  skippedAlreadyImported: Schema.Number,
+  skippedNoProject: Schema.Number,
+  skippedConflicts: Schema.Number,
+  projectsAdded: Schema.Number,
+  checkpointRefsCopied: Schema.Number,
+  checkpointRefsFailed: Schema.Number,
+  /** Replace only: PM3code's database as it was, to copy back over statev2.sqlite. */
+  backupPath: Schema.NullOr(Schema.String),
+});
+export type PmT3ImportResult = typeof PmT3ImportResult.Type;
+
 const PmRpcError = Schema.Union([PmError, EnvironmentAuthorizationError]);
 const PmTarget = { pm: ThreadId };
 const Ok = Schema.Struct({});
@@ -214,6 +260,11 @@ export const PM_WS_METHODS = {
   pageMarkSeen: "pm.page.markSeen",
   settingsGet: "pm.settings.get",
   settingsSet: "pm.settings.set",
+  convert: "pm.convert",
+  revert: "pm.revert",
+  t3Status: "pm.t3.status",
+  t3SetSync: "pm.t3.setSync",
+  t3Import: "pm.t3.import",
 } as const;
 
 /** The streaming `pm.*` methods, for the client runtime's subscription factory. */
@@ -322,6 +373,31 @@ export const PmRpcGroup = RpcGroup.make(
     success: PmSettings,
     error: PmRpcError,
   }),
+  Rpc.make(PM_WS_METHODS.convert, {
+    payload: Schema.Struct({ threadId: ThreadId }),
+    success: Ok,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.revert, {
+    payload: Schema.Struct(PmTarget),
+    success: Ok,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.t3Status, {
+    payload: Schema.Struct({}),
+    success: PmT3Status,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.t3SetSync, {
+    payload: Schema.Struct({ enabled: Schema.Boolean }),
+    success: PmT3Status,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.t3Import, {
+    payload: Schema.Struct({ mode: PmT3ImportMode }),
+    success: PmT3ImportResult,
+    error: PmRpcError,
+  }),
 );
 
 /** What a client needs before it offers a PM action; the server checks `PM_RPC_SCOPES`. */
@@ -340,6 +416,10 @@ export const PM_CLIENT_GUARDED_RPC_SCOPES = {
   [PM_WS_METHODS.pageAnswer]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.pageMarkSeen]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.settingsSet]: AuthSettingsWriteScope,
+  [PM_WS_METHODS.convert]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.revert]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.t3SetSync]: AuthSettingsWriteScope,
+  [PM_WS_METHODS.t3Import]: AuthSettingsWriteScope,
 } as const;
 
 /** Read methods; with the guarded ones above, every `pm.*` method has exactly one scope. */
@@ -348,4 +428,5 @@ export const PM_READ_RPC_SCOPES = {
   [PM_WS_METHODS.subscribeThread]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.pageGet]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.settingsGet]: AuthOrchestrationReadScope,
+  [PM_WS_METHODS.t3Status]: AuthSettingsWriteScope,
 } as const;

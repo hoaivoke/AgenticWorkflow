@@ -7,6 +7,7 @@ import { PM_WS_METHODS, PmError, PmRpcGroup, RpcScopeAuthorization } from "@t3to
 import { RpcInstrumentation } from "../observability/RpcInstrumentation.ts";
 
 import { PmService } from "./PmService.ts";
+import { PmT3Import } from "./t3/PmT3Import.ts";
 
 // The middlewares the server group runs, so these handlers spread into its `.of`.
 const PmServerRpcGroup =
@@ -41,6 +42,11 @@ const unavailableHandlers = PmServerRpcGroup.of({
   [PM_WS_METHODS.pageMarkSeen]: refuse,
   [PM_WS_METHODS.settingsGet]: refuse,
   [PM_WS_METHODS.settingsSet]: refuse,
+  [PM_WS_METHODS.convert]: refuse,
+  [PM_WS_METHODS.revert]: refuse,
+  [PM_WS_METHODS.t3Status]: refuse,
+  [PM_WS_METHODS.t3SetSync]: refuse,
+  [PM_WS_METHODS.t3Import]: refuse,
 });
 
 /** Thin transport: each handler calls one PmService method. */
@@ -48,6 +54,9 @@ export const makePmRpcHandlers = Effect.gen(function* () {
   const service = yield* Effect.serviceOption(PmService);
   if (Option.isNone(service)) return unavailableHandlers;
   const pm = service.value;
+  const t3 = Option.getOrUndefined(yield* Effect.serviceOption(PmT3Import));
+  const t3Call = <A>(run: (service: PmT3Import["Service"]) => Effect.Effect<A, PmError>) =>
+    t3 === undefined ? Effect.fail(missing) : run(t3);
   return PmServerRpcGroup.of({
     [PM_WS_METHODS.subscribe]: ({ projectId }) => pm.subscribe(projectId),
     [PM_WS_METHODS.subscribeThread]: ({ pm: thread }) => pm.subscribeThread(thread),
@@ -73,10 +82,21 @@ export const makePmRpcHandlers = Effect.gen(function* () {
     [PM_WS_METHODS.pageMarkSeen]: ({ pageId, reply }) => ok(pm.pageMarkSeen(pageId, reply)),
     [PM_WS_METHODS.settingsGet]: () => pm.getSettings,
     [PM_WS_METHODS.settingsSet]: (input) => pm.setSettings(input),
+    [PM_WS_METHODS.convert]: ({ threadId }) => ok(pm.convert(threadId)),
+    [PM_WS_METHODS.revert]: ({ pm: thread }) => ok(pm.revert(thread)),
+    [PM_WS_METHODS.t3Status]: () => t3Call((service) => service.status),
+    [PM_WS_METHODS.t3SetSync]: ({ enabled }) =>
+      t3Call((service) => service.setSyncEnabled(enabled)),
+    [PM_WS_METHODS.t3Import]: ({ mode }) => t3Call((service) => service.importThreads(mode)),
   });
 });
 
 /** The server's PmService, captured where the WebSocket route is built, for each connection. */
-export const capturePmService = Effect.map(Effect.serviceOption(PmService), (service) =>
-  Option.isNone(service) ? Layer.empty : Layer.succeed(PmService, service.value),
-);
+export const capturePmService = Effect.gen(function* () {
+  const service = yield* Effect.serviceOption(PmService);
+  const t3 = yield* Effect.serviceOption(PmT3Import);
+  return Layer.mergeAll(
+    Option.isNone(service) ? Layer.empty : Layer.succeed(PmService, service.value),
+    Option.isNone(t3) ? Layer.empty : Layer.succeed(PmT3Import, t3.value),
+  );
+});

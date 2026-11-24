@@ -149,6 +149,7 @@ const parseJson = <A>(value: unknown, fallback: A): A => {
     return fallback;
   }
 };
+const jsonText = (value: unknown) => JSON.stringify(value);
 
 const toPm = (row: Row): PmThreadRow => ({
   threadId: String(row.thread_id),
@@ -401,9 +402,53 @@ const make = Effect.gen(function* () {
             WHERE thread_id = ${threadId} RETURNING ${sql(counter)} - 1 AS allocated`,
         (row) => Number(row.allocated),
       ),
+    /** Turn back: the row waits in pm_retired_threads; items, asks and memory stay where they are. */
+    retirePm: (threadId: string, retiredAt: string) =>
+      run(
+        "retirePm",
+        sql.withTransaction(
+          Effect.gen(function* () {
+            const [row] = yield* sql<Row>`SELECT * FROM pm_threads WHERE thread_id = ${threadId}`;
+            if (row === undefined) return;
+            yield* sql`INSERT OR REPLACE INTO pm_retired_threads (pm_thread_id, row_json, retired_at)
+              VALUES (${threadId}, ${jsonText(row)}, ${retiredAt})`;
+            yield* sql`DELETE FROM pm_threads WHERE thread_id = ${threadId}`;
+          }),
+        ),
+      ),
+    /** Make a PM again: brings back the retired row, so its numbering and memory carry on. */
+    restorePm: (threadId: string) =>
+      run(
+        "restorePm",
+        sql.withTransaction(
+          Effect.gen(function* () {
+            const [retired] = yield* sql<{ row_json: string }>`
+              SELECT row_json FROM pm_retired_threads WHERE pm_thread_id = ${threadId}`;
+            if (retired === undefined) return false;
+            const row = parseJson<Row>(retired.row_json, {});
+            yield* sql`INSERT OR IGNORE INTO pm_threads ${sql.insert(row)}`;
+            yield* sql`DELETE FROM pm_retired_threads WHERE pm_thread_id = ${threadId}`;
+            return true;
+          }),
+        ),
+      ),
+    isRetiredPm: (threadId: string) =>
+      rows(
+        "isRetiredPm",
+        sql`SELECT 1 AS found FROM pm_retired_threads WHERE pm_thread_id = ${threadId}`,
+      ).pipe(Effect.map((found) => found.length > 0)),
+    /** Idle provider sessions of a thread; detaching one makes its next turn list tools afresh. */
+    idleProviderSessions: (threadId: string) =>
+      rows(
+        "idleProviderSessions",
+        sql`SELECT provider_session_id FROM orchestration_v2_projection_provider_sessions
+            WHERE thread_id = ${threadId} AND status IN ('starting', 'ready', 'error')`,
+      ).pipe(Effect.map((found) => found.map((row) => String(row.provider_session_id)))),
+
     deletePm: (threadId: string) =>
       Effect.forEach(
         [
+          "pm_retired_threads",
           "pm_threads",
           "pm_items",
           "pm_item_steps",

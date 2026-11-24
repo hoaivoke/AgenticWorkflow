@@ -25,6 +25,7 @@ import { useEnvironmentQuery } from "../state/query";
 import { useEnvironmentScope } from "../state/session";
 import { runPmCommand } from "./actions";
 import { pmCommands, pmSettingsQuery } from "./state";
+import { T3ImportSection } from "./T3ImportSection";
 
 /** Settings, Project managers: the switch and the playbook overrides every PM follows. */
 export function PmSettingsPanel() {
@@ -114,6 +115,7 @@ export function PmSettingsPanel() {
           </div>
         </SettingsRow>
       </SettingsSection>
+      <T3ImportSection environmentId={environmentId} canWrite={canWrite} />
       <Dialog open={playbookOpen} onOpenChange={setPlaybookOpen}>
         <DialogPopup className="max-h-[80dvh] sm:max-w-3xl">
           <DialogHeader>

@@ -4,7 +4,7 @@ import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "../i18n/messages";
 
-export type PmThreadActionMenuId = "pm:new" | "pm:edit-mission";
+export type PmThreadActionMenuId = "pm:new" | "pm:edit-mission" | "pm:make" | "pm:revert";
 
 export interface PmThreadMenuState {
   readonly environmentId: EnvironmentId;
@@ -14,9 +14,13 @@ export interface PmThreadMenuState {
   /** PMs are on where this thread lives. */
   readonly enabled: boolean;
   readonly isPm: boolean;
+  /** Works for a PM: it cannot become one until unlinked. */
+  readonly isWorker: boolean;
+  /** Running workers keep a PM from turning back. */
+  readonly runningWorkers: number;
 }
 
-/** "New PM in <project>" beside Filter by project, and "Edit mission…" on a PM's own row. */
+/** "New PM in <project>" beside Filter by project, plus the ways into and out of being a PM. */
 export function pmThreadMenuItems(
   state: PmThreadMenuState | undefined,
   resolve: MessageResolver = m,
@@ -25,8 +29,18 @@ export function pmThreadMenuItems(
   const { isPm } = state;
   return [
     ...(isPm
-      ? [{ id: "pm:edit-mission" as const, label: resolve(msg("Edit mission…")), icon: "pencil" }]
-      : []),
+      ? [
+          { id: "pm:edit-mission" as const, label: resolve(msg("Edit mission…")), icon: "pencil" },
+          {
+            id: "pm:revert" as const,
+            label: resolve(msg("Turn back into a normal thread")),
+            icon: "message-square",
+            disabled: state.runningWorkers > 0,
+          },
+        ]
+      : state.isWorker
+        ? []
+        : [{ id: "pm:make" as const, label: resolve(msg("Make this a PM")), icon: "briefcase" }]),
     {
       id: "pm:new" as const,
       label: state.projectLabel

@@ -1381,7 +1381,7 @@ function OpenCommandPaletteDialog(props: {
       groups: [{ value: NEW_THREAD_IN_GROUP, label: gt("Projects"), items: projectThreadItems }],
     });
   }
-  actionItems.push(...usePmPaletteItems(currentProject)); // t3code-pm:
+  actionItems.push(...usePmPaletteItems(currentProject, activeThread)); // t3code-pm:
 
   if (scratchTargetEnvironmentId !== null) {
     actionItems.push({

@@ -18,6 +18,7 @@ const pmClient = createPmClient(connectionAtomRuntime, environmentPresentations.
 
 export const {
   settingsQuery: pmSettingsQuery,
+  t3StatusQuery: pmT3StatusQuery,
   commands: pmCommands,
   indexAtom: pmIndexAtom,
 } = pmClient;

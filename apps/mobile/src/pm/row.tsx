@@ -10,7 +10,7 @@ import { AppText as Text } from "../components/ui/AppText";
 import { SymbolView } from "../components/ui/AppSymbol";
 import { cn } from "../lib/cn";
 import { useThreadShells } from "../state/entities";
-import { createPm } from "./actions";
+import { convertToPm, createPm, revertPm } from "./actions";
 import { PmNotMovingChip } from "./notMovingChip";
 import { pmWorkerPreview } from "./pm.logic";
 import { usePmIndex, usePmSummary } from "./state";
@@ -117,13 +117,28 @@ function Count(props: {
 
 /**
  * A row's long-press additions: a PM shows its mission first (mobile has no preview to carry it),
- * and every row in an environment with PMs on offers a new PM in its project.
+ * then the way in or out of being a PM, and every row in an environment with PMs on offers a new
+ * PM in its project.
  */
 export function usePmRowMenu(thread: RowThread) {
   const gt = useGT();
   const index = usePmIndex();
   const navigation = useNavigation();
-  const summary = index.pms.get(pmKey(thread.environmentId, thread.id)) ?? null;
+  const key = pmKey(thread.environmentId, thread.id);
+  const summary = index.pms.get(key) ?? null;
+  const role: MenuAction[] =
+    summary !== null
+      ? [
+          {
+            id: "pm-revert",
+            title: gt("Turn back into a normal thread"),
+            image: "bubble.left",
+            attributes: { disabled: summary.runningWorkers > 0 },
+          },
+        ]
+      : index.workerOf.has(key)
+        ? []
+        : [{ id: "pm-make", title: gt("Make this a PM"), image: "briefcase" }];
   const actions: MenuAction[] = index.enabled.has(thread.environmentId)
     ? [
         ...(summary === null
@@ -136,10 +151,19 @@ export function usePmRowMenu(thread: RowThread) {
                 attributes: { disabled: true },
               },
             ]),
+        ...role,
         { id: "pm-new", title: gt("New PM in this project"), image: "plus.bubble" },
       ]
     : [];
   const handle = (event: string) => {
+    if (event === "pm-make") {
+      void convertToPm(thread.environmentId, thread.id);
+      return true;
+    }
+    if (event === "pm-revert") {
+      void revertPm(thread.environmentId, thread.id);
+      return true;
+    }
     if (event !== "pm-new") return false;
     void createPm(thread.environmentId, thread.projectId, (target) =>
       navigation.dispatch(StackActions.push("Thread", target)),

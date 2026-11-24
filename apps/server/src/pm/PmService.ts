@@ -72,6 +72,7 @@ import {
   PAGE_HTML_LIMIT,
   pageAnswersMessage,
   PM_NEW_TITLE,
+  PM_CONVERT_MESSAGE,
   PM_SETUP_MESSAGE,
   quietStreakOf,
   usageLimitResetOf,
@@ -380,6 +381,43 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  /** The step both ways in share: the row, the tools, and the setup message that starts its role. */
+  const adopt = Effect.fn("PmService.adopt")(function* (input: {
+    readonly threadId: ThreadId;
+    readonly key: string;
+    readonly setupText: string;
+  }) {
+    pmVisibility.add(input.threadId);
+    yield* dispatchMessage({
+      threadId: input.threadId,
+      key: `setup:${input.key}`,
+      text: input.setupText,
+      createdBy: "agent",
+      notification: {
+        source: { kind: "system" },
+        outcome: "updated",
+        summary: "Project manager setup",
+      },
+    });
+    yield* changed(input.threadId);
+  });
+
+  /** A live provider session listed its tools when it started; the next turn starts a fresh one. */
+  const refreshTools = Effect.fn("PmService.refreshTools")(function* (threadId: ThreadId) {
+    const sessions = yield* store.idleProviderSessions(threadId);
+    for (const providerSessionId of sessions) {
+      yield* threads
+        .dispatch({
+          type: "provider-session.detach",
+          commandId: CommandId.make(`command:pm-tools:${yield* newId}`),
+          threadId,
+          providerSessionId: providerSessionId as never,
+          reason: "Project manager role changed",
+        })
+        .pipe(Effect.ignore);
+    }
+  });
+
   const create = Effect.fn("PmService.create")(function* (input: {
     readonly projectId: ProjectId;
     readonly modelSelection?: ModelSelection | undefined;
@@ -424,7 +462,6 @@ const make = Effect.gen(function* () {
             }),
         ),
       );
-    pmVisibility.add(threadId);
     // A deliberate title before any message, so upstream never queues a title generation that
     // would later overwrite the PM's own `pm_set_name`.
     yield* threads
@@ -435,19 +472,54 @@ const make = Effect.gen(function* () {
         title: PM_NEW_TITLE,
       })
       .pipe(Effect.mapError(unavailable("Could not name the new PM.")));
-    yield* dispatchMessage({
-      threadId,
-      key: `setup:${id}`,
-      text: PM_SETUP_MESSAGE,
-      createdBy: "agent",
-      notification: {
-        source: { kind: "system" },
-        outcome: "updated",
-        summary: "Project manager setup",
-      },
-    });
-    yield* changed(threadId);
+    yield* adopt({ threadId, key: id, setupText: PM_SETUP_MESSAGE });
     return { threadId };
+  });
+
+  /** Make this a PM: the thread keeps its history, provider and model; its next turn is a PM's. */
+  const convert = Effect.fn("PmService.convert")(function* (threadId: ThreadId) {
+    yield* requireEnabled;
+    if ((yield* store.getPm(threadId)) !== null)
+      return yield* conflict("This thread is already a PM.");
+    const worker = yield* store.getWorker(threadId);
+    if (worker !== null && worker.resolvedAt === null) {
+      return yield* conflict("This thread works for a PM. Unlink it from its PM first.");
+    }
+    const shell = yield* shellOf(threadId);
+    if (shell === null) return yield* notFound(`Thread ${threadId} was not found.`);
+    if (RUNNING_STATUSES.has(shell.status) || shell.status === "waiting") {
+      return yield* conflict("Wait for this thread's turn to finish, then make it a PM.");
+    }
+    const restored = yield* store.restorePm(threadId);
+    if (!restored) {
+      yield* store.insertPm({ threadId, projectId: shell.projectId, createdAt: yield* nowIso });
+    }
+    yield* refreshTools(threadId);
+    yield* adopt({ threadId, key: `convert:${yield* newId}`, setupText: PM_CONVERT_MESSAGE });
+  });
+
+  /** Turn back into a normal thread. Its workers are let go; its items wait for a return. */
+  const revert = Effect.fn("PmService.revert")(function* (pm: string) {
+    const row = yield* requirePm(pm);
+    const { workerStates } = yield* deriveItems(row);
+    const busy = workerStates.filter(
+      (entry) => entry.state === "running" || entry.state === "waiting",
+    ).length;
+    if (busy > 0) {
+      return yield* conflict(
+        `${busy} of this PM's workers are still running or waiting. Stop them or let them finish first.`,
+      );
+    }
+    const at = yield* nowIso;
+    for (const entry of workerStates) {
+      if (entry.worker.resolvedAt === null) {
+        yield* store.updateWorker(entry.worker.workerThreadId, { resolved_at: at });
+      }
+    }
+    yield* store.retirePm(pm, at);
+    pmVisibility.remove(pm);
+    yield* refreshTools(ThreadId.make(pm));
+    yield* changed(pm);
   });
 
   const setName = (pm: string, name: string) =>
@@ -1614,7 +1686,7 @@ const make = Effect.gen(function* () {
   });
 
   const forgetThread = Effect.fn("PmService.forgetThread")(function* (threadId: string) {
-    if ((yield* store.getPm(threadId)) !== null) {
+    if ((yield* store.getPm(threadId)) !== null || (yield* store.isRetiredPm(threadId))) {
       yield* store.deletePm(threadId);
       pmVisibility.remove(threadId);
       yield* changed(threadId);
@@ -1632,6 +1704,8 @@ const make = Effect.gen(function* () {
     changes: changesStream,
     changed,
     create,
+    convert,
+    revert,
     setName,
     setMission,
     setInstructions,

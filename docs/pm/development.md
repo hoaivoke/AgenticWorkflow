@@ -17,6 +17,11 @@ the Ghostex coordinator playbook (`packages/pm/src/playbook.ts`).
 - PM state lives in `pm_*` tables with their own migration ledger (`pm_migrations`). Upstream
   builds open a fork database and ignore those tables; the fork opens an upstream database and adds
   them. No upstream table is altered.
+- PM3code reads the official app's `~/.t3` (`T3CODE_PM_T3_HOME` overrides it, for tests) and
+  never writes it: the database is read through a read-only `ATTACH` into a `VACUUM INTO` copy,
+  settings files are only read. Imported threads get new ids and copies of their checkpoint refs,
+  because both apps key refs by thread id and storage cleanup deletes refs of removed threads.
+  Code: `apps/server/src/pm/t3`.
 - Upstream clients (app.t3.codes, the store apps) can talk to a fork server and see PMs as plain
   threads. The orchestration protocol version is unchanged.
 - The server never updates itself from npm: npm's `t3` package is upstream and would replace the

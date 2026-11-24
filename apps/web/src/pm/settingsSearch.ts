@@ -16,6 +16,12 @@ export const PM_SETTINGS_SEARCH_ITEMS = [
     to: PM_SETTINGS_PATH,
     searchTerms: [msg("pm project manager playbook rules every pm")],
   },
+  {
+    id: "pm-t3-import",
+    title: msg("Import from T3 Code"),
+    to: PM_SETTINGS_PATH,
+    searchTerms: [msg("t3 code import threads replace projects settings follow launch")],
+  },
 ] as const;
 
 /** The keybinding's label in Settings, Keybindings. */

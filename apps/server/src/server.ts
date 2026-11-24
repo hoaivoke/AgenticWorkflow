@@ -92,6 +92,7 @@ import * as ProjectSettingsOverrideSweep from "./provider/ProjectSettingsOverrid
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as McpHttpServer from "./mcp/McpHttpServer.ts";
 import * as PmLayer from "./pm/PmLayer.ts"; // t3code-pm:
+import { syncSettingsAtLaunch } from "./pm/t3/PmT3Sync.ts"; // t3code-pm:
 import { layerForkSelfUpdate } from "./pm/forkIdentity.ts"; // t3code-pm:
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
@@ -956,6 +957,7 @@ const layerMakeServer = Layer.unwrap(
     const config = yield* ServerConfig.ServerConfig;
     // Before anything opens the database: one server per T3 home.
     const ownership = yield* ServerOwnership.acquireServerOwnership(config.serverRuntimeStatePath);
+    yield* syncSettingsAtLaunch(config); // t3code-pm: T3 Code's settings, before they are read
     const activation = yield* Deferred.make<void>();
     const awaitActivation = Deferred.await(activation);
     const layerActivation = Layer.succeed(ServerActivation.ServerActivation, awaitActivation);

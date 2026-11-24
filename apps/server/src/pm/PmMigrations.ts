@@ -166,7 +166,31 @@ const createTables = Effect.gen(function* () {
   `;
 });
 
-const pmMigrationEntries = [[1, "PmTables", createTables]] as const;
+const createImportAndRetiredTables = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Threads copied from T3 Code under new ids; the source id keeps a second import from doubling.
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_t3_imported_threads (
+      thread_id TEXT PRIMARY KEY,
+      source_thread_id TEXT NOT NULL,
+      imported_at TEXT NOT NULL
+    ) WITHOUT ROWID
+  `;
+  yield* sql`CREATE INDEX IF NOT EXISTS pm_t3_imported_source ON pm_t3_imported_threads (source_thread_id)`;
+  // A PM turned back into a normal thread keeps its row here, so making it a PM again restores it.
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_retired_threads (
+      pm_thread_id TEXT PRIMARY KEY,
+      row_json TEXT NOT NULL,
+      retired_at TEXT NOT NULL
+    ) WITHOUT ROWID
+  `;
+});
+
+const pmMigrationEntries = [
+  [1, "PmTables", createTables],
+  [2, "PmImportAndRetired", createImportAndRetiredTables],
+] as const;
 
 const run = Migrator.make({});
 

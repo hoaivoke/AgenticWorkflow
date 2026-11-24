@@ -34,6 +34,12 @@ export function createPmClient<R, ER>(
     staleTimeMs: 0,
     idleTtlMs: 60_000,
   });
+  const t3StatusQuery = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:t3-status",
+    tag: PM_WS_METHODS.t3Status,
+    staleTimeMs: 0,
+    idleTtlMs: 0,
+  });
   const commands = {
     create: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pm:create",
@@ -95,6 +101,22 @@ export function createPmClient<R, ER>(
       label: "environment-data:pm:settings-set",
       tag: PM_WS_METHODS.settingsSet,
     }),
+    convert: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:convert",
+      tag: PM_WS_METHODS.convert,
+    }),
+    revert: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:revert",
+      tag: PM_WS_METHODS.revert,
+    }),
+    t3SetSync: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:t3-set-sync",
+      tag: PM_WS_METHODS.t3SetSync,
+    }),
+    t3Import: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:t3-import",
+      tag: PM_WS_METHODS.t3Import,
+    }),
   };
 
   /** Every connected environment's PMs in one index: a thread list's single read. */
@@ -119,5 +141,5 @@ export function createPmClient<R, ER>(
     return index;
   }).pipe(Atom.withLabel("pm-index"));
 
-  return { summaries, threadDetail, settingsQuery, commands, indexAtom };
+  return { summaries, threadDetail, settingsQuery, t3StatusQuery, commands, indexAtom };
 }

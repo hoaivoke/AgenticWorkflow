@@ -3,6 +3,8 @@ import type { PmThreadMenuState } from "./threadMenu.logic";
 import type { AnyRouter } from "@tanstack/react-router";
 import { msg, useGT } from "gt-react";
 import { BriefcaseIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import type { PmIndex } from "@t3tools/pm/client";
 
 import { toastManager } from "../components/ui/toast";
 import { m, type MessageResolver } from "../i18n/messages";
@@ -10,7 +12,7 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useProjects } from "../state/entities";
 import { registerCommands } from "../shortcuts/dispatcher";
 import { readThreadShell } from "../state/entities";
-import { createPmAndOpen } from "./actions";
+import { convertThreadToPm, createPmAndOpen, revertPmThread } from "./actions";
 import { requestMissionEdit } from "./missionEdit";
 import { pmIndexAtom, pmKey, usePmIndex } from "./state";
 
@@ -61,11 +63,19 @@ export function installPmCommands(appRouter: AnyRouter): void {
 export type { PmThreadMenuState } from "./threadMenu.logic";
 
 export function runPmThreadAction(
-  action: "pm:new" | "pm:edit-mission",
+  action: "pm:new" | "pm:edit-mission" | "pm:make" | "pm:revert",
   state: PmThreadMenuState,
 ): void {
   if (action === "pm:new") {
     void newPm(state.environmentId, state.projectId);
+    return;
+  }
+  if (action === "pm:make") {
+    void convertThreadToPm(state.environmentId, state.threadId);
+    return;
+  }
+  if (action === "pm:revert") {
+    void revertPmThread(state.environmentId, state.threadId);
     return;
   }
   requestMissionEdit(pmKey(state.environmentId, state.threadId));
@@ -98,12 +108,49 @@ export function handlePmFolderMenuAction(action: string | null, group: FolderGro
   return true;
 }
 
-/** "New PM in <current>" and "New PM in…" for the command palette. */
+/** The current thread into a PM, or a PM back into a normal thread. */
+function roleItems(
+  thread: { readonly environmentId: EnvironmentId; readonly id: ThreadId } | null | undefined,
+  index: PmIndex,
+  gt: ReturnType<typeof useGT>,
+  icon: ReactNode,
+) {
+  if (thread == null || !index.enabled.has(thread.environmentId)) return [];
+  const key = pmKey(thread.environmentId, thread.id);
+  const pm = index.pms.get(key);
+  if (pm !== undefined) {
+    if (pm.runningWorkers > 0) return [];
+    return [
+      {
+        kind: "action" as const,
+        value: "action:pm-revert",
+        searchTerms: ["pm", "project manager", "normal thread", "turn back", "stop being a pm"],
+        title: gt("Turn back into a normal thread"),
+        icon,
+        run: async () => revertPmThread(thread.environmentId, thread.id),
+      },
+    ];
+  }
+  if (index.workerOf.has(key)) return [];
+  return [
+    {
+      kind: "action" as const,
+      value: "action:pm-make",
+      searchTerms: ["pm", "project manager", "make this a pm", "convert"],
+      title: gt("Make this a PM"),
+      icon,
+      run: async () => convertThreadToPm(thread.environmentId, thread.id),
+    },
+  ];
+}
+
+/** "New PM in <current>", "New PM in…", and the current thread's way in or out of being a PM. */
 export function usePmPaletteItems(
   currentProject:
     | { readonly environmentId: EnvironmentId; readonly id: ProjectId; readonly title: string }
     | null
     | undefined,
+  currentThread?: { readonly environmentId: EnvironmentId; readonly id: ThreadId } | null,
 ) {
   const gt = useGT();
   const index = usePmIndex();
@@ -126,6 +173,7 @@ export function usePmPaletteItems(
       : [];
   return [
     ...current,
+    ...roleItems(currentThread, index, gt, icon),
     {
       kind: "submenu" as const,
       value: "action:pm-new-in",
