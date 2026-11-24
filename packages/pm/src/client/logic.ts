@@ -1,11 +1,4 @@
-import type {
-  EnvironmentId,
-  PmAsk,
-  PmItem,
-  PmPageSummary,
-  PmShownItemStatus,
-  ThreadId,
-} from "@t3tools/contracts";
+import type { EnvironmentId, PmAsk, PmItem, PmShownItemStatus, ThreadId } from "@t3tools/contracts";
 import { PM_SHOWN_STATUS_ORDER } from "../work.ts";
 import { threadKey } from "@t3tools/client-runtime/state/entities";
 
@@ -43,92 +36,6 @@ export const pmWorkerListKeys = (
   [...pms].flatMap((pm) =>
     pm.workerThreadIds.map((threadId) => threadKey({ environmentId: pm.environmentId, threadId })),
   );
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-export type PmDockRow =
-  | { readonly kind: "ask"; readonly key: string; readonly ask: PmAsk; readonly at: string }
-  | {
-      readonly kind: "page";
-      readonly key: string;
-      readonly page: PmPageSummary;
-      readonly at: string;
-    }
-  | { readonly kind: "blocked"; readonly key: string; readonly item: PmItem; readonly at: string };
-
-export interface PmDock {
-  readonly rows: ReadonlyArray<PmDockRow>;
-  /** Rows past the first four. */
-  readonly more: number;
-  readonly snoozed: ReadonlyArray<PmAsk>;
-  readonly counts: {
-    readonly needsYou: number;
-    readonly blocked: number;
-    readonly inProgress: number;
-  };
-}
-
-const newestFirstAgedLast = (now: number) => (a: PmDockRow, b: PmDockRow) => {
-  const aOld = now - Date.parse(a.at) > DAY_MS;
-  const bOld = now - Date.parse(b.at) > DAY_MS;
-  if (aOld !== bOld) return aOld ? 1 : -1;
-  return Date.parse(b.at) - Date.parse(a.at);
-};
-
-/**
- * The dock above the composer, Ghostex's rules: what needs you (asks, then pages to answer,
- * newest first, rows older than a day sink), then blocked items no holding ask already shows.
- * Snoozed asks fold into their own line until they wake.
- */
-export function pmDock(
-  input: {
-    readonly asks: ReadonlyArray<PmAsk>;
-    readonly pages: ReadonlyArray<PmPageSummary>;
-    readonly items: ReadonlyArray<PmItem>;
-  },
-  now: number,
-  limit = 4,
-): PmDock {
-  const open = input.asks.filter((ask) => ask.state === "open");
-  const snoozed = open.filter(
-    (ask) => ask.snoozedUntil !== null && Date.parse(ask.snoozedUntil) > now,
-  );
-  const awake = open.filter((ask) => !snoozed.includes(ask));
-  const order = newestFirstAgedLast(now);
-  // Hermes lacks toSorted; `map` already made fresh arrays, so sorting them in place is safe.
-  const asks: PmDockRow[] = awake
-    .map((ask) => ({ kind: "ask" as const, key: `ask:${ask.askNo}`, ask, at: ask.createdAt }))
-    .sort(order);
-  const pages: PmDockRow[] = input.pages
-    .filter((page) => page.state === "open")
-    .map((page) => ({
-      kind: "page" as const,
-      key: `page:${page.pageId}`,
-      page,
-      at: page.createdAt,
-    }))
-    .sort(order);
-  const heldItems = new Set(awake.filter((ask) => ask.holds).map((ask) => ask.itemNo));
-  const blocked: PmDockRow[] = input.items
-    .filter((item) => item.shownStatus === "blocked" && !heldItems.has(item.itemNo))
-    .map((item) => ({
-      kind: "blocked" as const,
-      key: `item:${item.itemNo}`,
-      item,
-      at: item.updatedAt,
-    }));
-  const all = [...asks, ...pages, ...blocked];
-  return {
-    rows: all.slice(0, limit),
-    more: Math.max(0, all.length - limit),
-    snoozed,
-    counts: {
-      needsYou: asks.length + pages.length,
-      blocked: input.items.filter((item) => item.shownStatus === "blocked").length,
-      inProgress: input.items.filter((item) => item.shownStatus === "in_progress").length,
-    },
-  };
-}
 
 export interface PmItemGroup {
   readonly status: PmShownItemStatus;
@@ -263,8 +170,36 @@ export function pmWorkerDot(shell: {
   return "idle";
 }
 
-/** One dot per kind present, back to front, so the most urgent is drawn on top. */
+/**
+ * One dot per kind present, back to front, so the most urgent is drawn on top. As in Ghostex, a
+ * finished worker's blue dot waits while another worker is still working.
+ */
 export const pmDotStack = (dots: Iterable<PmWorkerDot>): ReadonlyArray<PmWorkerDot> => {
   const present = new Set(dots);
+  if (present.has("working")) present.delete("finished");
   return DOT_URGENCY.filter((dot) => present.has(dot));
 };
+
+/** What a wait is on, as the user reads it: never a bare `W<n>` or `Q<n>` tag. */
+export type PmWaitTarget =
+  | { readonly kind: "item"; readonly title: string | null }
+  | { readonly kind: "answer" }
+  | { readonly kind: "text"; readonly text: string };
+
+const WAIT_LEAD = /^(waiting|waits) (on|for)\s+/i;
+
+/** Another item by its title, a question as the user's answer, words without a "waiting on" lead. */
+export function pmWaitTarget(
+  wait: Pick<PmItem["waits"][number], "onKind" | "onRef">,
+  items: ReadonlyArray<Pick<PmItem, "itemNo" | "title">>,
+): PmWaitTarget {
+  if (wait.onKind === "item")
+    return {
+      kind: "item",
+      title: items.find((item) => String(item.itemNo) === wait.onRef)?.title ?? null,
+    };
+  if (wait.onKind === "ask") return { kind: "answer" };
+  const text = wait.onRef.trim();
+  const stripped = text.replace(WAIT_LEAD, "").trim();
+  return { kind: "text", text: stripped.length > 0 ? stripped : text };
+}

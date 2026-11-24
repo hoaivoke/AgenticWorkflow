@@ -26,5 +26,6 @@ export const PM_SETTINGS_SEARCH_ITEMS = [
 
 /** The keybinding's label in Settings, Keybindings. */
 export const PM_NEW_COMMAND_LABEL = msg("Project Manager: New");
+export const PM_FOCUS_INBOX_COMMAND_LABEL = msg("Project Manager: Focus Inbox");
 
 export const PM_SETTINGS_LABEL = msg("Project managers");

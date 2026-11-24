@@ -166,6 +166,15 @@ const createTables = Effect.gen(function* () {
   `;
 });
 
+// The Inbox: a page's opened, snoozed and settled times, and a finished item archived from Done.
+const addInboxColumns = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`ALTER TABLE pm_pages ADD COLUMN opened_at TEXT`;
+  yield* sql`ALTER TABLE pm_pages ADD COLUMN snoozed_until TEXT`;
+  yield* sql`ALTER TABLE pm_pages ADD COLUMN settled_at TEXT`;
+  yield* sql`ALTER TABLE pm_items ADD COLUMN archived_at TEXT`;
+});
+
 const createImportAndRetiredTables = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   // Threads copied from T3 Code under new ids; the source id keeps a second import from doubling.
@@ -189,7 +198,8 @@ const createImportAndRetiredTables = Effect.gen(function* () {
 
 const pmMigrationEntries = [
   [1, "PmTables", createTables],
-  [2, "PmImportAndRetired", createImportAndRetiredTables],
+  [2, "PmInbox", addInboxColumns],
+  [3, "PmImportAndRetired", createImportAndRetiredTables],
 ] as const;
 
 const run = Migrator.make({});

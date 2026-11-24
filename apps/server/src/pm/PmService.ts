@@ -95,6 +95,9 @@ const conflict = (message: string) => new PmError({ code: "conflict", message })
 const unavailable = (message: string) => () => new PmError({ code: "unavailable", message });
 
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso));
+
+const isSnoozed = (ask: { readonly snoozedUntil: string | null }, nowMs: number) =>
+  ask.snoozedUntil !== null && Date.parse(ask.snoozedUntil) > nowMs;
 /** Unique enough for ids that also carry the PM or worker they belong to. */
 const newId = Effect.gen(function* () {
   const ms = yield* Clock.currentTimeMillis;
@@ -1141,6 +1144,20 @@ const make = Effect.gen(function* () {
     yield* changed(pm);
   });
 
+  /**
+   * Clears ask and page snoozes that are due, so a woken row counts as Needs you again on every
+   * client without waiting for some other change (Ghostex 48247ad15, 51ba8d55e).
+   */
+  const wakeSnoozed = Effect.fn("PmService.wakeSnoozed")(function* () {
+    const nowMs = yield* Clock.currentTimeMillis;
+    const asks = (yield* store.listSnoozedAsks()).filter((ask) => !isSnoozed(ask, nowMs));
+    const pages = (yield* store.listSnoozedPages()).filter((page) => !isSnoozed(page, nowMs));
+    for (const ask of asks)
+      yield* store.updateAsk(ask.pmThreadId, ask.askNo, { snoozed_until: null });
+    for (const page of pages) yield* store.updatePage(page.pageId, { snoozed_until: null });
+    for (const pm of new Set([...asks, ...pages].map((row) => row.pmThreadId))) yield* changed(pm);
+  });
+
   const dismissAsk = Effect.fn("PmService.dismissAsk")(function* (pm: string, askNo: number) {
     yield* requirePm(pm);
     const target = yield* askRef(pm, askNo);
@@ -1413,6 +1430,7 @@ const make = Effect.gen(function* () {
       state: "answered",
       answers_json: json,
       answers_message_id: messageId,
+      settled_at: yield* nowIso,
     });
     if (!recorded) return yield* conflict(`Page ${pageId} was already ${page.state}.`);
     yield* dispatchMessage({
@@ -1433,6 +1451,7 @@ const make = Effect.gen(function* () {
     const key = `page-seen:${pageId}`;
     const recorded = yield* store.answerPage(pageId, {
       state: "seen",
+      settled_at: yield* nowIso,
       ...(text.length === 0 ? {} : { answers_message_id: `message:pm:${key}` }),
     });
     if (!recorded) return yield* conflict(`Page ${pageId} was already ${page.state}.`);
@@ -1451,6 +1470,52 @@ const make = Effect.gen(function* () {
     yield* changed(page.pmThreadId);
   });
 
+  // t3code-pm: the Inbox's page and Done-row state. None of it reaches the PM: an archived page
+  // or item, a snooze and a first open are the user's own housekeeping.
+  const pageOpen = Effect.fn("PmService.pageOpen")(function* (pageId: string) {
+    const page = yield* requirePage(pageId);
+    if (page.openedAt !== null) return;
+    yield* store.updatePage(pageId, { opened_at: yield* nowIso });
+    yield* changed(page.pmThreadId);
+  });
+
+  const pageSnooze = Effect.fn("PmService.pageSnooze")(function* (
+    pageId: string,
+    until: string | null,
+  ) {
+    const page = yield* requirePage(pageId);
+    if (page.state !== "open") return yield* conflict(`Page ${pageId} is ${page.state}.`);
+    if (until !== null && Number.isNaN(Date.parse(until)))
+      return yield* invalid("Snooze needs an ISO time.");
+    yield* store.updatePage(pageId, { snoozed_until: until });
+    yield* changed(page.pmThreadId);
+  });
+
+  /** Undo of an Archive: only a page marked seen with no reply, which the PM never heard of. */
+  const pageReopen = Effect.fn("PmService.pageReopen")(function* (pageId: string) {
+    const page = yield* requirePage(pageId);
+    if (page.state !== "seen" || page.answersMessageId !== null)
+      return yield* conflict(`Page ${pageId} can no longer be reopened.`);
+    yield* store.updatePage(pageId, { state: "open", settled_at: null });
+    yield* changed(page.pmThreadId);
+  });
+
+  const archiveItems = Effect.fn("PmService.archiveItems")(function* (
+    pm: string,
+    itemNos: ReadonlyArray<number>,
+    archived: boolean,
+  ) {
+    yield* requirePm(pm);
+    const items = new Map((yield* store.listItems(pm)).map((item) => [item.itemNo, item]));
+    const missing = itemNos.find((itemNo) => !items.has(itemNo));
+    if (missing !== undefined) return yield* notFound(`There is no ${formatItemTag(missing)}.`);
+    const at = archived ? yield* nowIso : null;
+    yield* Effect.forEach(itemNos, (itemNo) => store.archiveItem(pm, itemNo, at), {
+      discard: true,
+    });
+    yield* changed(pm);
+  });
+
   const detail = Effect.fn("PmService.detail")(function* (pm: string) {
     const row = yield* store.getPm(pm);
     if (row === null || !(yield* isEnabled)) return null;
@@ -1466,6 +1531,7 @@ const make = Effect.gen(function* () {
       projectId: row.projectId as ProjectId,
       mission: row.mission,
       instructions: row.instructions,
+      turnStartedAt: row.turnStartedAt,
       memory: memory.map((note) => ({
         number: note.position,
         text: note.text,
@@ -1528,6 +1594,9 @@ const make = Effect.gen(function* () {
         answersMessageId:
           page.answersMessageId === null ? null : MessageId.make(page.answersMessageId),
         createdAt: page.createdAt,
+        openedAt: page.openedAt,
+        snoozedUntil: page.snoozedUntil,
+        settledAt: page.settledAt,
       })),
       reports: reports.map((report) => ({
         reportId: report.reportId,
@@ -1544,13 +1613,18 @@ const make = Effect.gen(function* () {
     const on = yield* isEnabled;
     if (!on) return { enabled: false, pms: [] } satisfies PmSubscribeEvent;
     const pms = yield* store.listPms(projectId);
+    const nowMs = yield* Clock.currentTimeMillis;
     const result: Array<PmSummary> = [];
     for (const row of pms) {
       const { derived, asks, workerStates } = yield* deriveItems(row);
       const live = workerStates.filter((entry) => entry.state !== "resolved");
       const openAsks = asks.filter((entry) => entry.state === "open").length;
       const blocked = derived.some((entry) => entry.shownStatus === "blocked");
-      const needsYou = openAsks > 0 || live.some((entry) => entry.state === "waiting");
+      // As in Ghostex, a snoozed ask is not Needs you until it wakes.
+      const awakeAsks = asks.filter(
+        (entry) => entry.state === "open" && !isSnoozed(entry, nowMs),
+      ).length;
+      const needsYou = awakeAsks > 0 || live.some((entry) => entry.state === "waiting");
       const running = live.filter((entry) => entry.state === "running").length;
       result.push({
         threadId: ThreadId.make(row.threadId),
@@ -1724,6 +1798,7 @@ const make = Effect.gen(function* () {
     nextTag,
     answerAsk,
     snoozeAsk,
+    wakeSnoozed,
     dismissAsk,
     undoDismissAsk,
     startWorker,
@@ -1736,6 +1811,10 @@ const make = Effect.gen(function* () {
     pageGet,
     pageAnswer,
     pageMarkSeen,
+    pageOpen,
+    pageSnooze,
+    pageReopen,
+    archiveItems,
     detail,
     summaries,
     subscribe,

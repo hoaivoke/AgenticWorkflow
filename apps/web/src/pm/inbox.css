@@ -1,0 +1,120 @@
+/* t3code-pm: the Inbox's look, Ghostex's dock metrics and colours (gx-chat-core work_cards.rs),
+   as utilities of its own so upstream's tokens stay as they are. */
+
+@utility pm-inbox-text {
+  font-size: 13px;
+}
+
+@utility pm-inbox-title {
+  font-size: 14px;
+  line-height: 22.75px;
+}
+
+/* One title line tall: the mark and the age sit on the title's middle. */
+@utility pm-inbox-line {
+  height: 22.75px;
+}
+
+@utility pm-ping {
+  color: #f472b6;
+}
+@utility pm-blocked {
+  color: #ef4444;
+}
+@utility pm-progress {
+  color: #c68a06;
+}
+@utility pm-done {
+  color: #2fa865;
+}
+@utility pm-star {
+  color: #f5b301;
+}
+
+/* The composer's glass (ComposerSurface): the card colour at --glass-opacity over a blur, so a
+   theme's art shows through the Inbox as it does through the composer under it. */
+@utility pm-inbox-glass {
+  background: color-mix(in srgb, var(--card) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  @variant dark {
+    background: color-mix(in srgb, var(--surface-raised) var(--glass-opacity), transparent);
+  }
+}
+
+@utility pm-inbox-row {
+  &:hover {
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  }
+  &[data-focused],
+  &[data-focused]:hover {
+    background: color-mix(in srgb, #f472b6 10%, transparent);
+    @variant dark {
+      background: color-mix(in srgb, #f472b6 14%, transparent);
+    }
+    box-shadow: inset 2px 0 0 #f472b6;
+  }
+}
+
+@utility pm-inbox-outcome {
+  background: color-mix(in srgb, #2fa865 14%, transparent);
+  color: #2fa865;
+}
+
+/* 0.9 of the body size: the Archive all summary and the Handled outcome pill. */
+@utility pm-inbox-note {
+  font-size: 12.5px;
+  line-height: 20px;
+}
+
+/* The header bar's hover, which steps aside while a count chip under it is hovered. */
+@utility pm-inbox-head {
+  &:hover:not(:has([data-pm-chip]:hover)) {
+    background: color-mix(in srgb, var(--foreground) 5.5%, var(--card));
+  }
+}
+
+@utility pm-inbox-chip {
+  border: 1px solid transparent;
+  &:hover {
+    background: color-mix(in srgb, var(--foreground) 7.5%, transparent);
+    border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+    @variant dark {
+      background: color-mix(in srgb, var(--foreground) 10.5%, transparent);
+    }
+  }
+  &:active {
+    background: color-mix(in srgb, var(--foreground) 13%, transparent);
+    @variant dark {
+      background: color-mix(in srgb, var(--foreground) 16%, transparent);
+    }
+  }
+}
+
+@utility pm-handled-mark {
+  color: color-mix(in srgb, #2fa865 85%, transparent);
+}
+
+@utility pm-swipe-archive {
+  background: #dcfce7;
+  color: #15803d;
+  @variant dark {
+    background: #214e36;
+    color: #86efac;
+  }
+}
+@utility pm-swipe-snooze {
+  background: #dbeafe;
+  color: #1d4ed8;
+  @variant dark {
+    background: #273c56;
+    color: #93c5fd;
+  }
+}
+
+/* A PM thread's chat column (timeline, Inbox and composer) is Ghostex's wide one, unless the
+   user's Chat width setting already asks for Wide or Full. Narrow windows still shrink it:
+   everything sized by this variable is `w-full` under it. */
+:root:not([data-chat-width="wide"], [data-chat-width="full"]) [data-pm-chat] {
+  --chat-content-max-width: 69rem;
+}

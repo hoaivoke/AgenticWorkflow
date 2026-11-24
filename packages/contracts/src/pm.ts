@@ -96,6 +96,8 @@ export const PmItem = Schema.Struct({
   updatedAt: Schema.String,
   finishedAt: Schema.NullOr(Schema.String),
   droppedAt: Schema.NullOr(Schema.String),
+  /** The Inbox's Archive on its Done row; a later finish shows it again. */
+  archivedAt: Schema.optional(Schema.NullOr(Schema.String)),
 });
 export type PmItem = typeof PmItem.Type;
 
@@ -152,6 +154,11 @@ export const PmPageSummary = Schema.Struct({
   messageId: Schema.NullOr(MessageId),
   answersMessageId: Schema.NullOr(MessageId),
   createdAt: Schema.String,
+  /** First opened by the user: the Inbox draws an opened page's row as read. */
+  openedAt: Schema.optional(Schema.NullOr(Schema.String)),
+  snoozedUntil: Schema.optional(Schema.NullOr(Schema.String)),
+  /** When it was answered or marked seen, for the Inbox's Answered drawer. */
+  settledAt: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
 export const PmReport = Schema.Struct({
@@ -169,6 +176,8 @@ export const PmThreadDetail = Schema.Struct({
   projectId: ProjectId,
   mission: Schema.String,
   instructions: Schema.String,
+  /** When the PM's newest turn started: the Inbox's Done drawer holds what it finished. */
+  turnStartedAt: Schema.optional(Schema.NullOr(Schema.String)),
   memory: Schema.Array(PmMemoryNote),
   items: Schema.Array(PmItem),
   asks: Schema.Array(PmAsk),
@@ -258,6 +267,10 @@ export const PM_WS_METHODS = {
   pageGet: "pm.page.get",
   pageAnswer: "pm.page.answer",
   pageMarkSeen: "pm.page.markSeen",
+  pageOpen: "pm.page.open",
+  pageSnooze: "pm.page.snooze",
+  pageReopen: "pm.page.reopen",
+  itemArchive: "pm.item.archive",
   settingsGet: "pm.settings.get",
   settingsSet: "pm.settings.set",
   convert: "pm.convert",
@@ -360,6 +373,32 @@ export const PmRpcGroup = RpcGroup.make(
     success: Ok,
     error: PmRpcError,
   }),
+  Rpc.make(PM_WS_METHODS.pageOpen, {
+    payload: Schema.Struct({ pageId: Schema.String }),
+    success: Ok,
+    error: PmRpcError,
+  }),
+  /** `until: null` wakes it. */
+  Rpc.make(PM_WS_METHODS.pageSnooze, {
+    payload: Schema.Struct({ pageId: Schema.String, until: Schema.NullOr(Schema.String) }),
+    success: Ok,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.pageReopen, {
+    payload: Schema.Struct({ pageId: Schema.String }),
+    success: Ok,
+    error: PmRpcError,
+  }),
+  /** `archived: false` is the Undo. */
+  Rpc.make(PM_WS_METHODS.itemArchive, {
+    payload: Schema.Struct({
+      ...PmTarget,
+      items: Schema.Array(Schema.Number),
+      archived: Schema.Boolean,
+    }),
+    success: Ok,
+    error: PmRpcError,
+  }),
   Rpc.make(PM_WS_METHODS.settingsGet, {
     payload: Schema.Struct({}),
     success: PmSettings,
@@ -415,6 +454,10 @@ export const PM_CLIENT_GUARDED_RPC_SCOPES = {
   [PM_WS_METHODS.askUndoDismiss]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.pageAnswer]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.pageMarkSeen]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pageOpen]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pageSnooze]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pageReopen]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.itemArchive]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.settingsSet]: AuthSettingsWriteScope,
   [PM_WS_METHODS.convert]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.revert]: AuthOrchestrationOperateScope,

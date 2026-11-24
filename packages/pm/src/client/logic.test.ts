@@ -14,14 +14,15 @@ import {
   parsePmPageAnswers,
   parsePmReportNotification,
   pmAskTag,
-  pmDock,
   pmDotStack,
   pmFirst,
   pmItemGroups,
+  pmWaitTarget,
   pmWorkerDot,
   pmWorkerListKeys,
   withPmWorkers,
 } from "./logic.ts";
+import { pmDescription, pmInbox, pmInboxHidden } from "./inbox.ts";
 
 const LISTED = {
   rootThreadId: ThreadId.make("w-1"),
@@ -122,38 +123,119 @@ describe("pmWorkerListKeys", () => {
   });
 });
 
-describe("pmDock", () => {
-  it("lists asks newest first, then pages, then blocked items no holding ask shows, at most four", () => {
-    const dock = pmDock(
-      {
-        asks: [ask(1), ask(2, { holds: true, itemNo: 3 }), ask(3)],
-        pages: [page("icons")],
-        items: [item(3, { shownStatus: "blocked" }), item(4, { shownStatus: "blocked" }), item(5)],
-      },
-      NOW,
-    );
-    expect(dock.rows.map((row) => row.key)).toEqual(["ask:1", "ask:2", "ask:3", "page:icons"]);
-    expect(dock.more).toBe(1);
-    expect(dock.counts).toEqual({ needsYou: 4, blocked: 2, inProgress: 1 });
+describe("pmInbox", () => {
+  const inbox = (input: Partial<Parameters<typeof pmInbox>[0]>) =>
+    pmInbox({ asks: [], pages: [], items: [], turnStartedAt: at(30), ...input }, NOW);
+
+  it("lists asks and pages newest first, then blocked items no holding ask shows", () => {
+    const result = inbox({
+      asks: [ask(1), ask(2, { holds: true, itemNo: 3 }), ask(4)],
+      pages: [page("icons", { questionTags: ["Q3"] })],
+      items: [item(3, { shownStatus: "blocked" }), item(4, { shownStatus: "blocked" }), item(5)],
+    });
+    expect(result.rows.map((row) => row.key)).toEqual([
+      "ask:1",
+      "ask:2",
+      "page:icons",
+      "ask:4",
+      "item:4",
+    ]);
+    expect(result.rows.map((row) => row.mark)).toEqual([
+      "question",
+      "blocked",
+      "page",
+      "question",
+      "blocked",
+    ]);
+    // A held ask counts once, as blocked work, not as a ping too.
+    expect(result.counts).toEqual({ pings: 3, blocked: 2, inProgress: 1 });
+    expect(pmInboxHidden(result.rows.slice(3))).toEqual({ pings: 1, blocked: 1, done: 0 });
   });
 
-  it("sinks rows older than a day and folds snoozed asks into their own line", () => {
-    const dock = pmDock(
-      {
-        asks: [
-          ask(1, { createdAt: at(60 * 30) }),
-          ask(2, { createdAt: at(10) }),
-          ask(3, { snoozedUntil: iso(NOW + 3_600_000) }),
-          ask(4, { snoozedUntil: iso(NOW - 60_000) }),
-          ask(5, { state: "answered" }),
-        ],
-        pages: [],
-        items: [],
-      },
-      NOW,
-    );
-    expect(dock.rows.map((row) => row.key)).toEqual(["ask:4", "ask:2", "ask:1"]);
-    expect(dock.snoozed.map((snoozed) => snoozed.askNo)).toEqual([3]);
+  it("sinks rows older than a day and moves snoozed asks and pages to Snoozed, soonest back first", () => {
+    const result = inbox({
+      asks: [
+        ask(1, { createdAt: at(60 * 30) }),
+        ask(2, { createdAt: at(10) }),
+        ask(3, { snoozedUntil: iso(NOW + 6 * 3_600_000) }),
+        ask(4, { snoozedUntil: iso(NOW - 60_000) }),
+        ask(5, { state: "answered" }),
+      ],
+      pages: [page("plan", { snoozedUntil: iso(NOW + 3_600_000) })],
+    });
+    expect(result.rows.map((row) => row.key)).toEqual(["ask:4", "ask:2", "ask:1"]);
+    expect(result.snoozed.map((row) => row.key)).toEqual(["page:plan", "ask:3"]);
+  });
+
+  it("reads an opened page as read, and archives seen-only pages and to-dos together", () => {
+    const result = inbox({
+      asks: [ask(1, { answers: [], recommended: null }), ask(2)],
+      pages: [
+        page("seen", { openedAt: at(1), createdAt: at(40) }),
+        page("form", { questionTags: ["Q9"], createdAt: at(41) }),
+      ],
+    });
+    const byKey = new Map(result.rows.map((row) => [row.key, row]));
+    expect(byKey.get("page:seen")?.unread).toBe(false);
+    expect(byKey.get("page:form")?.unread).toBe(true);
+    expect(byKey.get("ask:1")?.mark).toBe("todo");
+    expect(result.counts.pings).toBe(3);
+    expect(result.archiveAll).toEqual({ pageIds: ["seen"], askNos: [1] });
+    expect(inbox({ asks: [ask(1, { answers: [] })] }).archiveAll).toBeNull();
+  });
+
+  it("bundles two or more seen-only pages from one turn into one row", () => {
+    const result = inbox({
+      pages: [
+        page("a", { createdAt: at(2) }),
+        page("b", { createdAt: at(1), openedAt: at(1) }),
+        page("old", { createdAt: at(300) }),
+        page("asks", { questionTags: ["Q1"], createdAt: at(4) }),
+      ],
+    });
+    const bundle = result.rows.find((row) => row.kind === "pages");
+    expect(bundle).toMatchObject({ key: "pages:last", lastTurn: true, unread: true });
+    expect(bundle?.kind === "pages" && bundle.pages.map((one) => one.pageId)).toEqual(["b", "a"]);
+    expect(result.rows.map((row) => row.key)).toEqual(["pages:last", "page:asks", "page:old"]);
+    expect(result.archiveAll?.pageIds).toEqual(["b", "a", "old"]);
+  });
+
+  it("keeps this turn's finished items in Done until archived, and the last hour's answers", () => {
+    const finished = { status: "finished" as const, shownStatus: "done" as const };
+    const result = inbox({
+      items: [
+        item(1, { ...finished, finishedAt: at(5) }),
+        item(2, { ...finished, finishedAt: at(60) }),
+        item(3, { ...finished, finishedAt: at(10), archivedAt: at(2) }),
+        // Finished again after an archive: back in Done.
+        item(4, { ...finished, finishedAt: at(1), archivedAt: at(20) }),
+      ],
+      asks: [
+        ask(1, { state: "answered", answer: "Yes", settledAt: at(5) }),
+        ask(2, { state: "done", answer: "Done", settledAt: at(10) }),
+        ask(3, { state: "answered", answer: "No", settledAt: at(90) }),
+        ask(4, { state: "dismissed", settledAt: at(1) }),
+        // Mark answered: the canned answer is no outcome worth a pill.
+        ask(5, { state: "answered", answer: "I answered this in the chat.", settledAt: at(7) }),
+      ],
+      pages: [page("p", { state: "answered", settledAt: at(3) })],
+    });
+    expect(result.done.map((row) => row.item.itemNo)).toEqual([4, 1]);
+    expect(result.answered.map((row) => [row.key, row.outcome])).toEqual([
+      ["answered:page:p", null],
+      ["answered:ask:1", "Yes"],
+      ["answered:ask:5", null],
+      ["answered:ask:2", null],
+    ]);
+  });
+});
+
+describe("pmDescription", () => {
+  it("keeps a short one-line description on the row and sends a long one to Details", () => {
+    expect(pmDescription("CI is **green**.")).toEqual({ details: false, preview: "CI is green." });
+    expect(pmDescription("- one\n- two")).toEqual({ details: true, preview: "one" });
+    expect(pmDescription("x ".repeat(60)).details).toBe(true);
+    expect(pmDescription("")).toEqual({ details: false, preview: "" });
   });
 });
 
@@ -263,11 +345,43 @@ describe("pmWorkerDot and pmDotStack", () => {
   });
 
   it("stacks one dot per kind with the most urgent in front", () => {
+    expect(pmDotStack(["question", "idle", "finished", "blocker"])).toEqual([
+      "idle",
+      "finished",
+      "question",
+      "blocker",
+    ]);
+  });
+
+  it("holds a finished worker's blue dot while another worker is working", () => {
     expect(pmDotStack(["working", "question", "working", "idle", "finished"])).toEqual([
       "idle",
       "working",
-      "finished",
       "question",
     ]);
+  });
+});
+
+describe("pmWaitTarget", () => {
+  const items = [{ itemNo: 3, title: "Checkout fix" }];
+
+  it("names another item by its title and a question as the user's answer, never a tag", () => {
+    expect(pmWaitTarget({ onKind: "item", onRef: "3" }, items)).toEqual({
+      kind: "item",
+      title: "Checkout fix",
+    });
+    expect(pmWaitTarget({ onKind: "item", onRef: "9" }, items)).toEqual({
+      kind: "item",
+      title: null,
+    });
+    expect(pmWaitTarget({ onKind: "ask", onRef: "4" }, items)).toEqual({ kind: "answer" });
+  });
+
+  it("drops a redundant waiting-on lead from words", () => {
+    expect(pmWaitTarget({ onKind: "text", onRef: "Waiting on the App Store review" }, [])).toEqual({
+      kind: "text",
+      text: "the App Store review",
+    });
+    expect(pmWaitTarget({ onKind: "text", onRef: "CI" }, [])).toEqual({ kind: "text", text: "CI" });
   });
 });

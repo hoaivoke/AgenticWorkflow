@@ -1,13 +1,28 @@
-import type { EnvironmentId, PmItem, PmThreadDetail, ThreadId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  PmItem,
+  PmShownItemStatus,
+  PmThreadDetail,
+  ThreadId,
+} from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
 import { useGT } from "gt-react";
 import {
   ArrowUpRightIcon,
+  CalendarClockIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CircleCheckIcon,
+  CircleDashedIcon,
+  CircleDotIcon,
   CircleIcon,
+  CircleMinusIcon,
+  CircleOffIcon,
+  ContrastIcon,
+  type LucideIcon,
+  PauseIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -25,7 +40,7 @@ import { buildThreadRouteParams } from "../threadRoutes";
 import { formatShortTimestamp } from "../timestampFormat";
 import { runPmCommand } from "./actions";
 import { savePmMission } from "./mission";
-import { pmItemGroups } from "@t3tools/pm/client";
+import { pmItemGroups, pmWaitTarget } from "@t3tools/pm/client";
 import { pmCommands, pmKey, usePmSummary, usePmThreadDetail } from "./state";
 import { openPmPage, usePmFold } from "./uiState";
 import { PmNotMovingChip } from "./notMovingChip";
@@ -182,14 +197,20 @@ function useResumeLabel() {
     });
 }
 
-const STATUS_DOT: Record<string, string> = {
-  needs_you: "bg-warning",
-  blocked: "bg-destructive",
-  in_progress: "bg-warning",
-  not_worked_on: "border border-muted-foreground",
-  waiting: "bg-info",
-  later: "bg-muted-foreground/60",
-  done: "bg-success",
+// Ghostex's group icons (circle-dot, circle-minus, pause, circle-half, circle-check, circle-dashed,
+// calendar-clock), each group in its own tone; Waiting is the calm blue-grey hold, never red.
+const STATUS_LOOK: Record<
+  PmShownItemStatus,
+  { readonly icon: LucideIcon; readonly className: string }
+> = {
+  needs_you: { icon: CircleDotIcon, className: "text-warning" },
+  blocked: { icon: CircleMinusIcon, className: "text-destructive" },
+  in_progress: { icon: ContrastIcon, className: "text-warning" },
+  not_worked_on: { icon: CircleDashedIcon, className: "text-muted-foreground" },
+  waiting: { icon: PauseIcon, className: "text-[#7fa1c4]" },
+  later: { icon: CalendarClockIcon, className: "text-muted-foreground" },
+  done: { icon: CircleCheckIcon, className: "text-success" },
+  dropped: { icon: CircleOffIcon, className: "text-muted-foreground" },
 };
 
 function usePmStatusLabels() {
@@ -234,9 +255,10 @@ function PmWorkItemsSection(props: {
           groups.map((group) => (
             <PmItemGroupView
               key={group.status}
+              status={group.status}
               foldKey={`items:${key}:${group.status}`}
               label={labels[group.status]}
-              dot={STATUS_DOT[group.status] ?? ""}
+              look={STATUS_LOOK[group.status]}
               items={group.items}
               openByDefault={group.openByDefault}
               detail={props.detail}
@@ -250,17 +272,20 @@ function PmWorkItemsSection(props: {
 }
 
 function PmItemGroupView(props: {
+  readonly status: string;
   readonly foldKey: string;
   readonly label: string;
-  readonly dot: string;
+  readonly look: (typeof STATUS_LOOK)[PmShownItemStatus];
   readonly items: ReadonlyArray<PmItem>;
   readonly openByDefault: boolean;
   readonly detail: PmThreadDetail;
   readonly threadKey: string;
 }) {
   const [open, setOpen] = usePmFold(props.foldKey, props.openByDefault);
+  const Icon = props.look.icon;
   return (
-    <div>
+    // The Inbox's counts scroll here.
+    <div data-pm-group={props.status}>
       <button
         type="button"
         aria-expanded={open}
@@ -272,7 +297,7 @@ function PmItemGroupView(props: {
         ) : (
           <ChevronRightIcon aria-hidden className="size-3" />
         )}
-        <span aria-hidden className={cn("size-2 rounded-full", props.dot)} />
+        <Icon aria-hidden className={cn("size-3.5", props.look.className)} />
         <span className="text-foreground/90">{props.label}</span>
         <span className="text-muted-foreground">{props.items.length}</span>
       </button>
@@ -309,6 +334,23 @@ function PmItemCard(props: {
     worker.itemNo === item.itemNo && worker.limitResetAt ? [worker.limitResetAt] : [],
   );
   const resetAt = limitResets.toSorted()[0] ?? null;
+  const openWaits = item.waits.filter((wait) => wait.open);
+  const waitWords = (wait: (typeof openWaits)[number]) => {
+    const target = pmWaitTarget(wait, props.detail.items);
+    if (target.kind === "text") return target.text;
+    if (target.kind === "answer")
+      return gt("your answer", { $context: "what a work item waits on" });
+    return target.title ?? gt("another item", { $context: "what a work item waits on" });
+  };
+  // As in Ghostex, a row under Waiting says what it waits on, without repeating "Waiting on".
+  const waitsLine =
+    item.shownStatus === "waiting" && openWaits.length > 0
+      ? openWaits
+          .map(waitWords)
+          .join(", ")
+          .replace(/^./u, (first) => first.toUpperCase())
+      : null;
+  const subline = item.doneLine ?? waitsLine ?? item.nowLine;
   return (
     <div className="mx-1 mb-1.5 rounded-lg border border-border/70 bg-card/60 px-2.5 py-2 text-xs">
       <button
@@ -318,11 +360,7 @@ function PmItemCard(props: {
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium text-foreground text-sm">{item.title}</span>
-          {item.nowLine || item.doneLine ? (
-            <span className="block truncate text-muted-foreground">
-              {item.doneLine ?? item.nowLine}
-            </span>
-          ) : null}
+          {subline ? <span className="block truncate text-muted-foreground">{subline}</span> : null}
         </span>
         <span className="shrink-0 text-muted-foreground">W{item.itemNo}</span>
       </button>
@@ -370,20 +408,13 @@ function PmItemCard(props: {
               <span className={cn(step.done && "text-muted-foreground")}>{step.text}</span>
             </div>
           ))}
-          {item.waits
-            .filter((wait) => wait.open)
-            .map((wait) => (
-              <div key={wait.number} className="text-muted-foreground">
-                {gt("Waits on {target}", {
-                  target:
-                    wait.onKind === "item"
-                      ? `W${wait.onRef}`
-                      : wait.onKind === "ask"
-                        ? `Q${wait.onRef}`
-                        : wait.onRef,
-                })}
-              </div>
-            ))}
+          {waitsLine === null
+            ? openWaits.map((wait) => (
+                <div key={wait.number} className="text-muted-foreground">
+                  {gt("Waiting on {target}", { target: waitWords(wait) })}
+                </div>
+              ))
+            : null}
           {asks.map((ask) => (
             <div key={ask.askNo} className="text-warning-foreground">
               Q{ask.askNo} {ask.title}

@@ -15,6 +15,7 @@ import { readThreadShell } from "../state/entities";
 import { convertThreadToPm, createPmAndOpen, revertPmThread } from "./actions";
 import { requestMissionEdit } from "./missionEdit";
 import { pmIndexAtom, pmKey, usePmIndex } from "./state";
+import { setPmDockHidden } from "./uiState";
 
 let router: AnyRouter | null = null;
 
@@ -56,6 +57,14 @@ export function installPmCommands(appRouter: AnyRouter): void {
         return;
       }
       void newPm(shell.environmentId, shell.projectId);
+    },
+    "pm.focusInbox": (event) => {
+      // Ghostex's focusSessionInbox: nothing to triage is a no-op; a folded dock opens first.
+      const inbox = document.querySelector<HTMLElement>("[data-pm-inbox][data-pm-inbox-rows]");
+      if (inbox === null) return;
+      event.preventDefault();
+      setPmDockHidden(inbox.dataset.pmInbox ?? "", null);
+      requestAnimationFrame(() => inbox.focus());
     },
   });
 }

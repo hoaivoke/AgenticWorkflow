@@ -96,13 +96,15 @@ export function PmAnswersCard(props: { readonly text: string; readonly fallback:
         <FileTextIcon aria-hidden className="size-3.5 text-warning-foreground" />
         <span className="min-w-0 flex-1 truncate font-medium">
           {answers.seen
-            ? gt("Seen · {title}", { title: answers.title })
+            ? gt("Archived · {title}", { title: answers.title })
             : gt("Answers · {title}", { title: answers.title })}
         </span>
       </div>
       <div className="flex flex-col gap-1 px-3 py-2 text-xs">
         {answers.seen ? (
-          <span className="text-foreground/85">{answers.reply ?? gt("Marked as seen.")}</span>
+          <span className="text-foreground/85">
+            {answers.reply ?? gt("The project manager was told.")}
+          </span>
         ) : (
           answers.entries.map((entry) => (
             <div key={entry.key} className="flex gap-2">
