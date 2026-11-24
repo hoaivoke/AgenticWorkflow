@@ -34,9 +34,9 @@
   --app-theme-text-muted: #8c95a3 !important;
   --app-theme-border: #232326 !important;
   --app-theme-input: #2b2b2e !important;
-  --app-theme-focus: #e3a43c !important;
-  --app-theme-accent: #e6a840 !important;
-  --app-theme-accent-foreground: #1b1305 !important;
+  --app-theme-focus: #5581a9 !important;
+  --app-theme-accent: #5581a9 !important;
+  --app-theme-accent-foreground: #06101a !important;
   --app-theme-secondary: #18181a !important;
   --app-theme-secondary-foreground: #e6e4de !important;
   --app-theme-muted: #151517 !important;
@@ -50,16 +50,16 @@
   --app-theme-warning: #dcbd7a !important;
   --app-theme-warning-foreground: #e6c987 !important;
   --app-theme-warning-surface: #2b2210 !important;
-  --app-theme-update: #e6a840 !important;
-  --app-theme-update-foreground: #f0bf66 !important;
-  --app-theme-update-surface: #2a2012 !important;
+  --app-theme-update: #5581a9 !important;
+  --app-theme-update-foreground: #8fb3d4 !important;
+  --app-theme-update-surface: #131d27 !important;
   --app-theme-accent-surface: #1d1d20 !important;
   --app-theme-accent-surface-foreground: #e6e4de !important;
   --app-theme-message-surface: #232326 !important;
   --app-theme-message-foreground: #e6e4de !important;
-  --app-theme-message-action: #e6a840 !important;
-  --app-theme-message-action-foreground: #1b1305 !important;
-  --app-theme-message-action-hover: #d39532 !important;
+  --app-theme-message-action: #5581a9 !important;
+  --app-theme-message-action-foreground: #06101a !important;
+  --app-theme-message-action-hover: #6794bd !important;
   --app-theme-code-background: #121214 !important;
   --app-theme-code-foreground: #e6e4de !important;
   --app-theme-sidebar: #0a0b0e !important;
@@ -71,7 +71,30 @@
   --app-theme-sidebar-row-selected: #1c1c1f !important;
   --app-theme-sidebar-border: #1a1a1d !important;
   --app-theme-terminal-background: #0a0b0e !important;
-  --app-theme-terminal-cursor: #e6a840 !important;
+  --app-theme-terminal-cursor: #5581a9 !important;
+  --app-theme-terminal-selection-background: rgb(85 129 169 / 0.3) !important;
+  --app-theme-search-match-background: rgb(85 129 169 / 0.4) !important;
+  --app-theme-search-match-foreground: #e6e4de !important;
+  --app-theme-search-match-active-background: #5581a9 !important;
+  --app-theme-search-match-active-foreground: #06101a !important;
+}
+
+/* One accent, #5581A9: buttons, switches, checkboxes, links, focus rings and progress bars read
+   these tokens. Set here too so no stock blue survives a theme that maps fewer roles. */
+html {
+  --primary: #5581a9 !important;
+  --primary-foreground: #06101a !important;
+  --ring: #5581a9 !important;
+  --message-action: #5581a9 !important;
+  --message-action-foreground: #06101a !important;
+  --message-action-hover: #6794bd !important;
+  --update: #5581a9 !important;
+  --update-foreground: #8fb3d4 !important;
+}
+
+/* The Inbox's recommended star takes the accent, not Ghostex's amber. */
+.pm-star {
+  color: #5581a9 !important;
 }
 
 /* The art behind everything, 45% black over it, as Ghostex paints it. */
