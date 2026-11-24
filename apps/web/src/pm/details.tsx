@@ -1,13 +1,28 @@
-import type { EnvironmentId, PmItem, PmThreadDetail, ThreadId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  PmItem,
+  PmShownItemStatus,
+  PmThreadDetail,
+  ThreadId,
+} from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
 import { useGT } from "gt-react";
 import {
   ArrowUpRightIcon,
+  CalendarClockIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CircleCheckIcon,
+  CircleDashedIcon,
+  CircleDotIcon,
   CircleIcon,
+  CircleMinusIcon,
+  CircleOffIcon,
+  ContrastIcon,
+  type LucideIcon,
+  PauseIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -182,14 +197,20 @@ function useResumeLabel() {
     });
 }
 
-const STATUS_DOT: Record<string, string> = {
-  needs_you: "bg-warning",
-  blocked: "bg-destructive",
-  in_progress: "bg-warning",
-  not_worked_on: "border border-muted-foreground",
-  waiting: "bg-info",
-  later: "bg-muted-foreground/60",
-  done: "bg-success",
+// Ghostex's group icons (circle-dot, circle-minus, pause, circle-half, circle-check, circle-dashed,
+// calendar-clock), each group in its own tone; Waiting is the calm blue-grey hold, never red.
+const STATUS_LOOK: Record<
+  PmShownItemStatus,
+  { readonly icon: LucideIcon; readonly className: string }
+> = {
+  needs_you: { icon: CircleDotIcon, className: "text-warning" },
+  blocked: { icon: CircleMinusIcon, className: "text-destructive" },
+  in_progress: { icon: ContrastIcon, className: "text-warning" },
+  not_worked_on: { icon: CircleDashedIcon, className: "text-muted-foreground" },
+  waiting: { icon: PauseIcon, className: "text-[#7fa1c4]" },
+  later: { icon: CalendarClockIcon, className: "text-muted-foreground" },
+  done: { icon: CircleCheckIcon, className: "text-success" },
+  dropped: { icon: CircleOffIcon, className: "text-muted-foreground" },
 };
 
 function usePmStatusLabels() {
@@ -236,7 +257,7 @@ function PmWorkItemsSection(props: {
               key={group.status}
               foldKey={`items:${key}:${group.status}`}
               label={labels[group.status]}
-              dot={STATUS_DOT[group.status] ?? ""}
+              look={STATUS_LOOK[group.status]}
               items={group.items}
               openByDefault={group.openByDefault}
               detail={props.detail}
@@ -252,13 +273,14 @@ function PmWorkItemsSection(props: {
 function PmItemGroupView(props: {
   readonly foldKey: string;
   readonly label: string;
-  readonly dot: string;
+  readonly look: (typeof STATUS_LOOK)[PmShownItemStatus];
   readonly items: ReadonlyArray<PmItem>;
   readonly openByDefault: boolean;
   readonly detail: PmThreadDetail;
   readonly threadKey: string;
 }) {
   const [open, setOpen] = usePmFold(props.foldKey, props.openByDefault);
+  const Icon = props.look.icon;
   return (
     <div>
       <button
@@ -272,7 +294,7 @@ function PmItemGroupView(props: {
         ) : (
           <ChevronRightIcon aria-hidden className="size-3" />
         )}
-        <span aria-hidden className={cn("size-2 rounded-full", props.dot)} />
+        <Icon aria-hidden className={cn("size-3.5", props.look.className)} />
         <span className="text-foreground/90">{props.label}</span>
         <span className="text-muted-foreground">{props.items.length}</span>
       </button>
