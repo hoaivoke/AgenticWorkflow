@@ -31,13 +31,14 @@ const foldsAtom = Atom.make<ReadonlyMap<string, boolean>>(new Map()).pipe(
   Atom.withLabel("pm-folds"),
 );
 
+export const setPmFold = (key: string, next: boolean) => {
+  const current = appAtomRegistry.get(foldsAtom);
+  appAtomRegistry.set(foldsAtom, new Map(current).set(key, next));
+};
+
 export const usePmFold = (key: string, fallback: boolean) => {
   const folds: unknown = useAtomValue(foldsAtom);
   const value =
     (folds instanceof Map ? (folds.get(key) as boolean | undefined) : undefined) ?? fallback;
-  const set = (next: boolean) => {
-    const current = appAtomRegistry.get(foldsAtom);
-    appAtomRegistry.set(foldsAtom, new Map(current).set(key, next));
-  };
-  return [value, set] as const;
+  return [value, (next: boolean) => setPmFold(key, next)] as const;
 };

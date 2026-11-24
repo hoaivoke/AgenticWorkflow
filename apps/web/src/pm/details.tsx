@@ -234,6 +234,7 @@ function PmWorkItemsSection(props: {
           groups.map((group) => (
             <PmItemGroupView
               key={group.status}
+              status={group.status}
               foldKey={`items:${key}:${group.status}`}
               label={labels[group.status]}
               dot={STATUS_DOT[group.status] ?? ""}
@@ -250,6 +251,7 @@ function PmWorkItemsSection(props: {
 }
 
 function PmItemGroupView(props: {
+  readonly status: string;
   readonly foldKey: string;
   readonly label: string;
   readonly dot: string;
@@ -260,7 +262,8 @@ function PmItemGroupView(props: {
 }) {
   const [open, setOpen] = usePmFold(props.foldKey, props.openByDefault);
   return (
-    <div>
+    // The Inbox's counts scroll here.
+    <div data-pm-group={props.status}>
       <button
         type="button"
         aria-expanded={open}

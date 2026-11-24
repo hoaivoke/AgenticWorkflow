@@ -1744,7 +1744,9 @@ function ThreadDetailBody(
                       />
                     )}
                     {/* t3code-pm: */}
-                    {props.draftMode ? null : <PmDock thread={props.selectedThread} />}
+                    {props.draftMode ? null : (
+                      <PmDock thread={props.selectedThread} draftKey={props.composerDraftKey} />
+                    )}
                     {props.feedbackSubmissions.map((submission) => (
                       <ComposerFeedback
                         key={submission.id}

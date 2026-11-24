@@ -55,6 +55,12 @@ export function installPmCommands(appRouter: AnyRouter): void {
       }
       void newPm(shell.environmentId, shell.projectId);
     },
+    "pm.focusInbox": (event) => {
+      const inbox = document.querySelector<HTMLElement>("[data-pm-inbox]");
+      if (inbox === null) return;
+      event.preventDefault();
+      inbox.focus();
+    },
   });
 }
 

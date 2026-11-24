@@ -106,6 +106,7 @@ export const STATIC_KEYBINDING_COMMANDS = [
   "chat.newLocal",
   "chat.newWithoutProject",
   "pm.new", // t3code-pm:
+  "pm.focusInbox", // t3code-pm:
   "chat.find",
   "editor.openFavorite",
   "usage.cost",

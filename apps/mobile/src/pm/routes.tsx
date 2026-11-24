@@ -1,6 +1,7 @@
 import { createNativeStackScreen } from "@react-navigation/native-stack";
 
 import { sheetRoute } from "../features/layout/route-options";
+import { PmAskSheet } from "./askSheet";
 import { PmNewSheet } from "./newSheet";
 import { PmPageSheet } from "./pageSheet";
 import { PmSheet } from "./sheet";
@@ -14,6 +15,10 @@ export const pmScreens = {
   PmPage: createNativeStackScreen({
     screen: PmPageSheet,
     options: sheetRoute({ detent: 0.9, android: "fullScreen" }),
+  }),
+  PmAsk: createNativeStackScreen({
+    screen: PmAskSheet,
+    options: sheetRoute({ detent: 0.6, androidMaxDetent: 0.95 }),
   }),
   PmNew: createNativeStackScreen({
     screen: PmNewSheet,

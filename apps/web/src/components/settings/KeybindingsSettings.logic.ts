@@ -24,7 +24,7 @@ import {
 } from "../../keybindings";
 import { isMacPlatform } from "../../lib/utils";
 import { METRIC_OPTIONS, WINDOW_OPTIONS } from "../usage/usageShortcuts";
-import { PM_NEW_COMMAND_LABEL } from "../../pm/settingsSearch"; // t3code-pm:
+import { PM_FOCUS_INBOX_COMMAND_LABEL, PM_NEW_COMMAND_LABEL } from "../../pm/settingsSearch"; // t3code-pm:
 
 // Rank every usage command; mixing rank and alphabetical comparisons makes order input-dependent.
 const usageCommandOrder = new Map<KeybindingCommand, number>(
@@ -521,6 +521,7 @@ const LATE_COMMAND_LABELS: Partial<Record<KeybindingCommand, string>> = {
   "preview.focusUrl": msg("Preview: Focus URL"),
   "preview.find": msg("Preview: Find on Page"),
   "pm.new": PM_NEW_COMMAND_LABEL, // t3code-pm:
+  "pm.focusInbox": PM_FOCUS_INBOX_COMMAND_LABEL, // t3code-pm:
 };
 
 export function commandLabel(command: KeybindingCommand, resolve: MessageResolver = m): string {

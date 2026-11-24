@@ -1,0 +1,57 @@
+/* t3code-pm: the Inbox's look, Ghostex's dock metrics and colours (gx-chat-core work_cards.rs),
+   as utilities of its own so upstream's tokens stay as they are. */
+
+@utility pm-inbox-text {
+  font-size: 13px;
+}
+
+@utility pm-inbox-title {
+  font-size: 14px;
+  line-height: 22.75px;
+}
+
+/* One title line tall: the mark and the age sit on the title's middle. */
+@utility pm-inbox-line {
+  height: 22.75px;
+}
+
+@utility pm-ping {
+  color: #f472b6;
+}
+@utility pm-blocked {
+  color: #ef4444;
+}
+@utility pm-progress {
+  color: #c68a06;
+}
+@utility pm-done {
+  color: #2fa865;
+}
+@utility pm-star {
+  color: #f5b301;
+}
+
+@utility pm-inbox-row {
+  &:hover {
+    background: color-mix(in srgb, var(--foreground) 4%, var(--card));
+  }
+  &[data-focused],
+  &[data-focused]:hover {
+    background: color-mix(in srgb, #f472b6 14%, var(--card));
+    box-shadow: inset 2px 0 0 #f472b6;
+  }
+}
+
+@utility pm-inbox-outcome {
+  background: color-mix(in srgb, #2fa865 14%, transparent);
+  color: #2fa865;
+}
+
+@utility pm-swipe-archive {
+  background: #214e36;
+  color: #86efac;
+}
+@utility pm-swipe-snooze {
+  background: #273c56;
+  color: #93c5fd;
+}

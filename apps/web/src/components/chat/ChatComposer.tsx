@@ -3612,11 +3612,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
+      {/* t3code-pm: */}
+      <PmComposerDock threadRef={routeThreadRef} hidden={hasBlockingComposerTopDrawer} />
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />
-          {/* t3code-pm: */}
-          <PmComposerDock threadRef={routeThreadRef} hidden={hasBlockingComposerTopDrawer} />
           {showComposerTopDrawer ? (
             <ComposerBanner.Attachment>
               <ComposerBanner.Root data-chat-composer-top-drawer="true" variant="info">
