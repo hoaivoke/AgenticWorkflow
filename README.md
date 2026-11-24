@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="./docs/pm/screenshots/hero.png" width="100%" alt="A Project Manager thread in PM3code: the PM's plan in the chat, its questions above the chat box, its workers nested in the sidebar, and its work items grouped by status in the details panel" />
+  <img src="./docs/pm/screenshots/hero.png" width="100%" alt="A Project Manager thread in PM3code: the PM's plan in the chat, its Inbox above the chat box, its workers nested in the sidebar, and its work items grouped by status in the details panel" />
 </p>
 
 PM3code (PMs Mod for T3code) is an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) that adds **Project Manager threads**. You give a PM a brief. It splits the work into items, starts worker threads for them, follows those workers, and comes back to you only when it needs a decision.
@@ -35,10 +35,10 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 
 **Workers that report back.** When a worker finishes, needs an answer, goes quiet for 8 minutes, stops mid-turn, or restarts with the server, its PM gets a report and wakes up. Each report is delivered once, even across restarts.
 
-**A dock of questions.** The PM's questions (Q1, Q2, ...) sit above the chat box. Pick an answer in one click (the PM's pick has a star), or snooze, dismiss, or copy a question's tag.
+**An Inbox above the chat box.** The PM's questions (Q1, Q2, ...), its Live pages and its blocked work sit above the chat box, with counts at the top. Pick an answer in one click (the PM's pick has a star), snooze a row, or archive finished to-dos all at once. The Done, Snoozed and Handled drawers keep what the PM finished, what you put off, and what you already answered.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/dock.png" width="80%" alt="The dock above the chat box with two questions with one-click answers and two Live pages" />
+  <img src="./docs/pm/screenshots/inbox.png" width="80%" alt="The Inbox above the chat box: counts, two Live pages, two questions with one-click answers, Archive all, and the Done, Snoozed and Handled drawers" />
 </p>
 
 **Live pages.** When a question needs more than a button, the PM publishes a page that opens in a pop-up window over the chat. Your choices go straight back to the PM.
@@ -68,11 +68,23 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
   </tr>
 </table>
 
+**Make this a PM.** Any thread can become a Project Manager: right-click it in the sidebar, or use the thread menu or the command palette. It keeps its history, agent and model, and has the PM's tools from its next turn. **Turn back into a normal thread** undoes it.
+
+<p align="center">
+  <img src="./docs/pm/screenshots/make-pm.png" width="40%" alt="The sidebar's right-click menu on a thread, with Make this a PM highlighted" />
+</p>
+
+**Import from T3 Code.** Each time PM3code starts, it adds T3 Code's new projects and copies the settings you haven't changed in PM3code. It reads a copy, so it never writes to `~/.t3`. In Settings, Project managers, you can turn this off, import T3 Code's threads beside yours, or replace yours with them after a backup.
+
+<p align="center">
+  <img src="./docs/pm/screenshots/import-settings.png" width="80%" alt="Settings, Import from T3 Code: the Follow T3 Code on each launch switch, the last launch's result, and the Import threads and Replace threads buttons" />
+</p>
+
 **Any agent.** The PM drives its work through T3's MCP tools, so it runs on any agent that gets them: Claude, Codex, Cursor, OpenCode, Pi, Muse Code and ACP agents. Workers can use any agent T3 Code supports.
 
 **One switch.** Settings, Project managers turns the whole feature off (on the phone: Settings, Environments, your environment, Project managers). PM threads then show as normal threads, and nothing is deleted.
 
-**The Ghostex look.** The screenshots use a theme of frosted glass over Ghostex's Polar Night art. It's one CSS file: in Settings, Appearance, choose **Create theme**, set it to Dark, open **Custom CSS**, paste [pm3code-ghostex.css](./docs/pm/theme/pm3code-ghostex.css), and create the theme. Web and desktop only.
+**The Ghostex look.** The screenshots use a theme of frosted glass over Ghostex's Polar Night art. It's one CSS file: in Settings, Appearance, choose **Create theme**, set it to Dark, open **Custom CSS**, paste [pm3code-ghostex.css](./docs/pm/theme/pm3code-ghostex.css), set **Accent** to `#5581A9`, and create the theme. Web and desktop only.
 
 ## Install
 
