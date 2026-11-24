@@ -214,6 +214,8 @@ describe("pmInbox", () => {
         ask(2, { state: "done", answer: "Done", settledAt: at(10) }),
         ask(3, { state: "answered", answer: "No", settledAt: at(90) }),
         ask(4, { state: "dismissed", settledAt: at(1) }),
+        // Mark answered: the canned answer is no outcome worth a pill.
+        ask(5, { state: "answered", answer: "I answered this in the chat.", settledAt: at(7) }),
       ],
       pages: [page("p", { state: "answered", settledAt: at(3) })],
     });
@@ -221,6 +223,7 @@ describe("pmInbox", () => {
     expect(result.answered.map((row) => [row.key, row.outcome])).toEqual([
       ["answered:page:p", null],
       ["answered:ask:1", "Yes"],
+      ["answered:ask:5", null],
       ["answered:ask:2", null],
     ]);
   });

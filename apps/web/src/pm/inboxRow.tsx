@@ -1,5 +1,6 @@
 import type { PmPageSummary } from "@t3tools/contracts";
 import {
+  PM_ANSWERED_IN_CHAT,
   PM_SNOOZE_HOURS,
   pmAskTag,
   pmInboxAge,
@@ -35,7 +36,6 @@ import {
   archive,
   archiveDone,
   type InboxTarget,
-  type InboxUndo,
   mentionInComposer,
   openInboxPage,
   openWorkGroup,
@@ -61,12 +61,12 @@ const MARKS: Record<PmInboxMark, readonly [InboxGlyph, string]> = {
   finished: ["circleCheck", GREEN],
 };
 
-/** The 13px mark in a box one title line tall, so it sits on the title's middle. */
-function RowMark(props: { readonly mark: PmInboxMark }) {
+/** The 13px mark (12px on a bundle's page) in a box one title line tall, on the title's middle. */
+function RowMark(props: { readonly mark: PmInboxMark; readonly small?: boolean }) {
   const [glyph, color] = MARKS[props.mark];
   return (
     <span aria-hidden className="pm-inbox-line flex w-[13px] shrink-0 items-center">
-      <InboxIcon name={glyph} className={cn("size-[13px]", color)} />
+      <InboxIcon name={glyph} className={cn(props.small ? "size-3" : "size-[13px]", color)} />
     </span>
   );
 }
@@ -90,7 +90,7 @@ export function useAgeLabel() {
   };
 }
 
-/** A square 26px icon button with a tooltip, Ghostex's row buttons. */
+/** A square 28px icon button with a tooltip, Ghostex's `tone_square_icon_button`. */
 function IconButton(props: {
   readonly icon: InboxGlyph;
   readonly label: string;
@@ -114,7 +114,7 @@ function IconButton(props: {
           />
         }
       >
-        <InboxIcon name={props.icon} className="size-[15px]" />
+        <InboxIcon name={props.icon} className="size-3.5" />
       </TooltipTrigger>
       <TooltipPopup side="top">{props.label}</TooltipPopup>
     </Tooltip>
@@ -122,14 +122,14 @@ function IconButton(props: {
 }
 
 const ICON_BUTTON =
-  "inline-flex size-[26px] shrink-0 items-center justify-center rounded-md bg-foreground/7 text-foreground/80 hover:bg-foreground/12 hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground/7 text-foreground/80 hover:bg-foreground/12 hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
 
 /** The Reply box's actions are words, as in Ghostex's reply popover. */
 const PLAIN_BUTTON =
   "inline-flex h-[26px] shrink-0 items-center gap-1.5 rounded-md px-2 font-medium pm-inbox-text text-foreground hover:bg-foreground/8 disabled:pointer-events-none disabled:opacity-50";
 
 const TEXT_BUTTON =
-  "inline-flex h-[26px] shrink-0 items-center gap-1 rounded-md bg-foreground/7 px-2.75 font-medium pm-inbox-text text-foreground hover:bg-foreground/12 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-foreground/7 px-2.5 text-sm text-foreground hover:bg-foreground/12 disabled:pointer-events-none disabled:opacity-50";
 
 export function TextButton(props: {
   readonly children: ReactNode;
@@ -153,10 +153,10 @@ export function TextButton(props: {
   );
 }
 
-/** A count in a circle for one digit, a pill for more. */
+/** Ghostex's `count_badge`: an 18px circle for one digit, a pill for more. */
 export function CountBadge(props: { readonly count: number }) {
   return (
-    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground/10 px-1 font-medium text-2xs text-foreground tabular-nums">
+    <span className="inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground/10 px-1 font-medium text-2xs text-foreground tabular-nums">
       {props.count}
     </span>
   );
@@ -177,13 +177,12 @@ export interface RowContext {
   readonly cwd: string | undefined;
   readonly menu: RowMenuRequest | null;
   readonly onMenu: (request: RowMenuRequest | null) => void;
-  readonly onUndo: (undo: InboxUndo | null) => void;
 }
 
-/** The row's Archive or Dismiss, for its button, its menu, the E key and a left swipe. */
+/** The row's Archive or Dismiss, for its button, its menu, the E key and a left swipe. Silent:
+ * only the bulk Archive all gets Ghostex's Undo bar. */
 export function rowArchive(context: RowContext, row: PmInboxRow): (() => void) | null {
-  const run = (pending: () => Promise<InboxUndo | null>) => () =>
-    void pending().then((undo) => undo && context.onUndo(undo));
+  const run = (pending: () => Promise<unknown>) => () => void pending();
   switch (row.kind) {
     case "ask":
       return run(() => archive(context.target, { askNos: [row.ask.askNo] }));
@@ -283,11 +282,15 @@ function RowMenu(props: {
                 {gt("Show in chat")}
               </MenuItem>
             ) : null}
-            {row.kind === "ask" && !row.todo ? (
+            {asks ? (
               <MenuItem
                 disabled={!context.canOperate}
                 onClick={() =>
-                  void answerAsk(context.target, row.ask.askNo, "I answered this in the chat.")
+                  void (row.kind === "ask"
+                    ? answerAsk(context.target, row.ask.askNo, PM_ANSWERED_IN_CHAT)
+                    : row.kind === "page"
+                      ? replyToPage(context.target, row.page.pageId, PM_ANSWERED_IN_CHAT)
+                      : null)
                 }
               >
                 <InboxIcon name="circleCheck" className="size-4" />
@@ -378,7 +381,7 @@ function ReplyButton(props: {
           />
         }
       >
-        <InboxIcon name="reply" className="size-[15px]" />
+        <InboxIcon name="reply" className="size-3.5" />
       </PopoverTrigger>
       <PopoverPopup side="top" align="end" padding="compact" width="lg">
         <div className="flex flex-col gap-2" onClick={(event) => event.stopPropagation()}>
@@ -438,7 +441,7 @@ function Answers(props: {
     width <= (props.context.phone ? 16 : 34);
   const star = (answer: string) =>
     answer === props.recommended ? (
-      <InboxIcon name="star" filled className="size-3 pm-star" />
+      <InboxIcon name="star" filled className="size-2.5 pm-star" />
     ) : null;
   if (fits)
     return props.answers.map((answer) => (
@@ -523,7 +526,7 @@ function AskDialog(props: {
                 onClick={() => answer(choice)}
               >
                 {choice === row.ask.recommended ? (
-                  <InboxIcon name="star" filled className="size-3 pm-star" />
+                  <InboxIcon name="star" filled className="size-2.5 pm-star" />
                 ) : null}
                 {choice}
               </TextButton>
@@ -578,8 +581,9 @@ export function InboxRowView(props: {
   readonly row: PmInboxRow;
   readonly context: RowContext;
   readonly focused?: boolean;
-  /** Drawn in a drawer: quieter, with its own hover action. */
+  /** Drawn in the Done or Snoozed drawer: the same row, quieter. */
   readonly drawer?: boolean;
+  /** A page under its expanded bundle: mark, title and age only. */
   readonly nested?: boolean;
 }) {
   const gt = useGT();
@@ -592,12 +596,13 @@ export function InboxRowView(props: {
   const archiveRow = context.canOperate ? rowArchive(context, row) : null;
   const snoozable = context.canOperate && (row.kind === "ask" || row.kind === "page");
   const swipe = useSwipe(
-    context.phone ? archiveRow : null,
-    context.phone && snoozable
+    context.phone && !props.nested ? archiveRow : null,
+    context.phone && snoozable && !props.nested
       ? () => context.onMenu({ key: row.key, mode: "snooze", at: null })
       : null,
   );
   const menuOpen = context.menu?.key === row.key;
+  const finished = row.kind === "finished";
 
   const openRow = () => {
     if (row.kind === "ask") setAskOpen(true);
@@ -616,9 +621,12 @@ export function InboxRowView(props: {
             ? gt("{count} pages from last turn", { count: row.pages.length })
             : gt("{count} pages from an earlier turn", { count: row.pages.length })
           : row.item.title;
-  const preview =
-    row.kind === "ask"
-      ? row.preview
+  const preview = props.nested
+    ? ""
+    : row.kind === "ask"
+      ? row.details
+        ? ""
+        : row.preview
       : row.kind === "blocked"
         ? (row.item.nowLine ?? "")
         : row.kind === "finished"
@@ -626,20 +634,8 @@ export function InboxRowView(props: {
           : "";
 
   const buttons: Array<ReactNode> = [];
-  if (props.drawer) {
-    if (row.kind === "finished" && archiveRow)
-      buttons.push(
-        <IconButton key="archive" icon="check" label={gt("Archive")} onClick={archiveRow} />,
-      );
-    if (row.snoozedUntil !== null && context.canOperate)
-      buttons.push(
-        <IconButton
-          key="wake"
-          icon="alarmOff"
-          label={gt("Unsnooze")}
-          onClick={() => void snoozeRow(context.target, row, null)}
-        />,
-      );
+  if (props.nested || finished) {
+    // A finished row's Archive is its hover check; a bundle's page has no buttons.
   } else if (row.kind === "pages") {
     buttons.push(
       <TextButton key="expand" onClick={() => setExpanded(!expanded)}>
@@ -648,12 +644,12 @@ export function InboxRowView(props: {
     );
     if (archiveRow)
       buttons.push(
-        <TextButton key="all" onClick={archiveRow}>
+        <TextButton key="all" label={gt("Archive all pages")} onClick={archiveRow}>
           {gt("Archive all")}
         </TextButton>,
       );
   } else {
-    if (!asks && archiveRow && row.kind !== "finished")
+    if (!asks && archiveRow)
       buttons.push(
         <IconButton key="archive" icon="check" label={gt("Archive")} onClick={archiveRow} />,
       );
@@ -683,12 +679,11 @@ export function InboxRowView(props: {
         <IconButton
           key="open"
           icon="externalLink"
-          label={gt("Open", { $context: "open a Live page" })}
+          label={gt("Open page")}
           onClick={() => void openInboxPage(context.target, row.page)}
         />,
       );
-    if (row.kind !== "finished")
-      buttons.push(<ReplyButton key="reply" row={row} context={context} />);
+    buttons.push(<ReplyButton key="reply" row={row} context={context} />);
   }
 
   const strip =
@@ -702,8 +697,17 @@ export function InboxRowView(props: {
         ? { className: "pm-swipe-snooze justify-start", icon: "moon" as const, label: gt("Snooze") }
         : null;
 
+  const ageLabel =
+    row.snoozedUntil !== null
+      ? gt("back in {age}", {
+          age: age(new Date(context.now).toISOString(), Date.parse(row.snoozedUntil)),
+          $context: "When a snoozed Inbox row comes back",
+        })
+      : age(row.at, context.now);
+  const slotShown = menuOpen || props.focused;
+
   return (
-    <div className={cn("relative", props.nested && "ms-5.75 border-border border-s ps-1")}>
+    <div className={cn("relative", props.nested && "ms-5.5 border-border border-s-2 ps-1")}>
       {strip ? (
         <div
           aria-hidden
@@ -722,6 +726,7 @@ export function InboxRowView(props: {
         data-focused={props.focused ? "" : undefined}
         onClick={openRow}
         onContextMenu={(event) => {
+          if (props.nested) return;
           event.preventDefault();
           context.onMenu({
             key: row.key,
@@ -737,7 +742,7 @@ export function InboxRowView(props: {
         )}
       >
         <div className="flex items-start gap-2.5">
-          <RowMark mark={row.mark} />
+          <RowMark mark={row.mark} small={props.nested === true} />
           <span
             className={cn(
               "pm-inbox-title min-w-0 flex-1 truncate",
@@ -746,34 +751,53 @@ export function InboxRowView(props: {
           >
             {title}
           </span>
-          <div className="flex shrink-0 items-center gap-1">{buttons}</div>
+          {buttons.length > 0 ? (
+            <div className="flex shrink-0 items-center gap-1.5">{buttons}</div>
+          ) : null}
           <div className="pm-inbox-line relative flex min-w-[26px] shrink-0 items-center justify-end">
             <span
               className={cn(
-                "text-muted-foreground text-xs tabular-nums group-hover/row:invisible",
-                (menuOpen || props.focused) && "invisible",
+                "whitespace-nowrap text-muted-foreground text-xs tabular-nums",
+                !props.nested && "group-hover/row:invisible",
+                !props.nested && slotShown && "invisible",
               )}
             >
-              {row.snoozedUntil !== null
-                ? // Time left until it comes back.
-                  age(new Date(context.now).toISOString(), Date.parse(row.snoozedUntil))
-                : age(row.at, context.now)}
+              {ageLabel}
             </span>
-            <button
-              ref={setMore}
-              type="button"
-              aria-label={gt("More")}
-              onClick={(event) => {
-                event.stopPropagation();
-                context.onMenu(menuOpen ? null : { key: row.key, mode: "full", at: null });
-              }}
-              className={cn(
-                "absolute inset-y-0 end-0 m-auto inline-flex size-[26px] items-center justify-center rounded-md text-muted-foreground opacity-0 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100",
-                (menuOpen || props.focused) && "opacity-100",
-              )}
-            >
-              <InboxIcon name="dots" className="size-[15px]" />
-            </button>
+            {props.nested ? null : finished ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={gt("Archive")}
+                      disabled={archiveRow === null}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        archiveRow?.();
+                      }}
+                      className={cn(SLOT_BUTTON, slotShown && "opacity-100")}
+                    />
+                  }
+                >
+                  <InboxIcon name="check" className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="top">{gt("Archive")}</TooltipPopup>
+              </Tooltip>
+            ) : (
+              <button
+                ref={setMore}
+                type="button"
+                aria-label={gt("More actions")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  context.onMenu(menuOpen ? null : { key: row.key, mode: "full", at: null });
+                }}
+                className={cn(SLOT_BUTTON, slotShown && "opacity-100")}
+              >
+                <InboxIcon name="dots" className="size-3.5" />
+              </button>
+            )}
           </div>
         </div>
         {preview ? (
@@ -782,7 +806,7 @@ export function InboxRowView(props: {
           </div>
         ) : null}
       </div>
-      <RowMenu row={row} context={context} anchor={more} />
+      {props.nested ? null : <RowMenu row={row} context={context} anchor={more} />}
       {row.kind === "ask" ? (
         <AskDialog row={row} context={context} open={askOpen} onOpenChange={setAskOpen} />
       ) : null}
@@ -810,3 +834,7 @@ export function InboxRowView(props: {
     </div>
   );
 }
+
+/** The age slot's hover button, laid over the age so nothing shifts: 26x22, a hair past the edge. */
+const SLOT_BUTTON =
+  "absolute inset-y-0 -end-0.5 m-auto inline-flex h-5.5 w-6.5 items-center justify-center rounded-md text-muted-foreground opacity-0 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 disabled:pointer-events-none";

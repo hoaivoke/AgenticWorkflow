@@ -36,6 +36,26 @@ export const setPmFold = (key: string, next: boolean) => {
   appAtomRegistry.set(foldsAtom, new Map(current).set(key, next));
 };
 
+/** A folded dock remembers the rows it folded over, so any new row opens it again. */
+const dockHiddenAtom = Atom.make<ReadonlyMap<string, ReadonlySet<string>>>(new Map()).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("pm-dock-hidden"),
+);
+
+export const setPmDockHidden = (key: string, rows: ReadonlySet<string> | null) => {
+  const next = new Map(appAtomRegistry.get(dockHiddenAtom));
+  if (rows === null) next.delete(key);
+  else next.set(key, rows);
+  appAtomRegistry.set(dockHiddenAtom, next);
+};
+
+export const usePmDockHidden = (key: string): ReadonlySet<string> | null => {
+  const hidden: unknown = useAtomValue(dockHiddenAtom);
+  return hidden instanceof Map
+    ? ((hidden.get(key) as ReadonlySet<string> | undefined) ?? null)
+    : null;
+};
+
 export const usePmFold = (key: string, fallback: boolean) => {
   const folds: unknown = useAtomValue(foldsAtom);
   const value =

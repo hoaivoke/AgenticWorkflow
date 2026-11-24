@@ -37,7 +37,10 @@
   }
   &[data-focused],
   &[data-focused]:hover {
-    background: color-mix(in srgb, #f472b6 14%, var(--card));
+    background: color-mix(in srgb, #f472b6 10%, var(--card));
+    @variant dark {
+      background: color-mix(in srgb, #f472b6 14%, var(--card));
+    }
     box-shadow: inset 2px 0 0 #f472b6;
   }
 }
@@ -47,11 +50,53 @@
   color: #2fa865;
 }
 
+/* 0.9 of the body size: the Archive all summary and the Handled outcome pill. */
+@utility pm-inbox-note {
+  font-size: 12.5px;
+  line-height: 20px;
+}
+
+/* The header bar's hover, which steps aside while a count chip under it is hovered. */
+@utility pm-inbox-head {
+  &:hover:not(:has([data-pm-chip]:hover)) {
+    background: color-mix(in srgb, var(--foreground) 5.5%, var(--card));
+  }
+}
+
+@utility pm-inbox-chip {
+  border: 1px solid transparent;
+  &:hover {
+    background: color-mix(in srgb, var(--foreground) 7.5%, transparent);
+    border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+    @variant dark {
+      background: color-mix(in srgb, var(--foreground) 10.5%, transparent);
+    }
+  }
+  &:active {
+    background: color-mix(in srgb, var(--foreground) 13%, transparent);
+    @variant dark {
+      background: color-mix(in srgb, var(--foreground) 16%, transparent);
+    }
+  }
+}
+
+@utility pm-handled-mark {
+  color: color-mix(in srgb, #2fa865 85%, transparent);
+}
+
 @utility pm-swipe-archive {
-  background: #214e36;
-  color: #86efac;
+  background: #dcfce7;
+  color: #15803d;
+  @variant dark {
+    background: #214e36;
+    color: #86efac;
+  }
 }
 @utility pm-swipe-snooze {
-  background: #273c56;
-  color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+  @variant dark {
+    background: #273c56;
+    color: #93c5fd;
+  }
 }

@@ -12,14 +12,17 @@ import {
   pmInboxHidden,
   type PmInboxRow,
 } from "@t3tools/pm/client";
+import { useAtomValue } from "@effect/atom-react";
 import { useGT } from "gt-react";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 
 import { toastManager } from "../components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { shortcutLabelForCommand } from "../keybindings";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { cn } from "../lib/utils";
+import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentScope } from "../state/session";
 import {
   archive,
@@ -46,12 +49,14 @@ import {
 } from "./inboxRow";
 import { PmMissionDialog } from "./mission";
 import { pmKey, usePmSummary, usePmThreadDetail } from "./state";
-import { usePmFold } from "./uiState";
+import { setPmDockHidden, usePmDockHidden, usePmFold } from "./uiState";
 
 interface DockProps {
   readonly threadRef: { readonly environmentId: EnvironmentId; readonly threadId: ThreadId } | null;
   /** Upstream's blocking question drawer is showing; the Inbox steps aside. */
   readonly hidden?: boolean;
+  /** Ghostex folds the dock away past 280 characters of draft (`DOCK_FOLDS_PAST_CHARS`). */
+  readonly longDraft?: boolean;
 }
 
 /** The Inbox above a PM's composer: Ghostex's Session Inbox over the PM's asks, pages and work. */
@@ -64,7 +69,7 @@ export function PmComposerDock(props: DockProps) {
   return (
     <>
       <PmMissionDialog threadRef={props.threadRef} />
-      {props.hidden ? null : <PmInboxCard target={props.threadRef} />}
+      {props.hidden || props.longDraft ? null : <PmInboxCard target={props.threadRef} />}
     </>
   );
 }
@@ -75,16 +80,10 @@ function PmInboxCard(props: { readonly target: InboxTarget }) {
   // The tick is UTC `YYYY-MM-DDTHH:mm`; without the zone Date.parse would read it as local time.
   const now = Date.parse(`${useNowMinute()}:00Z`);
   if (detail === null) return null;
-  const inbox = pmInbox(detail, now);
-  const empty =
-    inbox.rows.length === 0 &&
-    inbox.done.length === 0 &&
-    inbox.snoozed.length === 0 &&
-    inbox.answered.length === 0 &&
-    inbox.counts.inProgress === 0;
-  if (empty) return null;
-  return <InboxSurface target={props.target} inbox={inbox} now={now} />;
+  return <InboxSurface target={props.target} inbox={pmInbox(detail, now)} now={now} />;
 }
+
+const UNDO_MS = 10_000;
 
 function InboxSurface(props: {
   readonly target: InboxTarget;
@@ -96,7 +95,7 @@ function InboxSurface(props: {
   const key = pmKey(target.environmentId, target.threadId);
   const canOperate = useEnvironmentScope(target.environmentId, AuthOrchestrationOperateScope);
   const phone = useMediaQuery("max-sm");
-  const [folded, setFolded] = usePmFold(`dock:${key}`, false);
+  const hiddenRows = usePmDockHidden(key);
   const [showAll, setShowAll] = useState(false);
   const [focus, setFocus] = useState(-1);
   const [menu, setMenu] = useState<RowMenuRequest | null>(null);
@@ -105,12 +104,27 @@ function InboxSurface(props: {
   const shown = showAll ? inbox.rows : inbox.rows.slice(0, limit);
   const hidden = pmInboxHidden(inbox.rows.slice(limit));
   const focusAt = Math.min(focus, shown.length - 1);
+  const content =
+    inbox.rows.length +
+      inbox.done.length +
+      inbox.snoozed.length +
+      inbox.answered.length +
+      (undo ? 1 : 0) >
+    0;
+  // Ghostex's `work_dock_hidden`: folded only while every row now was there when it was folded.
+  const folded =
+    content &&
+    undo === null &&
+    hiddenRows !== null &&
+    inbox.rows.every((row) => hiddenRows.has(row.key));
+  const onFold = () =>
+    setPmDockHidden(key, folded ? null : new Set(inbox.rows.map((row) => row.key)));
 
   const onUndo = (next: InboxUndo | null) => {
     if (next === null) return;
     const id = Date.now();
     setUndo({ ...next, id });
-    setTimeout(() => setUndo((current) => (current?.id === id ? null : current)), 8000);
+    setTimeout(() => setUndo((current) => (current?.id === id ? null : current)), UNDO_MS);
   };
   const context: RowContext = {
     target,
@@ -120,22 +134,22 @@ function InboxSurface(props: {
     cwd: undefined,
     menu,
     onMenu: setMenu,
-    onUndo,
   };
 
-  // Ghostex's Inbox keys: Up and Down move, Enter opens, E archives or dismisses, S snoozes, Esc
-  // goes back to the chat box.
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  // Ghostex's Inbox keys: Up and Down move round the rows, Enter opens, E archives or dismisses,
+  // S snoozes, Esc goes back to the chat box.
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget || event.metaKey || event.ctrlKey || event.altKey)
       return;
     const row: PmInboxRow | undefined = shown[focusAt];
+    const count = shown.length;
     const handled = (() => {
       switch (event.key) {
         case "ArrowDown":
-          setFocus(Math.min(shown.length - 1, focusAt + 1));
+          if (count > 0) setFocus((focusAt + 1) % count);
           return true;
         case "ArrowUp":
-          setFocus(Math.max(0, focusAt - 1));
+          if (count > 0) setFocus((Math.max(focusAt, 0) + count - 1) % count);
           return true;
         case "Enter":
           if (row)
@@ -173,7 +187,8 @@ function InboxSurface(props: {
 
   return (
     <section
-      data-pm-inbox=""
+      data-pm-inbox={key}
+      data-pm-inbox-rows={inbox.rows.length > 0 ? inbox.rows.length : undefined}
       aria-label={gt("Inbox")}
       tabIndex={-1}
       onKeyDown={onKeyDown}
@@ -188,13 +203,14 @@ function InboxSurface(props: {
       <InboxHeader
         target={target}
         inbox={inbox}
+        collapsible={content}
         folded={folded}
-        onFold={() => setFolded(!folded)}
+        onFold={onFold}
       />
-      {folded ? null : (
-        <>
+      {!content || folded ? null : (
+        <div className="max-h-[min(360px,40vh)] overflow-y-auto p-1">
           {shown.length > 0 ? (
-            <div role="list" className="max-h-[min(360px,40vh)] overflow-y-auto p-1">
+            <div role="list">
               {shown.map((row, index) => (
                 <InboxRowView
                   key={row.key}
@@ -203,13 +219,13 @@ function InboxSurface(props: {
                   focused={index === focusAt}
                 />
               ))}
-              {moreParts.length > 0 && !showAll ? (
-                <MoreLine onClick={() => setShowAll(true)}>{moreParts.join(" · ")}</MoreLine>
-              ) : null}
-              {showAll && inbox.rows.length > limit ? (
-                <MoreLine onClick={() => setShowAll(false)}>{gt("Show fewer")}</MoreLine>
-              ) : null}
             </div>
+          ) : null}
+          {moreParts.length > 0 && !showAll ? (
+            <MoreLine onClick={() => setShowAll(true)}>{moreParts.join(" · ")}</MoreLine>
+          ) : null}
+          {showAll && inbox.rows.length > limit ? (
+            <MoreLine onClick={() => setShowAll(false)}>{gt("Show fewer")}</MoreLine>
           ) : null}
           {inbox.archiveAll && canOperate ? (
             <ArchiveAllFooter
@@ -218,8 +234,8 @@ function InboxSurface(props: {
             />
           ) : null}
           {undo ? (
-            <div className="flex h-9 items-center gap-2 border-border/60 border-t ps-3 pe-1.25 pm-inbox-text">
-              <InboxIcon name="archive" className="size-[15px] text-muted-foreground" />
+            <div className="mt-0.5 flex h-9 items-center gap-2 border-foreground/6 border-t ps-2 pe-0.5 text-sm">
+              <InboxIcon name="archive" className="size-[13px] text-muted-foreground" />
               <span className="flex-1 text-muted-foreground">
                 {gt("Archived {count}", { count: undo.count })}
               </span>
@@ -235,9 +251,9 @@ function InboxSurface(props: {
                 type="button"
                 aria-label={gt("Close")}
                 onClick={() => setUndo(null)}
-                className="inline-flex size-[26px] items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/8 hover:text-foreground"
+                className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/8 hover:text-foreground"
               >
-                <InboxIcon name="x" className="size-[15px]" />
+                <InboxIcon name="x" className="size-3.5" />
               </button>
             </div>
           ) : null}
@@ -283,18 +299,18 @@ function InboxSurface(props: {
           ) : null}
           {inbox.answered.length > 0 ? (
             <Drawer
-              foldKey={`dock-answered:${key}`}
+              foldKey={`dock-handled:${key}`}
               icon="messageCheck"
               iconClassName={GREEN}
-              label={gt("Answered")}
+              label={gt("Handled", { $context: "Inbox drawer of questions already answered" })}
               count={inbox.answered.length}
             >
               {inbox.answered.map((row) => (
-                <AnsweredRow key={row.key} row={row} now={now} />
+                <HandledRow key={row.key} row={row} now={now} />
               ))}
             </Drawer>
           ) : null}
-        </>
+        </div>
       )}
     </section>
   );
@@ -303,69 +319,93 @@ function InboxSurface(props: {
 function InboxHeader(props: {
   readonly target: InboxTarget;
   readonly inbox: PmInbox;
+  readonly collapsible: boolean;
   readonly folded: boolean;
   readonly onFold: () => void;
 }) {
   const gt = useGT();
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const shortcut = shortcutLabelForCommand(keybindings, "pm.focusInbox");
   const { counts } = props.inbox;
+  const open = props.collapsible && !props.folded;
+  const quiet = counts.pings + counts.blocked + counts.inProgress === 0;
   return (
     <div
-      onClick={props.onFold}
+      onClick={props.collapsible ? props.onFold : undefined}
       className={cn(
-        "flex h-[34px] min-w-0 cursor-default items-center gap-3 overflow-hidden ps-3 pe-1.25 pm-inbox-text max-sm:gap-2",
-        !props.folded && "rounded-t-xl border-border/60 border-b bg-foreground/[3.5%]",
+        "flex h-[34px] min-w-0 cursor-default items-center gap-1.5 overflow-hidden ps-3 pe-1.25 pm-inbox-text",
+        props.collapsible && "pm-inbox-head",
+        open && "h-[35px] rounded-t-xl border-border border-b bg-foreground/[3.5%]",
       )}
     >
-      <span className="inline-flex items-center gap-1.5 font-semibold">
-        <InboxIcon name="inbox" className="size-[15px] text-muted-foreground" />
-        {gt("Inbox")}
-      </span>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="me-1.5 inline-flex shrink-0 items-center gap-1.25 font-semibold" />
+          }
+        >
+          <InboxIcon name="inbox" className="size-3.5 text-foreground/85" />
+          {gt("Inbox")}
+        </TooltipTrigger>
+        <TooltipPopup side="top">
+          {gt("Session Inbox")}
+          {shortcut ? <span className="ms-2 text-muted-foreground">{shortcut}</span> : null}
+        </TooltipPopup>
+      </Tooltip>
+      {quiet ? (
+        <span className="truncate text-muted-foreground">{gt("Nothing in progress")}</span>
+      ) : null}
       {counts.pings > 0 ? (
         <CountChip
           icon="circleDot"
           className={PINK}
+          count={counts.pings}
+          word={gt("{count, plural, one {ping} other {pings}}", {
+            count: counts.pings,
+            $context: "Inbox count word after its number",
+          })}
           tooltip={gt("Open Pings in Work")}
           onClick={() => openWorkGroup(props.target, "needs_you")}
-        >
-          {gt("{count, plural, one {# ping} other {# pings}}", { count: counts.pings })}
-        </CountChip>
+        />
       ) : null}
       {counts.blocked > 0 ? (
         <CountChip
           icon="circleMinusFilled"
           className={RED}
+          count={counts.blocked}
+          word={gt("blocked", { $context: "Inbox count word after its number" })}
           tooltip={gt("Open Blocked in Work")}
           onClick={() => openWorkGroup(props.target, "blocked")}
-        >
-          {gt("{count} blocked", { count: counts.blocked, $context: "Inbox count" })}
-        </CountChip>
+        />
       ) : null}
       {counts.inProgress > 0 ? (
         <CountChip
           icon="circleHalf"
           className={AMBER}
+          count={counts.inProgress}
+          word={gt("in progress", { $context: "Inbox count word after its number" })}
           tooltip={gt("Open In progress in Work")}
           onClick={() => openWorkGroup(props.target, "in_progress")}
-        >
-          {gt("{count} in progress", { count: counts.inProgress, $context: "Inbox count" })}
-        </CountChip>
+        />
       ) : null}
       <span className="flex-1" />
-      <button
-        type="button"
-        aria-expanded={!props.folded}
-        aria-label={props.folded ? gt("Show the Inbox") : gt("Fold the Inbox")}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onFold();
-        }}
-        className="inline-flex size-[26px] items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/8 hover:text-foreground"
-      >
-        <InboxIcon
-          name="chevronDown"
-          className={cn("size-[15px] transition-transform", props.folded && "rotate-180")}
-        />
-      </button>
+      {props.collapsible ? (
+        <button
+          type="button"
+          aria-expanded={!props.folded}
+          aria-label={props.folded ? gt("Show the Inbox") : gt("Fold the Inbox")}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onFold();
+          }}
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+        >
+          <InboxIcon
+            name="chevronDown"
+            className={cn("size-3.5 transition-transform", props.folded && "rotate-180")}
+          />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -373,9 +413,10 @@ function InboxHeader(props: {
 function CountChip(props: {
   readonly icon: InboxGlyph;
   readonly className: string;
+  readonly count: number;
+  readonly word: string;
   readonly tooltip: string;
   readonly onClick: () => void;
-  readonly children: ReactNode;
 }) {
   return (
     <Tooltip>
@@ -383,16 +424,20 @@ function CountChip(props: {
         render={
           <button
             type="button"
+            data-pm-chip=""
             onClick={(event) => {
               event.stopPropagation();
               props.onClick();
             }}
-            className="inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1 text-foreground/80 hover:bg-foreground/8 hover:text-foreground"
+            className="group/chip pm-inbox-chip inline-flex shrink-0 items-center gap-1.25 whitespace-nowrap rounded-md px-1.5 py-0.5"
           />
         }
       >
         <InboxIcon name={props.icon} className={cn("size-[13px]", props.className)} />
-        {props.children}
+        <span className="text-foreground tabular-nums">{props.count}</span>
+        <span className="text-muted-foreground group-hover/chip:text-foreground max-sm:hidden">
+          {props.word}
+        </span>
       </TooltipTrigger>
       <TooltipPopup side="top">{props.tooltip}</TooltipPopup>
     </Tooltip>
@@ -404,7 +449,7 @@ function MoreLine(props: { readonly onClick: () => void; readonly children: Reac
     <button
       type="button"
       onClick={props.onClick}
-      className="block w-full truncate rounded-lg py-1 ps-7.75 pe-2 text-start pm-inbox-text text-muted-foreground hover:bg-foreground/4 hover:text-foreground"
+      className="block w-full truncate rounded-lg py-1 ps-7.75 pe-2 text-start text-muted-foreground text-sm hover:bg-foreground/4 hover:text-foreground"
     >
       {props.children}
     </button>
@@ -425,13 +470,17 @@ function ArchiveAllFooter(props: {
     .filter(Boolean)
     .join(" · ");
   return (
-    <div className="flex h-9 items-center gap-2 border-border/60 border-t ps-3 pe-1.25 pm-inbox-text">
-      <span className="flex-1 truncate text-muted-foreground">{summary}</span>
-      <TextButton onClick={props.onArchive}>
-        <InboxIcon name="check" className="size-3.5" />
-        {gt("Archive all")}
-        <CountBadge count={pages + todos} />
-      </TextButton>
+    <div className="mt-0.5 flex items-center gap-2 border-foreground/6 border-t px-2 pt-1.25 pb-1">
+      <span className="flex-1 truncate pm-inbox-note text-muted-foreground">{summary}</span>
+      <Tooltip>
+        <TooltipTrigger render={<span className="inline-flex" />}>
+          <TextButton onClick={props.onArchive}>
+            {gt("Archive all")}
+            <CountBadge count={pages + todos} />
+          </TextButton>
+        </TooltipTrigger>
+        <TooltipPopup side="top">{gt("Archive all pages and plain to-dos")}</TooltipPopup>
+      </Tooltip>
     </div>
   );
 }
@@ -447,30 +496,31 @@ function Drawer(props: {
 }) {
   const [open, setOpen] = usePmFold(props.foldKey, false);
   return (
-    <div className="border-border/60 border-t">
-      <div className="flex h-8 items-center gap-2 ps-3 pe-1.25">
+    <div className="mt-0.5 border-foreground/6 border-t">
+      <div className="flex h-8 items-center gap-2 ps-2 pe-0.5">
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen(!open)}
-          className="flex h-full min-w-0 flex-1 items-center gap-1.5 pm-inbox-text text-muted-foreground hover:text-foreground"
+          className="flex h-full min-w-0 flex-1 items-center gap-1.5 text-muted-foreground text-sm hover:text-foreground"
         >
           <InboxIcon name={props.icon} className={cn("size-[13px]", props.iconClassName)} />
           <span>{props.label}</span>
           <CountBadge count={props.count} />
           <InboxIcon
             name="chevronDown"
-            className={cn("size-3.5 transition-transform", !open && "-rotate-90")}
+            className={cn("size-3 transition-transform", !open && "-rotate-90")}
           />
         </button>
         {open ? props.action : null}
       </div>
-      {open ? <div className="px-1 pb-1">{props.children}</div> : null}
+      {open ? <div className="pb-0.5">{props.children}</div> : null}
     </div>
   );
 }
 
-function AnsweredRow(props: { readonly row: PmInboxAnswered; readonly now: number }) {
+/** A Handled row: Ghostex's compact settled line; a click shows the turn that settled it. */
+function HandledRow(props: { readonly row: PmInboxAnswered; readonly now: number }) {
   const gt = useGT();
   const age = useAgeLabel();
   const { row } = props;
@@ -479,15 +529,19 @@ function AnsweredRow(props: { readonly row: PmInboxAnswered; readonly now: numbe
       type="button"
       onClick={() => {
         if (row.messageId === null || !showMessageInChat(row.messageId))
-          toastManager.add({ type: "info", title: gt("That message is not loaded") });
+          toastManager.add({
+            type: "info",
+            title: gt("That turn isn't loaded in this chat any more."),
+          });
       }}
-      className="flex w-full items-center gap-2 rounded-lg py-1.5 ps-6 pe-2 text-start opacity-72 hover:bg-foreground/4"
+      className="flex w-full items-center gap-2 rounded-lg py-1.25 ps-6 pe-2 text-start opacity-72 hover:bg-foreground/4"
     >
+      <InboxIcon name="messageCheck" className="size-3 shrink-0 pm-handled-mark" />
       <span className="pm-inbox-title min-w-0 flex-1 truncate text-muted-foreground">
         {row.title}
       </span>
       {row.outcome ? (
-        <span className="max-w-[40%] shrink-0 truncate pm-inbox-outcome rounded-full px-2 text-xs leading-5">
+        <span className="max-w-[180px] shrink-0 truncate pm-inbox-note pm-inbox-outcome rounded-full px-2">
           {row.outcome}
         </span>
       ) : null}

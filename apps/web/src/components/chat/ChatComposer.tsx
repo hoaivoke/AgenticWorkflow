@@ -3613,7 +3613,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       {...threadContextDropTargetProps()}
     >
       {/* t3code-pm: */}
-      <PmComposerDock threadRef={routeThreadRef} hidden={hasBlockingComposerTopDrawer} />
+      <PmComposerDock
+        threadRef={routeThreadRef}
+        hidden={hasBlockingComposerTopDrawer}
+        longDraft={prompt.length > 280}
+      />
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />

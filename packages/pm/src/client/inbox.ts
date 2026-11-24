@@ -15,6 +15,10 @@ const SHORT_DESCRIPTION = 90;
 /** Same-turn pages that only wait to be seen bundle once there are this many. */
 const BUNDLE_MIN = 2;
 const BUNDLE_WINDOW_MS = 2 * MINUTE_MS;
+/** The Handled drawer's pill only says something the drawer doesn't: no "answered" or "done". */
+const GENERIC_OUTCOME = /^(answered|done|i answered this in the chat\.?)?$/i;
+/** Mark answered's words, which the PM reads and the Handled drawer doesn't repeat. */
+export const PM_ANSWERED_IN_CHAT = "I answered this in the chat.";
 
 export const PM_INBOX_LIMIT = 4;
 export const PM_INBOX_PHONE_LIMIT = 3;
@@ -63,7 +67,7 @@ export type PmInboxRow =
 export interface PmInboxAnswered {
   readonly key: string;
   readonly title: string;
-  /** The answer picked, when it says more than "answered" or "done". */
+  /** The answer picked, when it says more than "answered", "done" or Mark answered. */
   readonly outcome: string | null;
   readonly at: string;
   readonly messageId: string | null;
@@ -283,7 +287,7 @@ export function pmInbox(
           return {
             key: `answered:ask:${ask.askNo}`,
             title: ask.title,
-            outcome: words === "" || /^(answered|done)$/i.test(words) ? null : words,
+            outcome: GENERIC_OUTCOME.test(words) ? null : words,
             at: ask.settledAt!,
             messageId: ask.answerMessageId,
           };
