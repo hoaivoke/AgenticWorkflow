@@ -6,6 +6,7 @@ import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popov
 import { QRCodeSvg } from "../ui/qr-code";
 import { SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
+import { pmPhoneStores } from "../../pm/phoneApp"; // t3code-pm:
 
 const stores = [
   {
@@ -32,7 +33,8 @@ export function MobileAppSettingsRow() {
       description={gt("Connect to your server from your phone or tablet.")}
       control={
         <div className="flex items-center gap-2">
-          {stores.map(({ label, store, url, Icon }) => (
+          {pmPhoneStores(stores).map(({ label, store, url, Icon }) => (
+            // t3code-pm:
             <Popover key={store}>
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
                 <Icon />

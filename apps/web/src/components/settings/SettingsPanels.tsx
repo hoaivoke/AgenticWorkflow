@@ -79,6 +79,7 @@ import {
 import { useTextGenerationTargets } from "../../textGenerators";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { PM_DEFAULT_THEME } from "../../pm/ghostexTheme";
+import { PM_COLLECTS_USAGE_DATA } from "../../pm/usageData"; // t3code-pm:
 import { isMacPlatform } from "../../lib/utils";
 import {
   useEnvironmentProviders,
@@ -2568,23 +2569,28 @@ export function AboutSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="legal" title={gt("Legal")}>
-        <SettingsRow
-          {...setting("privacy-policy")}
-          description={
-            telemetryOff === undefined
-              ? gt("How we handle your data, including the anonymous usage data T3 Code collects.")
-              : gt("How we handle your data. {telemetryOff}", { telemetryOff })
-          }
-          control={
-            <Button
-              render={<a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener" />}
-              size="sm"
-              variant="outline"
-            >
-              <T>View policy</T>
-            </Button>
-          }
-        />
+        {/* t3code-pm: PM3code collects no usage data, and T3's policy is not its own */}
+        {PM_COLLECTS_USAGE_DATA ? (
+          <SettingsRow
+            {...setting("privacy-policy")}
+            description={
+              telemetryOff === undefined
+                ? gt(
+                    "How we handle your data, including the anonymous usage data T3 Code collects.",
+                  )
+                : gt("How we handle your data. {telemetryOff}", { telemetryOff })
+            }
+            control={
+              <Button
+                render={<a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener" />}
+                size="sm"
+                variant="outline"
+              >
+                <T>View policy</T>
+              </Button>
+            }
+          />
+        ) : null}
         <SettingsRow
           {...setting("open-source-licenses")}
           description={gt("Notices for dependencies, assets, and optional tools used by T3 Code.")}

@@ -47,20 +47,40 @@ export const PM_TRUSTED_DESKTOP_ORIGINS = [
 ] as const;
 
 const UPSTREAM_APP_NAME = /\bT3 (Code|server|desktop|home)/g;
+/** `t3 …` in code spans, so `t3 connect link` is caught where the bare form below skips it. */
+const UPSTREAM_COMMAND_CODE = /`t3(?=[ `])/g;
+/**
+ * The bare word: not `t3@1.2`, `t3code`, `t3/branch`, `mcp__t3__`, an MCP server named in
+ * `--transport http t3 {url}`, or the "t3 connect" and "t3 chat" search terms for T3's services.
+ */
+const UPSTREAM_COMMAND = /(?<![\w./@`-])(?<!http )t3(?![\w/@-]|\.\w| connect\b| chat\b)/g;
+const UPSTREAM_HOME_ENV = /\bT3CODE_HOME\b/g;
+
+const pmCommandName = (text: string): string => {
+  if (!text.includes("t3")) return text;
+  const coded = text.replace(UPSTREAM_COMMAND_CODE, `\`${PM_DESKTOP_IDENTITY.cliName}`);
+  // "t3 or t3/ produces t3/add-search" is a branch prefix example, not the command.
+  return text.includes("t3/")
+    ? coded
+    : coded.replace(UPSTREAM_COMMAND, PM_DESKTOP_IDENTITY.cliName);
+};
 
 /**
- * Upstream copy calls this app "T3 Code" (and its "T3 server"); every PM3code surface shows its
- * own name there instead. Applied where text is resolved for display, so upstream's strings and
- * translation keys stay untouched. "T3 Connect" and "T3 Chat" are T3's services and stay.
+ * Upstream copy calls this app "T3 Code" (and its "T3 server"), its command `t3` and its home
+ * variable T3CODE_HOME; every PM3code surface shows its own instead. Applied where text is
+ * resolved for display, so upstream's strings and translation keys stay untouched. "T3 Connect"
+ * and "T3 Chat" are T3's services and stay.
  */
-export const pmAppName = (text: string): string =>
-  text.includes("T3 ")
+export const pmAppName = (text: string): string => {
+  const named = text.includes("T3 ")
     ? text.replace(UPSTREAM_APP_NAME, (_match, word: string) =>
         word === "Code"
           ? PM_DESKTOP_IDENTITY.productName
           : `${PM_DESKTOP_IDENTITY.productName} ${word}`,
       )
     : text;
+  return pmCommandName(named).replace(UPSTREAM_HOME_ENV, PM_DESKTOP_IDENTITY.homeEnv);
+};
 
 /**
  * `pmAppName` in a fork desktop or server bundle, the text unchanged under Vitest, so upstream's

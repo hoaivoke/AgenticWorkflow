@@ -41,6 +41,9 @@ import { traceCommand } from "./cli/trace.ts";
 import { triageCommand } from "./cli/triage.ts";
 import { connectCommand, statusCommand, upCommand } from "./cli/up.ts";
 import { layerPmCliOutput } from "./pm/cliOutput.ts"; // t3code-pm:
+import { PM_DESKTOP_IDENTITY, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
+
+const CLI_NAME = pmDesktop(PM_DESKTOP_IDENTITY.cliName, "t3"); // t3code-pm: usage lines say t3-pm
 
 const layerCliRuntime = Layer.mergeAll(
   NodeServices.layer,
@@ -66,7 +69,7 @@ const connectUnavailableCommand = Command.make("connect", {
   Command.withHandler(() =>
     Effect.fail(
       new CliError.ShowHelp({
-        commandPath: ["t3", "connect"],
+        commandPath: [CLI_NAME, "connect"] /* t3code-pm: */,
         errors: [new ConnectPublicConfigMissingError({ cause: connectPublicConfigMissingMessage })],
       }),
     ),
@@ -74,54 +77,57 @@ const connectUnavailableCommand = Command.make("connect", {
 );
 
 export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
-  Command.make("t3", { ...sharedServerCommandFlags }).pipe(
-    Command.withDescription(
-      "Run T3 Code in this terminal and open it in your browser. To use it from your other devices, run `t3 up`.",
-    ),
-    Command.withHandler(runDefaultServerCommand),
-    Command.withSubcommands([
-      Command.make("help").pipe(
-        Command.withDescription("Show command help."),
-        Command.withHandler(() =>
-          Effect.fail(new CliError.ShowHelp({ commandPath: ["t3"], errors: [] })),
+  Command.make(CLI_NAME, { ...sharedServerCommandFlags }) /* t3code-pm: */
+    .pipe(
+      Command.withDescription(
+        "Run T3 Code in this terminal and open it in your browser. To use it from your other devices, run `t3 up`.",
+      ),
+      Command.withHandler(runDefaultServerCommand),
+      Command.withSubcommands([
+        Command.make("help").pipe(
+          Command.withDescription("Show command help."),
+          Command.withHandler(() =>
+            Effect.fail(
+              new CliError.ShowHelp({ commandPath: [CLI_NAME] /* t3code-pm: */, errors: [] }),
+            ),
+          ),
         ),
-      ),
-      acpMcpBridgeCommand,
-      acpMcpCallCommand,
-      startCommand,
-      serveCommand,
-      appCommand,
-      pairCommand,
-      authCommand,
-      environmentCommand,
-      browserCommand,
-      projectCommand,
-      threadCommand,
-      upCommand,
-      statusCommand,
-      serviceCommand,
-      updateCommand,
-      installCommand,
-      uninstallCommand,
-      // bin.ts runs the bare service invocation; this keeps flags and help working like other commands.
-      Command.make("__service-launcher").pipe(
-        Command.unlisted,
-        // The launcher owns shutdown until its child exits; `runMain` would interrupt that shutdown.
-        Command.withHandler(() => Effect.sync(() => void runServiceLauncherCli())),
-      ),
-      claudeHistoryCommand,
-      speechWorkerCommand,
-      sshHelperCommand,
+        acpMcpBridgeCommand,
+        acpMcpCallCommand,
+        startCommand,
+        serveCommand,
+        appCommand,
+        pairCommand,
+        authCommand,
+        environmentCommand,
+        browserCommand,
+        projectCommand,
+        threadCommand,
+        upCommand,
+        statusCommand,
+        serviceCommand,
+        updateCommand,
+        installCommand,
+        uninstallCommand,
+        // bin.ts runs the bare service invocation; this keeps flags and help working like other commands.
+        Command.make("__service-launcher").pipe(
+          Command.unlisted,
+          // The launcher owns shutdown until its child exits; `runMain` would interrupt that shutdown.
+          Command.withHandler(() => Effect.sync(() => void runServiceLauncherCli())),
+        ),
+        claudeHistoryCommand,
+        speechWorkerCommand,
+        sshHelperCommand,
 
-      servicePreflightCommand,
-      themeCommand,
-      traceCommand,
-      doctorCommand,
-      policyCommand,
-      triageCommand,
-      cloudEnabled ? connectCommand : connectUnavailableCommand,
-    ]),
-  );
+        servicePreflightCommand,
+        themeCommand,
+        traceCommand,
+        doctorCommand,
+        policyCommand,
+        triageCommand,
+        cloudEnabled ? connectCommand : connectUnavailableCommand,
+      ]),
+    );
 
 export const cli = makeCli();
 

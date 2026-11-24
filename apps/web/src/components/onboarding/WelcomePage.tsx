@@ -48,6 +48,7 @@ import { usePersistEnvironmentProviderInstanceMutation } from "../../hooks/useSe
 import { useCloudLinkState } from "../../cloud/cloudLinkState";
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
+import { PM_COLLECTS_USAGE_DATA } from "../../pm/usageData"; // t3code-pm:
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 import { retryClerkLoad, useClerkLoadFailed } from "../clerk/clerkLoadFailure";
 import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
@@ -339,7 +340,7 @@ export function WelcomePage({
                 </Button>
               </div>
             </div>
-            <TelemetryNotice environmentId={environmentId} />
+            {PM_COLLECTS_USAGE_DATA ? <TelemetryNotice environmentId={environmentId} /> : null}
           </div>
         </div>
       </div>

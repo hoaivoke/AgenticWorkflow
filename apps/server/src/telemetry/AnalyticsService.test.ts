@@ -395,6 +395,55 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
     }),
   );
 
+  // t3code-pm: a PM3code build never reports to T3's account unless the user points it elsewhere.
+  it.effect("a PM3code build sends nothing until given its own key and host", () =>
+    Effect.gen(function* () {
+      for (const [env, expected] of [
+        [{}, 0],
+        [{ T3CODE_TELEMETRY_ENABLED: true }, 0],
+        [
+          {
+            T3CODE_TELEMETRY_ENABLED: true,
+            T3CODE_POSTHOG_KEY: "phc_own_key",
+            T3CODE_POSTHOG_HOST: "http://localhost",
+          },
+          1,
+        ],
+      ] as const) {
+        const hosts: Array<string> = [];
+        const client = HttpClient.make((request) => {
+          hosts.push(request.url);
+          return respondWithStatus(204)(request);
+        });
+        yield* Effect.gen(function* () {
+          const analytics = yield* AnalyticsService.AnalyticsService;
+          yield* analytics.record("test.pm", { index: 1 });
+          yield* analytics.flush;
+        }).pipe(
+          Effect.provide(
+            AnalyticsService.layer.pipe(
+              Layer.provideMerge(
+                ServerConfig.ServerConfig.layerTest(process.cwd(), { prefix: "t3-telemetry-pm-" }),
+              ),
+              Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(env))),
+              Layer.provide(
+                Layer.mergeAll(
+                  Layer.succeed(AnalyticsService.PmForkTelemetryDefaults, true),
+                  Layer.succeed(HostProcess.Platform, "darwin"),
+                  Layer.succeed(HostProcess.Architecture, "arm64"),
+                  Layer.succeed(HttpClient.HttpClient, client),
+                  ManagedPolicy.layerTest(),
+                ),
+              ),
+            ),
+          ),
+        );
+        assert.equal(hosts.length, expected, JSON.stringify(env));
+        assert.isFalse(hosts.some((url) => url.includes("t3.codes")));
+      }
+    }),
+  );
+
   it.effect("does not send batch requests when telemetry is disabled", () =>
     Effect.gen(function* () {
       const capturedPaths: Array<string> = [];

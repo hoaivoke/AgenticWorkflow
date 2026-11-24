@@ -12,6 +12,28 @@ describe("pmAppName", () => {
     ["Bienvenue dans T3 Code", "Bienvenue dans PM3code"],
     ["T3 Connect and T3 Chat are T3's services", "T3 Connect and T3 Chat are T3's services"],
     ["github.com/pingdotgg/t3code", "github.com/pingdotgg/t3code"],
+    [
+      "Run `t3 auth pairing create` or `t3 connect link`.",
+      "Run `t3-pm auth pairing create` or `t3-pm connect link`.",
+    ],
+    ["Use `npx t3@latest` if `t3` is missing.", "Use `npx t3@latest` if `t3-pm` is missing."],
+    [
+      "Stop t3 on {serverLabel}, then restart t3.",
+      "Stop t3-pm on {serverLabel}, then restart t3-pm.",
+    ],
+    ["t3 auth pairing create", "t3-pm auth pairing create"],
+    ["The t3@{version} update failed.", "The t3@{version} update failed."],
+    [
+      "For example, t3 or t3/ produces t3/add-search.",
+      "For example, t3 or t3/ produces t3/add-search.",
+    ],
+    ["claude mcp add --transport http t3 {url}", "claude mcp add --transport http t3 {url}"],
+    ["host tunnel t3 connect t3 chat", "host tunnel t3 connect t3 chat"],
+    [
+      "mcp__t3__thread, t3code, t3.json, T3 Connect",
+      "mcp__t3__thread, t3code, t3.json, T3 Connect",
+    ],
+    ["Set a separate T3CODE_HOME.", "Set a separate T3CODE_PM_HOME."],
   ])("%s", (source, expected) => {
     expect(pmAppName(source)).toBe(expected);
   });

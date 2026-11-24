@@ -22,6 +22,7 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import packageJson from "../../package.json" with { type: "json" };
 import * as ServerConfig from "../config.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
+import { pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 import { getTelemetryIdentity, type TelemetryOwner } from "./Identify.ts";
 
 interface BufferedAnalyticsEvent {
@@ -64,20 +65,29 @@ function retryDelayMs(failures: number, random: number): number {
   return Math.round(ceiling / 2 + (ceiling / 2) * random);
 }
 
-const TelemetryEnvConfig = Config.all({
-  posthogKey: Config.String("T3CODE_POSTHOG_KEY").pipe(
-    Config.withDefault("phc_XOWci4oZP4VvLiEyrFqkFjP4CZn55mjYYBMREK5Wd6m"),
-  ),
-  posthogHost: Config.String("T3CODE_POSTHOG_HOST").pipe(
-    Config.withDefault("https://ingest.t3.codes"),
-  ),
-  enabled: Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(Config.withDefault(true)),
-  flushBatchSize: Config.Number("T3CODE_TELEMETRY_FLUSH_BATCH_SIZE").pipe(Config.withDefault(20)),
-  maxBufferedEvents: Config.Number("T3CODE_TELEMETRY_MAX_BUFFERED_EVENTS").pipe(
-    Config.withDefault(1_000),
-  ),
-  wslDistroName: Config.String("WSL_DISTRO_NAME").pipe(Config.option),
+/**
+ * t3code-pm: a fork build is off by default with no default key or host, so it never reports to
+ * T3's account. T3CODE_TELEMETRY_ENABLED=true with your own key and host turns it back on.
+ */
+export const PmForkTelemetryDefaults = Context.Reference<boolean>("t3/telemetry/PmForkDefaults", {
+  defaultValue: () => pmDesktop(true, false),
 });
+
+const TelemetryEnvConfig = (fork: boolean) =>
+  Config.all({
+    posthogKey: Config.String("T3CODE_POSTHOG_KEY").pipe(
+      Config.withDefault(fork ? "" : "phc_XOWci4oZP4VvLiEyrFqkFjP4CZn55mjYYBMREK5Wd6m"),
+    ),
+    posthogHost: Config.String("T3CODE_POSTHOG_HOST").pipe(
+      Config.withDefault(fork ? "" : "https://ingest.t3.codes"),
+    ),
+    enabled: Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(Config.withDefault(!fork)),
+    flushBatchSize: Config.Number("T3CODE_TELEMETRY_FLUSH_BATCH_SIZE").pipe(Config.withDefault(20)),
+    maxBufferedEvents: Config.Number("T3CODE_TELEMETRY_MAX_BUFFERED_EVENTS").pipe(
+      Config.withDefault(1_000),
+    ),
+    wslDistroName: Config.String("WSL_DISTRO_NAME").pipe(Config.option),
+  });
 
 export class AnalyticsService extends Context.Service<
   AnalyticsService,
@@ -119,7 +129,8 @@ function serverOsFromNodePlatform(platform: string): ClientOs {
 /** @public */
 /** @public */
 export const make = Effect.gen(function* () {
-  const telemetryConfig = yield* TelemetryEnvConfig;
+  const fork = yield* PmForkTelemetryDefaults; // t3code-pm:
+  const telemetryConfig = yield* TelemetryEnvConfig(fork);
   const hostEnvironment = yield* HostProcess.Environment;
   const awaitingShellConsent = hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1";
   // A managed policy can switch analytics off over the environment, never on.
@@ -128,12 +139,13 @@ export const make = Effect.gen(function* () {
   // A cached PATH does not establish consent from the current login shell.
   const telemetryEnabled = Effect.suspend(() => {
     if (!telemetryConfig.enabled || !policyAllows) return Effect.succeed(false);
+    if (!telemetryConfig.posthogKey || !telemetryConfig.posthogHost) return Effect.succeed(false); // t3code-pm:
     if (!awaitingShellConsent) return Effect.succeed(true);
     if (hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1")
       return Effect.succeed(false);
     const preference = hostEnvironment.T3CODE_TELEMETRY_ENABLED;
     return Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(
-      Config.withDefault(true),
+      Config.withDefault(!fork), // t3code-pm:
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv({

@@ -1,6 +1,7 @@
 // t3code-pm: upstream files import gt-react through this module (vite.config.ts redirects them),
 // so every string they show says PM3code where upstream's says T3 Code. PM files import the real one.
 import { pmAppName } from "@t3tools/pm/identity";
+import { PM_COPY_OVERRIDES } from "../phoneApp";
 import {
   createRenderPipeline,
   Currency,
@@ -19,9 +20,8 @@ import { cloneElement, isValidElement, type ComponentProps, type ReactNode } fro
 
 export * from "gt-react";
 
-// Copy about the official T3 Code phone app (the store QR, T3 Connect's phone page) keeps its name.
-const OFFICIAL_SOURCES: ReadonlySet<string> = new Set(["T3 Code app for iPhone and Android"]);
-const OFFICIAL_T_HASHES: ReadonlySet<string> = new Set(["0070a15f6b693068", "3260726e13a6882b"]);
+// T3 Connect's phone page means the official T3 Code app, so it keeps the name.
+const OFFICIAL_T_HASHES: ReadonlySet<string> = new Set(["3260726e13a6882b"]);
 
 const VARIABLES: ReadonlySet<unknown> = new Set([
   Var,
@@ -78,8 +78,11 @@ export function useGT(
   messages?: Parameters<typeof useUpstreamGT>[0],
 ): ReturnType<typeof useUpstreamGT> {
   const gt = useUpstreamGT(messages);
-  return (message, options) =>
-    OFFICIAL_SOURCES.has(message) ? gt(message, options) : pmAppName(gt(message, options));
+  const resolve = useUpstreamMessages();
+  return (message, options) => {
+    const override = PM_COPY_OVERRIDES.get(message);
+    return override === undefined ? pmAppName(gt(message, options)) : resolve(override, options);
+  };
 }
 
 export function useMessages(

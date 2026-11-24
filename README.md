@@ -134,6 +134,7 @@ PM3code installs as its own app, with its own name, its own `t3-pm` command, and
 - **Go back:** open the official T3 Code. It never saw `~/.t3-pm`, so there is nothing to undo. To take your fork threads with you, copy the same file the other way while both apps are closed. PMs open there as plain threads.
 - **Remove it:** delete the app and `~/.t3-pm`.
 - **Updates:** the app does not update itself. Download new versions from [Releases](https://github.com/maddada/pm3code/releases).
+- **Usage data:** PM3code sends none. To send analytics to a PostHog project of your own, set `T3CODE_TELEMETRY_ENABLED=true`, `T3CODE_POSTHOG_KEY` and `T3CODE_POSTHOG_HOST`.
 
 A new PM's first turn runs on Claude Opus at high effort. Each later PM starts on the model the previous one used, and you can change a PM's model in its composer.
 
