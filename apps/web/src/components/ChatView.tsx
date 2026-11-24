@@ -406,7 +406,6 @@ import {
   useSystemComposerBanners,
 } from "./chat/useSystemComposerBanners";
 import { PmPageWindow } from "../pm/pageWindow"; // t3code-pm:
-import { usePmChatColumn } from "../pm/dock"; // t3code-pm:
 import { useDraftHeroLayoutTransition } from "./chat/useDraftHeroLayoutTransition";
 import { useLocalDispatchState } from "./chat/useLocalDispatchState";
 import { draftFanoutSelectionsAtom, draftSendState } from "./chat/chatViewSend";
@@ -1070,7 +1069,6 @@ export default function ChatView(props: ChatViewProps) {
     return labels;
   })();
   const activeThreadRef = useActiveThreadRef(activeThread);
-  const pmChatColumn = usePmChatColumn(activeThreadRef); // t3code-pm:
   const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
   const activeEnvironmentServerBrowser = useEnvironmentSupportsServerBrowser(
     activeThreadRef?.environmentId ?? null,
@@ -3487,7 +3485,6 @@ export default function ChatView(props: ChatViewProps) {
   const content = (
     <div
       ref={setWorkspaceLayoutElement}
-      data-pm-chat={pmChatColumn /* t3code-pm: */}
       className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
     >
       {embedded ? null : (

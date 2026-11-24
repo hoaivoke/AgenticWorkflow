@@ -111,10 +111,3 @@
     color: #93c5fd;
   }
 }
-
-/* A PM thread's chat column (timeline, Inbox and composer) is Ghostex's wide one, unless the
-   user's Chat width setting already asks for Wide or Full. Narrow windows still shrink it:
-   everything sized by this variable is `w-full` under it. */
-:root:not([data-chat-width="wide"], [data-chat-width="full"]) [data-pm-chat] {
-  --chat-content-max-width: 69rem;
-}

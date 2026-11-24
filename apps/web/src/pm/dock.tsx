@@ -59,12 +59,6 @@ interface DockProps {
   readonly longDraft?: boolean;
 }
 
-/** Marks a PM thread's chat root, which widens its column to Ghostex's (see inbox.css). */
-export function usePmChatColumn(threadRef: DockProps["threadRef"]): "" | undefined {
-  const summary = usePmSummary(threadRef?.environmentId ?? null, threadRef?.threadId ?? null);
-  return summary === null ? undefined : "";
-}
-
 /** The Inbox above a PM's composer: Ghostex's Session Inbox over the PM's asks, pages and work. */
 export function PmComposerDock(props: DockProps) {
   const summary = usePmSummary(
