@@ -51,6 +51,7 @@ import {
   buildAntigravityAcpSpawnInput,
   prepareAntigravityProfile,
 } from "./antigravityAuthSupport.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const DRIVER = ProviderDriverKind.make("antigravity");
 const DOWNLOAD_TIMEOUT = "45 minutes";
@@ -504,7 +505,9 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
         _tag: "repairable" as const,
         error: installationError(
           "resolve",
-          `Antigravity ${record.version} predates the Antigravity CLI and no longer works with this T3 Code release. Update it in Antigravity setup.`,
+          pmBundleAppName(
+            `Antigravity ${record.version} predates the Antigravity CLI and no longer works with this T3 Code release. Update it in Antigravity setup.`,
+          ),
         ),
       };
     }
@@ -656,7 +659,9 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
       if (yield* isWithdrawn(installed.version))
         return yield* installationError(
           "resolve",
-          `Antigravity ${installed.version} no longer works with this T3 Code release. Update it in Antigravity setup.`,
+          pmBundleAppName(
+            `Antigravity ${installed.version} no longer works with this T3 Code release. Update it in Antigravity setup.`,
+          ),
         );
       return installed;
     }

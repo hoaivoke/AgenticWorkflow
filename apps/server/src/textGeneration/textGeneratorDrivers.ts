@@ -7,6 +7,7 @@ import {
   HttpClientRequest,
   type HttpClientResponse,
 } from "effect/http";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 /** Where a text generator is reached, with its key already read from wherever settings keep it. */
 export interface TextGeneratorConnection {
@@ -95,7 +96,7 @@ const sendJson = Effect.fn("TextGenerator.sendJson")(function* <S extends Schema
     Effect.mapError(
       (cause) =>
         new TextGeneratorRequestError({
-          detail: `${label} returned a reply T3 Code couldn't read.`,
+          detail: pmBundleAppName(`${label} returned a reply T3 Code couldn't read.`),
           cause,
         }),
     ),

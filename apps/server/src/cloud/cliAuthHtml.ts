@@ -1,3 +1,4 @@
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 export type LoopbackAuthorizationStage = "dev" | "nightly" | "latest";
 
 declare const __T3CODE_BUILD_CHANNEL__: "nightly" | "latest" | undefined;
@@ -7,9 +8,9 @@ function resolveLoopbackAuthorizationStage(): LoopbackAuthorizationStage {
 }
 
 const stageBrands = {
-  dev: "T3 Code (Dev)",
-  nightly: "T3 Code (Nightly)",
-  latest: "T3 Code",
+  dev: pmBundleAppName("T3 Code (Dev)"),
+  nightly: pmBundleAppName("T3 Code (Nightly)"),
+  latest: pmBundleAppName("T3 Code"),
 } as const satisfies Record<LoopbackAuthorizationStage, string>;
 
 export function renderLoopbackAuthorizationCompleteHtml(

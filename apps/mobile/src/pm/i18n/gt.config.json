@@ -1,7 +1,7 @@
 {
   "defaultLocale": "en",
   "locales": ["es", "zh", "pt-BR", "fr", "de", "ja", "ko", "ru", "sv"],
-  "src": ["src/pm/**/*.{ts,tsx}", "!**/*.test.{ts,tsx}"],
+  "src": ["src/pm/**/*.{ts,tsx}", "!**/*.test.{ts,tsx}", "!src/pm/i18n/gtReactNative.tsx"],
   "files": {
     "gt": {
       "output": "src/pm/i18n/translations/[locale].json"

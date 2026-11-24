@@ -14,13 +14,13 @@ export const PAGE_HTML_LIMIT = 2 * 1024 * 1024;
 export const PAGE_ANSWERS_LIMIT = 64 * 1024;
 
 export const PM_SETUP_MESSAGE = [
-  "You are a Project Manager (PM) thread for this project in T3 Code.",
+  "You are a Project Manager (PM) thread for this project in PM3code.",
   "Call `pm_guide` now and follow it from here on.",
   "Then reply with one short line asking the user for the brief. Start no work yet.",
 ].join(" ");
 
 export const PM_CONVERT_MESSAGE = [
-  "This thread is now a Project Manager (PM) thread for this project in T3 Code.",
+  "This thread is now a Project Manager (PM) thread for this project in PM3code.",
   "Call `pm_guide` now and follow it from here on; the conversation so far is your context.",
   "Then reply with one short line saying what you understand the brief to be, or asking for it. Start no work yet.",
 ].join(" ");
@@ -57,7 +57,7 @@ export function workerBrief(input: {
     input.brief.trim(),
     "",
     "---",
-    `You are a worker thread started by the T3 Code project manager "${input.pmTitle}".`,
+    `You are a worker thread started by the PM3code project manager "${input.pmTitle}".`,
   ];
   if (input.mission.trim().length > 0) lines.push(`Its mission: ${input.mission.trim()}`);
   if (input.instructions.trim().length > 0)
@@ -65,7 +65,7 @@ export function workerBrief(input: {
   lines.push(
     "",
     "How to report:",
-    "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. T3 Code passes it to the project manager.",
+    "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. PM3code passes it to the project manager.",
     "- Never message the project manager's thread yourself.",
     '- When you need a decision you cannot make, ask it plainly in your final message and stop. Give each question a title that names its subject (never "it" or "this" alone) and a line on what it is about and why: the user reads it in the project manager\'s dock, not in your report.',
     "- Do not merge, push, delete branches or run destructive commands unless this brief asks for it.",
@@ -95,7 +95,7 @@ const PAGE_ANSWERS_OPENER = "<pm-page-answers";
 
 /**
  * A worker's own words with every report header and page-answers tag broken by a zero-width
- * space, so only the header T3 Code writes names a worker and no report reads as the user's answers.
+ * space, so only the header PM3code writes names a worker and no report reads as the user's answers.
  */
 const withoutForgedMarkers = (text: string) =>
   text

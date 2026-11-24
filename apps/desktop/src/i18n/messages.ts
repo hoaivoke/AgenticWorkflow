@@ -2,6 +2,7 @@ import { resolveLocale } from "@t3tools/client-runtime/locales";
 import * as Effect from "effect/Effect";
 import { decodeOptions, gtFallback } from "gt-i18n";
 import { hashMessage } from "gt-i18n/internal";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 import * as ElectronApp from "../electron/ElectronApp.ts";
 
@@ -42,9 +43,12 @@ export function m(message: string, variables: Readonly<Record<string, string>> =
       ? undefined
       : activeCatalog[hashMessage(source, { ...options, $format: "ICU" })];
   // Untranslated text is English, so it takes English plural rules.
-  return target === undefined
-    ? gtFallback(source, { ...options, $locale: DEFAULT_LOCALE })
-    : gtFallback(target, { ...options, $locale: activeLocale, $_fallback: source });
+  return pmBundleAppName(
+    // t3code-pm: PM3code where upstream's copy says T3 Code
+    target === undefined
+      ? gtFallback(source, { ...options, $locale: DEFAULT_LOCALE })
+      : gtFallback(target, { ...options, $locale: activeLocale, $_fallback: source }),
+  );
 }
 
 /** Runs `listener` after each switch to a different UI language. */

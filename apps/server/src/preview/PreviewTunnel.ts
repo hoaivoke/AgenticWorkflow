@@ -18,6 +18,7 @@ import { authenticateMediaRequest } from "../auth/http.ts";
 import * as SessionStore from "../auth/SessionStore.ts";
 import { requestUrl } from "../requestUrl.ts";
 import { ServerSettingsService } from "../serverSettings.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const PREVIEW_TUNNEL_ROUTE = "/api/preview/tunnel";
 /**
@@ -35,7 +36,7 @@ export class PreviewTunnelPortRefusedError extends Schema.TaggedError<PreviewTun
   { port: Schema.Number },
 ) {
   override get message(): string {
-    return `Port ${this.port} is this T3 Code server's own port.`;
+    return pmBundleAppName(`Port ${this.port} is this T3 Code server's own port.`);
   }
 }
 
@@ -44,7 +45,7 @@ export class PreviewTunnelDisabledError extends Schema.TaggedError<PreviewTunnel
   {},
 ) {
   override get message(): string {
-    return "The preview tunnel is turned off on this T3 Code server.";
+    return pmBundleAppName("The preview tunnel is turned off on this T3 Code server.");
   }
 }
 

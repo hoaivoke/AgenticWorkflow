@@ -269,7 +269,7 @@ describe("PmReportWatcher", () => {
         const sent = reportsTo(world, pm);
         assert.lengthOf(sent, 2);
         expect(sent[1]!.text).toContain(
-          "Still no new output (8 minutes), even after T3 Code nudged it. Not nudged again",
+          "Still no new output (8 minutes), even after PM3code nudged it. Not nudged again",
         );
         assert.lengthOf(messagesTo(world, worker), 1);
         // Still In progress, never Blocked; the turn check names it for healing.
@@ -277,7 +277,7 @@ describe("PmReportWatcher", () => {
           'W1 Pairing: In progress (quiet: "Fix pairing" not moving after the nudge)',
         );
         expect((yield* service.itemList(pm, true)).result).toContain(
-          'A worker on it is not moving, even after T3 Code nudged it:\n    W1 Pairing ("Fix pairing")',
+          'A worker on it is not moving, even after PM3code nudged it:\n    W1 Pairing ("Fix pairing")',
         );
         assert.deepStrictEqual(yield* notMoving, [true, [worker]]);
         // It moves again: the next sweep clears the chip.

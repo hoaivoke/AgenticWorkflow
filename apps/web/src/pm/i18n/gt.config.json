@@ -1,7 +1,7 @@
 {
   "defaultLocale": "en",
   "locales": ["de", "es", "fr", "ja", "ko", "pt-BR", "ru", "sv", "zh"],
-  "src": ["src/pm/**/*.{ts,tsx}", "!**/*.test.{ts,tsx}"],
+  "src": ["src/pm/**/*.{ts,tsx}", "!**/*.test.{ts,tsx}", "!src/pm/i18n/gtReact.tsx"],
   "files": {
     "gt": {
       "output": "src/pm/i18n/translations/[locale].json"

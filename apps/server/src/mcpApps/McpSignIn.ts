@@ -15,6 +15,7 @@ import * as Schema from "effect/Schema";
 
 import * as ProviderSessionManager from "../orchestration-v2/ProviderSessionManager.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 /**
  * Signs an agent's MCP server in through the session that reported it needs
@@ -55,7 +56,10 @@ const make = Effect.gen(function* () {
     );
     if (runtime === undefined) return yield* stopped(input.server);
     if (runtime.mcpSignIn === undefined) {
-      return yield* fail(input.server, "This agent can't sign MCP servers in from T3 Code.");
+      return yield* fail(
+        input.server,
+        pmBundleAppName("This agent can't sign MCP servers in from T3 Code."),
+      );
     }
     return { providerThread, mcpSignIn: runtime.mcpSignIn };
   });

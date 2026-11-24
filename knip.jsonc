@@ -101,7 +101,8 @@
     "apps/web": {
       // Worktree setup (scripts/setup-worktree.ts) runs this directly, and evidence
       // fixtures run under node.
-      "entry": ["scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs"],
+      // t3code-pm: vite/pmAppName.ts redirects gt-react imports to the PM shim by path.
+      "entry": ["scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs", "src/pm/i18n/gtReact.tsx!"],
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still
       // reports an entire component module when nothing imports it.
@@ -120,6 +121,8 @@
         "scripts/generate-device-stream.mts",
         "src/features/devices/device-stream.browser.ts!",
         "src/features/browser/preview-stream.browser.ts!",
+        // t3code-pm: metro.config.js redirects gt-react-native imports to the PM shim by path.
+        "src/pm/i18n/gtReactNative.tsx!",
       ],
       // Fonts are configured as asset paths; Expo autolinks the native packages.
       "ignoreDependencies": [

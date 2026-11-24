@@ -2,7 +2,7 @@ import { useGT } from "gt-react";
 
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 
-/** Ghostex's red "Not moving" chip: still quiet a full round after T3 Code nudged it. */
+/** Ghostex's red "Not moving" chip: still quiet a full round after PM3code nudged it. */
 export function PmNotMovingChip() {
   const gt = useGT();
   return (
@@ -15,7 +15,7 @@ export function PmNotMovingChip() {
         {gt("Not moving")}
       </TooltipTrigger>
       <TooltipPopup side="top">
-        {gt("No progress for a while, even after T3 Code nudged it")}
+        {gt("No progress for a while, even after PM3code nudged it")}
       </TooltipPopup>
     </Tooltip>
   );

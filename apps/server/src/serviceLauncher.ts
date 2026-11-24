@@ -7,7 +7,7 @@ import * as NodeFS from "node:fs";
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
-import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop, pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 import { acquireServiceSelectionLock } from "./cloud/serviceSelectionLock.ts";
 import { isNoCopyOnWrite, markNoCopyOnWrite } from "./noCopyOnWrite.ts";
 
@@ -973,7 +973,9 @@ export class Launcher {
       const lock = await tryAcquireSqliteLock(lockPath);
       if (lock !== undefined) return lock;
       if (attempt >= LOCK_ATTEMPTS) {
-        throw new Error("Another T3 Code service launcher still runs for this T3 home.");
+        throw new Error(
+          pmBundleAppName("Another T3 Code service launcher still runs for this T3 home."),
+        );
       }
       await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
     }
@@ -1078,7 +1080,9 @@ export class Launcher {
     ]);
     const free = Math.min(...available);
     return free < MIN_SERVICE_START_FREE_BYTES
-      ? `T3 Code needs at least ${MIN_SERVICE_START_FREE_BYTES} bytes free before starting the server; ${free} bytes available.`
+      ? pmBundleAppName(
+          `T3 Code needs at least ${MIN_SERVICE_START_FREE_BYTES} bytes free before starting the server; ${free} bytes available.`,
+        )
       : undefined;
   }
 
@@ -1575,7 +1579,7 @@ export interface LauncherOptions {
 export async function main(options: LauncherOptions = {}): Promise<void> {
   const baseDir = options.baseDir ?? process.env.T3CODE_HOME;
   if (baseDir === undefined || baseDir.trim() === "") {
-    throw new Error("T3CODE_HOME is required by the T3 Code service launcher.");
+    throw new Error(pmBundleAppName("T3CODE_HOME is required by the T3 Code service launcher."));
   }
   const output =
     options.logFile === undefined ? undefined : NodeFS.openSync(options.logFile, "a", 0o600);

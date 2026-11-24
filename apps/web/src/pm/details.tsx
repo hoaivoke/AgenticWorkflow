@@ -180,7 +180,7 @@ function PmManagerSection(props: {
   );
 }
 
-/** Ghostex's calm "hold" tone: a usage-limit wait T3 Code ends by itself, not a problem. */
+/** Ghostex's calm "hold" tone: a usage-limit wait PM3code ends by itself, not a problem. */
 const LIMIT_PILL_TONE = {
   color: "#7fa1c4",
   borderColor: "rgb(127 161 196 / 0.3)",

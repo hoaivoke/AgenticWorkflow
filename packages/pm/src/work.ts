@@ -27,7 +27,7 @@ export const PM_SHOWN_STATUS_ORDER: ReadonlyArray<PmShownItemStatus> = [
 
 export type PmAskState = "open" | "answered" | "done" | "withdrawn" | "dismissed";
 
-/** `limited`: stopped at a usage limit that has not reset yet; T3 Code carries it on after. */
+/** `limited`: stopped at a usage limit that has not reset yet; PM3code carries it on after. */
 export type PmWorkerState = "running" | "limited" | "waiting" | "idle" | "resolved";
 
 export type PmWaitOn =

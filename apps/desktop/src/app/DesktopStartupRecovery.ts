@@ -19,6 +19,7 @@ import type { BackendStartupFailure } from "../backend/DesktopBackendManager.ts"
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopObservability from "./DesktopObservability.ts";
 import * as DesktopState from "./DesktopState.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";
 const LAST_STARTED_VERSION_FILE = "desktop-last-started-version";
@@ -267,7 +268,9 @@ export const listen: Effect.Effect<
         const failure = yield* Ref.get(failureRef);
         if (Option.isNone(failure)) return;
         yield* electronShell.copyText(
-          `T3 Code ${environment.appVersion} (${environment.platform} ${environment.processArch}) could not start.\n${failure.value.reason}\n\n${failure.value.output}`,
+          pmBundleAppName(
+            `T3 Code ${environment.appVersion} (${environment.platform} ${environment.processArch}) could not start.\n${failure.value.reason}\n\n${failure.value.output}`,
+          ),
         );
         return;
       }

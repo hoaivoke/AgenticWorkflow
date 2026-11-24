@@ -58,6 +58,7 @@ import {
   reduceDesktopUpdateStateOnUpdateAvailable,
   resolveNotAppliedInstallVersion,
 } from "./updateMachine.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const CHANNEL_CHANGE_RETRY_DELAY = Duration.seconds(1);
 const CHANNEL_CHANGE_RETRIES = 30;
@@ -1373,7 +1374,8 @@ export const make = Effect.gen(function* () {
       if (Option.isSome(channelBlockedReason(nextChannel))) {
         return yield* new DesktopUpdateChannelManagedError({
           channel: nextChannel,
-          policyMessage: policy.message ?? "Your administrator manages T3 Code updates.",
+          policyMessage:
+            policy.message ?? pmBundleAppName("Your administrator manages T3 Code updates."),
         });
       }
       // A background check holds the updater only briefly, so wait it out instead of refusing.

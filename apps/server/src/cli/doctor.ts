@@ -12,6 +12,7 @@ import * as ServerOwnership from "../serverOwnership.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import * as CliService from "./service.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const formatBytes = (bytes: number) =>
   bytes >= 1024 ** 3
@@ -109,7 +110,9 @@ export const runDoctor = Effect.fn("runDoctor")(function* (
           {
             id: "legacy" as const,
             title: "Delete the database from before 0.1.0",
-            description: `Frees ${formatBytes(status.legacyDatabaseBytes)}.\n  Warning: after this, a T3 Code version before 0.1.0 starts with no threads or settings, so you can no longer roll back.`,
+            description: pmBundleAppName(
+              `Frees ${formatBytes(status.legacyDatabaseBytes)}.\n  Warning: after this, a T3 Code version before 0.1.0 starts with no threads or settings, so you can no longer roll back.`,
+            ),
             recommended: false,
           },
         ]),

@@ -59,6 +59,7 @@ import {
 } from "./codexUsageLimits.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import packageJson from "../../package.json" with { type: "json" };
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 const isCodexAppServerSpawnError = Schema.is(CodexErrors.CodexAppServerSpawnError);
 
 type CodexRateLimitsProbe =
@@ -946,7 +947,7 @@ const makePendingCodexProvider = Effect.fn("CodexProvider.makePendingCodexProvid
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex is disabled in T3 Code settings.",
+        message: pmBundleAppName("Codex is disabled in T3 Code settings."),
       },
     });
   }
@@ -1047,7 +1048,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex is disabled in T3 Code settings.",
+        message: pmBundleAppName("Codex is disabled in T3 Code settings."),
       },
     });
   }

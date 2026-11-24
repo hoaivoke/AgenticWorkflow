@@ -13,7 +13,7 @@ import type { LinuxWindowSnapshot } from "./LinuxSnapShot.ts";
 import { CaptureSetupRequiredError, readPortalPng } from "./linuxCaptureSession.ts";
 import { startNativeCaptureFeedback } from "./NativeCaptureFeedback.ts";
 export { isKdeCaptureSession } from "./linuxCaptureSession.ts";
-import { PM_DESKTOP_IDENTITY as PM, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
+import { PM_DESKTOP_IDENTITY as PM, pmDesktop, pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 export const KDE_CAPTURE_EXECUTABLE = "t3-kde-snap-shot";
 const DESKTOP_FILE = pmDesktop(
@@ -42,7 +42,7 @@ function kdeCaptureDesktopEntry(executable: string): string {
   return [
     "[Desktop Entry]",
     "Type=Application",
-    "Name=T3 Code SnapShots",
+    pmBundleAppName("Name=T3 Code SnapShots"),
     "NoDisplay=true",
     `Exec=${escapeDesktopEntryExecArgument(executable)} check`,
     // KService reads this custom property as a KConfig list, not an XDG ';' list.
@@ -124,7 +124,9 @@ export class KdeCaptureSetup {
       if (!bundle)
         return {
           status: "error",
-          message: "The capture helper is missing from this build. Update or reinstall T3 Code.",
+          message: pmBundleAppName(
+            "The capture helper is missing from this build. Update or reinstall T3 Code.",
+          ),
         };
       if (!installed.equals(bundle) || entry.toString() !== kdeCaptureDesktopEntry(executable))
         return {
@@ -169,7 +171,9 @@ export class KdeCaptureSetup {
       const bundle = await regularFile(this.paths.bundle);
       if (!bundle)
         throw new Error(
-          "The capture helper is missing from this build. Update or reinstall T3 Code.",
+          pmBundleAppName(
+            "The capture helper is missing from this build. Update or reinstall T3 Code.",
+          ),
         );
       await NodeFSP.mkdir(directory, { recursive: true });
       await NodeFSP.mkdir(NodePath.dirname(desktop), { recursive: true });

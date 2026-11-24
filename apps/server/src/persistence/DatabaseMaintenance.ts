@@ -17,13 +17,14 @@ import { isSqlError } from "effect/sql/SqlError";
 
 import * as ProjectionMaintenance from "../orchestration-v2/ProjectionMaintenance.ts";
 import { rebuildMessageSearch } from "../orchestration-v2/messageSearchIndex.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 export class DatabaseMissingError extends Schema.TaggedError<DatabaseMissingError>()(
   "DatabaseMissingError",
   { path: Schema.String },
 ) {
   override get message() {
-    return "No existing T3 Code database was found in this data directory.";
+    return pmBundleAppName("No existing T3 Code database was found in this data directory.");
   }
 }
 
@@ -38,9 +39,13 @@ export class DatabaseInUseError extends Schema.TaggedError<DatabaseInUseError>()
 ) {
   override get message() {
     if (this.pid !== undefined) {
-      return `Stop T3 Code server process ${this.pid}${this.serviceManaged ? "" : ", which the background service did not start,"} before repairing the database.`;
+      return pmBundleAppName(
+        `Stop T3 Code server process ${this.pid}${this.serviceManaged ? "" : ", which the background service did not start,"} before repairing the database.`,
+      );
     }
-    return "Stop the T3 Code server and desktop app, including any version before 0.1.0, before repairing the database.";
+    return pmBundleAppName(
+      "Stop the T3 Code server and desktop app, including any version before 0.1.0, before repairing the database.",
+    );
   }
 }
 
@@ -353,7 +358,9 @@ export const runRequestedReclaim = Effect.fn("DatabaseMaintenance.runRequestedRe
             .writeFileString(
               files.failure,
               error._tag === "DatabaseInUseError"
-                ? "Another program kept the database open. Close other T3 Code apps and t3 commands on this machine, then try again."
+                ? pmBundleAppName(
+                    "Another program kept the database open. Close other T3 Code apps and t3 commands on this machine, then try again.",
+                  )
                 : error.message,
             )
             .pipe(

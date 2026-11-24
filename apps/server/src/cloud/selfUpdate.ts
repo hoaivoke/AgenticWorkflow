@@ -44,6 +44,7 @@ import { bootServiceProgramOf, bootServiceUnitPath } from "./bootService.ts";
 import { runStagedServicePreflight } from "./servicePreflight.ts";
 import * as ServiceLauncherClient from "./serviceLauncherClient.ts";
 import { decodeServiceUnit, isExactServiceVersion } from "./serviceProtocol.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 export function resolveServerSelfUpdateCapability(input: {
   readonly desktopManaged: boolean;
@@ -191,14 +192,18 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
         );
       }
       return yield* failWith(
-        "This server is managed by the T3 Code desktop app on its machine; update the desktop app to update it.",
+        pmBundleAppName(
+          "This server is managed by the T3 Code desktop app on its machine; update the desktop app to update it.",
+        ),
       );
     }
     // The target must accept the launcher that will run it, which can be older than this server.
     const launcherProtocol = launcher.protocol;
     if (capability === null || launcherProtocol === undefined) {
       return yield* failWith(
-        "Remote updates require the T3 Code background service. Run `t3 service install` on the server machine.",
+        pmBundleAppName(
+          "Remote updates require the T3 Code background service. Run `t3 service install` on the server machine.",
+        ),
       );
     }
 

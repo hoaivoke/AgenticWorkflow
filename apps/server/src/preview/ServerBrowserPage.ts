@@ -26,6 +26,7 @@ import type { CDPSession, ConsoleMessage, Frame, Locator, Page } from "playwrigh
 import * as NodeCrypto from "node:crypto";
 import * as NodeUtil from "node:util";
 import { BrowserControlInterrupted } from "./SessionControl.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const isBrowserControlInterrupted = Schema.is(BrowserControlInterrupted);
 
@@ -565,8 +566,9 @@ export const captureViewport = async (
         reject(
           new ServerBrowserOperationError({
             tag: "PreviewAutomationExecutionError",
-            message:
+            message: pmBundleAppName(
               "The browser is not producing screenshot frames. For a desktop tab, show or restore the T3 Code window and try again.",
+            ),
           }),
         ),
       SCREENSHOT_TIMEOUT_MS,

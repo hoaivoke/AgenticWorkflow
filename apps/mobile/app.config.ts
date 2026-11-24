@@ -3,6 +3,7 @@ import type { ExpoConfig } from "expo/config";
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 import { PM_APP_IDENTITY } from "./src/pm/appIdentity.ts"; // t3code-pm:
+import { pmAppNameCatalog } from "../../packages/pm/src/identity.ts"; // t3code-pm:
 
 type AppVariant = "development" | "preview" | "production" | "pm"; // t3code-pm: fork APK
 
@@ -506,4 +507,5 @@ const config: ExpoConfig = {
   },
 };
 
-export default config;
+// t3code-pm: permission prompts and widget text name PM3code in the fork APK.
+export default APP_VARIANT === "pm" ? pmAppNameCatalog(config) : config;

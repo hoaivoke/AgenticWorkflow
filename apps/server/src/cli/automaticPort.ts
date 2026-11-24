@@ -6,6 +6,7 @@ import * as CliError from "effect/cli/CliError";
 
 import { queryWindowsTcpListeners } from "../process/windowsTcpListeners.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const KERNEL_RELEASE_PATH = "/proc/sys/kernel/osrelease";
 const WINDOWS_NETSTAT_PATH = String.raw`C:\Windows\System32\netstat.exe`;
@@ -62,8 +63,9 @@ export const make = Effect.gen(function* () {
       if (!windows.has(port)) return port;
     }
     return yield* new CliError.UserError({
-      cause:
+      cause: pmBundleAppName(
         "Windows is already using every port T3 Code tried. Pass --port or set T3CODE_PORT to a port Windows is not using.",
+      ),
     });
   });
 });

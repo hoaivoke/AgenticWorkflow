@@ -166,6 +166,7 @@ import {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { buildWorkspaceInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const CODEX_PROVIDER = ProviderDriverKind.make("codex");
 const CODEX_CAPACITY_MAX_RETRIES = 5;
@@ -9035,7 +9036,9 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   catch: () =>
                     new ProviderMcpSignInError({
                       server,
-                      detail: `Codex returned a sign-in page for ${server} that T3 Code can't open.`,
+                      detail: pmBundleAppName(
+                        `Codex returned a sign-in page for ${server} that T3 Code can't open.`,
+                      ),
                     }),
                 });
                 const redirectUri = params.get("redirect_uri");

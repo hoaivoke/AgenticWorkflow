@@ -11,6 +11,7 @@ import { brokenVersionDetail } from "@t3tools/provider-core/server/compatibility
 import { satisfiesSemverRange } from "@t3tools/shared/semver";
 import * as Schema from "effect/Schema";
 import packageJson from "../../package.json" with { type: "json" };
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const StableVersion = TrimmedNonEmptyString.pipe(
   Schema.check(Schema.makeFilter((value) => /^\d+\.\d+\.\d+$/.test(value))),
@@ -91,11 +92,17 @@ export function resolveProviderCompatibility(
       : "unknown";
   const message =
     status === "broken"
-      ? "This provider version is known to be incompatible with this T3 Code release."
+      ? pmBundleAppName(
+          "This provider version is known to be incompatible with this T3 Code release.",
+        )
       : status === "unsupported"
-        ? "This provider version is outside the supported range for this T3 Code release."
+        ? pmBundleAppName(
+            "This provider version is outside the supported range for this T3 Code release.",
+          )
         : status === "graceful"
-          ? "This provider version has limited compatibility with this T3 Code release."
+          ? pmBundleAppName(
+              "This provider version has limited compatibility with this T3 Code release.",
+            )
           : null;
   const recommendedVersion = policy.recommendedVersion ?? null;
   const recommendedRange = policy.recommendedRange ?? null;

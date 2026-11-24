@@ -94,7 +94,7 @@ const PmPlaybookOverrideTool = pmTool(
 );
 const PmWorkerStartTool = pmTool(
   "pm_worker_start",
-  "Start a worker thread in your project with a brief that stands alone. T3 Code adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours.",
+  "Start a worker thread in your project with a brief that stands alone. PM3code adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours.",
   {
     title: TrimmedNonEmptyString.annotate({ description: "Its task, 3 to 6 words." }),
     brief: TrimmedNonEmptyString.check(Schema.isMaxLength(120000)),

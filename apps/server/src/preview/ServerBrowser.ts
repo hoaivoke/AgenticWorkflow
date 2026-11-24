@@ -96,6 +96,7 @@ import * as PreviewBrowserHost from "./PreviewBrowserHost.ts";
 import { presentAsChrome, ServerBrowserContexts } from "./ServerBrowserContexts.ts";
 import { BrowserControlInterrupted, SessionControl } from "./SessionControl.ts";
 import { installPdfDocumentNavigation, isPdfAssetUrl } from "./PdfDocumentNavigation.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 const SERVER_HOST_CLIENT_ID = SERVER_BROWSER_AUTOMATION_CLIENT_ID;
 // Each client's report is capped, but the saved catalog is their union, so it has no cap.
@@ -2867,8 +2868,9 @@ const make = Effect.gen(function* () {
         if (tab.desktopResizeUndrawn) {
           throw new ServerBrowserPage.ServerBrowserOperationError({
             tag: "PreviewAutomationExecutionError",
-            message:
+            message: pmBundleAppName(
               "The desktop did not draw the page at the new size. Show or restore the T3 Code window and try again.",
+            ),
           });
         }
         // Only a read after the draw, with no page resize or load during it, measures this resize.

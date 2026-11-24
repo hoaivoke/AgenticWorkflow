@@ -6,6 +6,7 @@ import type {
   ThreadPullRequestWatch,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 /** Bounds consecutive comment-only wakes to stop bot reply loops; check, conflict, or push news resets it. */
 export const PULL_REQUEST_WATCH_WAKE_LIMIT = 10;
@@ -496,7 +497,9 @@ export function pullRequestWatchEndMessage(input: {
     : "was closed without merging";
   return {
     text: [
-      `Pull request #${input.number} (${input.url}) ${how}, so T3 Code stopped watching it.`,
+      pmBundleAppName(
+        `Pull request #${input.number} (${input.url}) ${how}, so T3 Code stopped watching it.`,
+      ),
       ...(merged ? [] : ["If it is reopened, call watch_pull_request to watch it again."]),
     ].join(" "),
     notification: {
@@ -520,11 +523,15 @@ export function pullRequestWatchMessage(input: {
     commit: input.headSha === null ? "" : ` on ${input.headSha.slice(0, 7)}`,
   };
   const text = [
-    `Update on pull request #${input.number} (${input.url}), which T3 Code is watching for you:`,
+    pmBundleAppName(
+      `Update on pull request #${input.number} (${input.url}), which T3 Code is watching for you:`,
+    ),
     ...changes.flatMap((change) => changeLines(change, context)),
     "",
     exhausted
-      ? `T3 Code stopped watching after ${PULL_REQUEST_WATCH_WAKE_LIMIT} comment-only updates in a row. Call watch_pull_request to watch it again.`
+      ? pmBundleAppName(
+          `T3 Code stopped watching after ${PULL_REQUEST_WATCH_WAKE_LIMIT} comment-only updates in a row. Call watch_pull_request to watch it again.`,
+        )
       : WATCHING_CLOSING,
   ].join("\n");
   const failed = changes.some(

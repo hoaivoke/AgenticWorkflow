@@ -11,7 +11,7 @@ import { CaptureSetupRequiredError, readPortalPng } from "./linuxCaptureSession.
 import { startNativeCaptureFeedback } from "./NativeCaptureFeedback.ts";
 import { HYPRLAND_CAPTURE_ACTION } from "./linuxCaptureSession.ts";
 export { isHyprlandCaptureSession } from "./linuxCaptureSession.ts";
-import { pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
+import { pmDesktop, pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 export const HYPRLAND_CAPTURE_EXECUTABLE = "t3-hyprland-snap-shot";
 export type HyprlandCapturePaths = { readonly bundle: string; readonly dataHome: string };
@@ -98,7 +98,9 @@ export class HyprlandCaptureSetup {
       const bundle = await regularFile(this.paths.bundle);
       if (!bundle)
         throw new Error(
-          "The Hyprland capture helper is missing from this build. Update or reinstall T3 Code.",
+          pmBundleAppName(
+            "The Hyprland capture helper is missing from this build. Update or reinstall T3 Code.",
+          ),
         );
       if (!installed.equals(bundle))
         return {

@@ -327,7 +327,7 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  /** What T3 Code tells the PM under a tool result: the port of Ghostex's system notes. */
+  /** What PM3code tells the PM under a tool result: the port of Ghostex's system notes. */
   const notesFor = Effect.fn("PmService.notesFor")(function* (pm: PmThreadRow) {
     const notes: Array<string> = [];
     const guide = yield* guideText;
@@ -908,7 +908,7 @@ const make = Effect.gen(function* () {
         detail: () => "",
       },
       {
-        heading: "A worker on it is not moving, even after T3 Code nudged it",
+        heading: "A worker on it is not moving, even after PM3code nudged it",
         fix: 'Heal it: read the worker with t3_thread_read (see "While workers run").',
         entries: derived.filter((entry) => entry.quietWorkers.length > 0),
         detail: (entry: (typeof derived)[number]) =>

@@ -5,6 +5,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { isHttpClientError } from "effect/http/HttpClientError";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 /** Only unavailable is retryable. Descriptions expose relay explanations and trace IDs, never request details. */
 export class RelayRequestError extends Schema.TaggedError<RelayRequestError>()(
@@ -62,16 +63,24 @@ export function relayRetryAfterMillis(error: unknown): number | undefined {
 function recoveryHint(error: RelayProtectedError): string {
   switch (error._tag) {
     case "RelayEnvironmentLinkLimitExceededError":
-      return "Unlink an unused environment in T3 Connect, then restart T3 Code on this machine.";
+      return pmBundleAppName(
+        "Unlink an unused environment in T3 Connect, then restart T3 Code on this machine.",
+      );
     case "RelayAuthInvalidError":
       return "Run `t3 connect login` to check this machine's authorization. If the stored credential was revoked, sign out with `t3 connect logout`, then run `t3 connect` again. Restart T3 Code after signing in.";
     case "RelayEnvironmentLinkProofInvalidError":
       if (error.reason === "environment_key_mismatch") {
-        return "T3 Connect already has this environment linked with a different key. Unlink it in T3 Connect, then restart T3 Code on this machine.";
+        return pmBundleAppName(
+          "T3 Connect already has this environment linked with a different key. Unlink it in T3 Connect, then restart T3 Code on this machine.",
+        );
       }
-      return "Check this machine's date and time, update T3 Code, then restart it.";
+      return pmBundleAppName(
+        "Check this machine's date and time, update T3 Code, then restart it.",
+      );
     case "RelayEnvironmentLinkProofExpiredError":
-      return "Check this machine's date and time, update T3 Code, then restart it.";
+      return pmBundleAppName(
+        "Check this machine's date and time, update T3 Code, then restart it.",
+      );
     default:
       return "Retry when the relay is available. If this continues, include the trace ID when reporting it.";
   }

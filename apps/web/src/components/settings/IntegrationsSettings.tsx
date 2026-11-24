@@ -692,7 +692,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
 
 const LINK_TARGET_LABELS: Readonly<Record<BrowserLinkTarget, string>> = {
   system: msg("Your default browser"),
-  app: "T3 Code",
+  app: "PM3code", // t3code-pm:
 };
 
 function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) {

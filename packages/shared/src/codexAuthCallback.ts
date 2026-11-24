@@ -79,7 +79,7 @@ export async function receiveCodexAuthCallback(
       server.once("error", () =>
         reject(
           new Error(
-            "The ChatGPT callback port is in use on this computer. Close the other sign-in and try again, or paste the redirect URL in T3 Code.",
+            "The ChatGPT callback port is in use on this computer. Close the other sign-in and try again, or paste the redirect URL in PM3code.", // t3code-pm:
           ),
         ),
       );

@@ -78,7 +78,7 @@ export function clientPresentationMetadata(input: {
   if (input.desktopBridge !== undefined) {
     return {
       // oxlint-disable-next-line t3code/no-untranslated-copy -- client label stored on the server
-      label: "T3 Code Desktop",
+      label: "PM3code Desktop", // t3code-pm:
       deviceType: "desktop",
       os: clientOsFromElectronPlatform(input.desktopBridge.getClientPlatform()),
       surface: "desktop",
@@ -88,7 +88,7 @@ export function clientPresentationMetadata(input: {
 
   return {
     // oxlint-disable-next-line t3code/no-untranslated-copy -- client label stored on the server
-    label: "T3 Code Web",
+    label: "PM3code Web", // t3code-pm:
     deviceType: browserDeviceType(input.identity),
     os: browserClientOs(input.identity),
     surface: "web",

@@ -16,6 +16,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as HttpClient from "effect/http/HttpClient";
 
 import * as DesktopBackendPool from "./DesktopBackendPool.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 // Each /oauth/token attempt may take 10 s, so a backend busy after ready needs several attempts.
 const BOOTSTRAP_TRANSIENT_RETRY_TIMEOUT = Duration.seconds(60);
@@ -106,7 +107,7 @@ export const make = Effect.gen(function* () {
           httpBaseUrl: config.httpBaseUrl.href,
           credential,
           clientMetadata: {
-            label: "T3 Code Desktop",
+            label: pmBundleAppName("T3 Code Desktop"),
             deviceType: "desktop",
           },
         }).pipe(

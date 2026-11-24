@@ -45,3 +45,35 @@ export const PM_TRUSTED_DESKTOP_ORIGINS = [
   `${PM_DESKTOP_IDENTITY.scheme}://app`,
   `${PM_DESKTOP_IDENTITY.devScheme}://app`,
 ] as const;
+
+const UPSTREAM_APP_NAME = /\bT3 (Code|server|desktop|home)/g;
+
+/**
+ * Upstream copy calls this app "T3 Code" (and its "T3 server"); every PM3code surface shows its
+ * own name there instead. Applied where text is resolved for display, so upstream's strings and
+ * translation keys stay untouched. "T3 Connect" and "T3 Chat" are T3's services and stay.
+ */
+export const pmAppName = (text: string): string =>
+  text.includes("T3 ")
+    ? text.replace(UPSTREAM_APP_NAME, (_match, word: string) =>
+        word === "Code"
+          ? PM_DESKTOP_IDENTITY.productName
+          : `${PM_DESKTOP_IDENTITY.productName} ${word}`,
+      )
+    : text;
+
+/**
+ * `pmAppName` in a fork desktop or server bundle, the text unchanged under Vitest, so upstream's
+ * tests keep pinning upstream's copy. Wrap the literal and leave it as upstream wrote it.
+ */
+export const pmBundleAppName = (text: string): string => pmDesktop(pmAppName(text), text);
+
+/** `pmAppName` over a translation catalog: strings, and the strings inside JSX entries. */
+export const pmAppNameCatalog = <T>(value: T): T => {
+  if (typeof value === "string") return pmAppName(value) as T;
+  if (Array.isArray(value)) return value.map(pmAppNameCatalog) as T;
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, pmAppNameCatalog(entry)]),
+  ) as T;
+};

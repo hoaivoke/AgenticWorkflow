@@ -38,6 +38,20 @@ config.resolver = {
   },
 };
 
+// t3code-pm: upstream files get gt-react-native through the PM shim, which says PM3code where
+// upstream's copy says T3 Code. PM files keep the real module.
+const pmDirectory = `${path.join(__dirname, "src", "pm")}${path.sep}`;
+const pmGtShim = path.join(__dirname, "src", "pm", "i18n", "gtReactNative.tsx");
+const upstreamResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) =>
+  (upstreamResolveRequest ?? context.resolveRequest)(
+    context,
+    moduleName === "gt-react-native" && !context.originModulePath.startsWith(pmDirectory)
+      ? pmGtShim
+      : moduleName,
+    platform,
+  );
+
 async function writeFileIfChanged(filePath, contents) {
   try {
     if ((await fs.promises.readFile(filePath, "utf8")) === contents) return;

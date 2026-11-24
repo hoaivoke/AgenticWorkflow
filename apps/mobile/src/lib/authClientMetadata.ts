@@ -8,7 +8,7 @@ export function authClientMetadata(appVersion?: string): AuthClientPresentationM
 
   return {
     // oxlint-disable-next-line t3code/no-untranslated-copy -- product name
-    label: "T3 Code Mobile",
+    label: "PM3code Mobile", // t3code-pm:
     deviceType:
       Device.deviceType === Device.DeviceType.TABLET
         ? "tablet"

@@ -87,6 +87,7 @@ import {
   restartCancelledBackgroundWorkNote,
   stoppedDelegatedTasksNote,
 } from "./RestartBackgroundNote.ts";
+import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
 
 export class ProviderTurnStartError extends Schema.TaggedError<ProviderTurnStartError>()(
   "ProviderTurnStartError",
@@ -235,8 +236,9 @@ export const isProviderTurnStartRunStateMissingError = Schema.is(
 
 const RESUME_PROMPT = "Continue where you left off.";
 
-const START_GAVE_UP_MESSAGE =
-  "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.";
+const START_GAVE_UP_MESSAGE = pmBundleAppName(
+  "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.",
+);
 
 const startFailureMessage = (error: Error): string => {
   const nestedCause = "cause" in error ? error.cause : undefined;
