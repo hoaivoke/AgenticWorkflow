@@ -32,7 +32,7 @@ the Ghostex coordinator playbook (`packages/pm/src/playbook.ts`).
 ```sh
 vp i
 vp run dev                      # server + web, state in this checkout's .t3 when it is a worktree
-vp run dist:desktop:dmg:arm64   # "PM3code" for Apple Silicon, ad-hoc signed
+vp run dist:desktop:dmg:arm64   # "PM3code" for Apple Silicon, ad-hoc signed (see below to notarize)
 vp run dist:desktop:win:x64     # Windows installer
 vp run dist:desktop:linux       # Linux AppImage
 ```
@@ -45,9 +45,21 @@ The desktop app is **PM3code** (`com.t3codepm.desktop`, URL scheme `t3code-pm`, 
 `t3-pm`). It keeps its data in `~/.t3-pm` and its Electron profile in
 `~/Library/Application Support/t3code-pm`, and has no update feed. Its ids, folders, scheme and command keep the
 older `t3code-pm` spelling on purpose: installs from 0.1.0 and 0.2.0, which were named T3 Code PM,
-keep their data. Each new ad-hoc signed macOS
-build has a new signature, which is why macOS asks again for the "t3code-pm Safe Storage" keychain
-item after an update.
+keep their data.
+
+Release DMGs are signed with a Developer ID and notarized. Build them on a Mac whose keychain has
+the Developer ID Application identity and a notarytool profile
+(`xcrun notarytool store-credentials notarytool-profile`):
+
+```sh
+T3CODE_DESKTOP_SIGNED=true CSC_NAME=<team ID> T3CODE_DESKTOP_VERSION=<version> vp run dist:desktop:dmg:arm64
+```
+
+`CSC_NAME` picks the identity by its team ID or SHA-1 hash, and `APPLE_KEYCHAIN_PROFILE` names
+another profile. The app is signed with the hardened runtime and
+`scripts/pm-entitlements.mac.plist`, notarized and stapled, then the DMG is signed, notarized and
+stapled too. Unsigned builds stay ad-hoc signed; each one has a new signature, so macOS asks again
+for the "t3code-pm Safe Storage" keychain item after updating to one.
 
 The resource monitor needs Rust 1.95 or newer when building.
 

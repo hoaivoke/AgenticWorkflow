@@ -94,12 +94,10 @@ Releases up to 0.2.0 were called T3 Code PM, and their files and app are named `
 
 ### macOS (Apple Silicon)
 
-1. Download `PM3code-<version>-arm64.dmg`, open it, and drag **PM3code** to Applications.
-2. The app is ad-hoc signed, not notarized, so macOS blocks the first open. Do one of these:
-   - Right-click the app in Applications and choose **Open**, then **Open** again.
-   - Or try to open it once, then go to System Settings, Privacy & Security, and click **Open Anyway**.
-   - Or run `xattr -dr com.apple.quarantine "/Applications/PM3code.app"`.
-3. After each update, macOS asks once for the "t3code-pm Safe Storage" keychain item. Choose **Always Allow**.
+1. Download `PM3code-<version>-arm64.dmg`, open it, and drag **PM3code** to Applications. It's signed and notarized by Apple, so it opens like any other app.
+2. The first time it starts, macOS asks for the "t3code-pm Safe Storage" keychain item. Choose **Always Allow**.
+
+Releases up to 0.2.1 aren't notarized, so macOS blocks their first open: right-click the app in Applications and choose **Open**, or go to System Settings, Privacy & Security, and click **Open Anyway**.
 
 ### Windows (x64)
 

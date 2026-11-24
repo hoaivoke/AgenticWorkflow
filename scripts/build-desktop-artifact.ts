@@ -70,6 +70,8 @@ const pmBuild = <T>(fork: T, upstream: T): T =>
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
 const DESKTOP_APP_ID = pmBuild(PM.appId, "com.t3tools.t3code"); // t3code-pm:
+// t3code-pm: the default `xcrun notarytool store-credentials` profile; APPLE_KEYCHAIN_PROFILE overrides it.
+const PM_NOTARY_KEYCHAIN_PROFILE = "notarytool-profile";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -2921,6 +2923,10 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
+      // t3code-pm: Developer ID signing without a provisioning profile, so no passkey entitlements.
+      ...(signed && pmBuild(true, false)
+        ? { entitlements: path.join(repoRoot, "scripts/pm-entitlements.mac.plist") }
+        : {}),
       ...(macPasskeySigning
         ? {
             entitlements: macPasskeySigning.entitlementsPath,
@@ -2946,6 +2952,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       ],
       iconSize: 120,
       iconTextSize: 12,
+      ...(signed && pmBuild(true, false) ? { sign: true } : {}), // t3code-pm: notarized after the build
     };
   }
 
@@ -3905,7 +3912,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   yield* fs.copy(stageResourcesDir, stageProdResourcesDir);
 
   const configuredMacPasskeySigning =
-    options.platform === "mac" && options.signed
+    options.platform === "mac" && options.signed && pmBuild(false, true) // t3code-pm: no profile
       ? yield* Effect.try({
           try: () => resolveMacPasskeySigningConfiguration(loadRepoEnv({ repoRoot })),
           catch: MacPasskeySigningConfigurationResolutionError.fromCause,
@@ -4086,6 +4093,10 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     delete buildEnv.CSC_LINK;
     delete buildEnv.CSC_KEY_PASSWORD;
   }
+  // t3code-pm: electron-builder notarizes the app through this notarytool keychain profile.
+  if (options.platform === "mac" && options.signed && pmBuild(true, false)) {
+    buildEnv.APPLE_KEYCHAIN_PROFILE ??= PM_NOTARY_KEYCHAIN_PROFILE;
+  }
   if (!options.signed) {
     buildEnv.CSC_IDENTITY_AUTO_DISCOVERY = "false";
     delete buildEnv.CSC_LINK;
@@ -4175,6 +4186,23 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   // x64 builds on arm64 runners; the arm64 check covers the shared JS bundle.
   if (options.platform === "mac" && options.arch === "arm64" && hostPlatform === "darwin") {
     yield* validateMacPackagedPayload({ stageDistDir, verbose: options.verbose });
+  }
+  // t3code-pm: the app inside is already notarized and stapled; staple the DMG too, for offline first opens.
+  const pmNotaryProfile = buildEnv.APPLE_KEYCHAIN_PROFILE;
+  if (options.platform === "mac" && options.signed && pmBuild(true, false) && pmNotaryProfile) {
+    for (const entry of yield* fs.readDirectory(stageDistDir)) {
+      if (!entry.endsWith(".dmg")) continue;
+      const dmgPath = path.join(stageDistDir, entry);
+      for (const args of [
+        ["notarytool", "submit", dmgPath, "--keychain-profile", pmNotaryProfile, "--wait"],
+        ["stapler", "staple", dmgPath],
+      ]) {
+        yield* runCommand(ChildProcess.make("xcrun", args), {
+          label: `xcrun ${args[0]} ${args[1]} ${entry}`,
+          verbose: options.verbose,
+        });
+      }
+    }
   }
 
   const copiedArtifacts = yield* copyDesktopBuildArtifacts(
