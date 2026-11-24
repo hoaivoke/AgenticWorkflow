@@ -17,6 +17,7 @@ import {
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
 import { SettingsSection } from "./components/SettingsSection";
+import { openPmReleases } from "../../pm/releases"; // t3code-pm:
 import {
   environmentReleaseCheckAtom,
   releaseCheckError,
@@ -45,6 +46,7 @@ export function OutdatedServerUpdateSection({
 
   function check() {
     if (busy) return;
+    if (openPmReleases()) return; // t3code-pm:
     setCheckErrorDismissed(false);
     startCheck(async () => {
       const description = await describe(environmentId);
