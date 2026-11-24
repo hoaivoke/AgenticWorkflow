@@ -1579,7 +1579,10 @@ export interface LauncherOptions {
 export async function main(options: LauncherOptions = {}): Promise<void> {
   const baseDir = options.baseDir ?? process.env.T3CODE_HOME;
   if (baseDir === undefined || baseDir.trim() === "") {
-    throw new Error(pmBundleAppName("T3CODE_HOME is required by the T3 Code service launcher."));
+    // t3code-pm: only the app name is rewritten; the launcher reads T3CODE_HOME, and smoke-cli-archive checks for it.
+    throw new Error(
+      `T3CODE_HOME is required by the ${pmBundleAppName("T3 Code")} service launcher.`,
+    );
   }
   const output =
     options.logFile === undefined ? undefined : NodeFS.openSync(options.logFile, "a", 0o600);

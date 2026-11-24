@@ -54,7 +54,8 @@ const UPSTREAM_COMMAND_CODE = /`t3(?=[ `])/g;
  * `--transport http t3 {url}`, or the "t3 connect" and "t3 chat" search terms for T3's services.
  */
 const UPSTREAM_COMMAND = /(?<![\w./@`-])(?<!http )t3(?![\w/@-]|\.\w| connect\b| chat\b)/g;
-const UPSTREAM_HOME_ENV = /\bT3CODE_HOME\b/g;
+/** An assignment (`T3CODE_HOME=…`) is a command for the service launcher, which reads that name. */
+const UPSTREAM_HOME_ENV = /\bT3CODE_HOME\b(?!=)/g;
 
 const pmCommandName = (text: string): string => {
   if (!text.includes("t3")) return text;

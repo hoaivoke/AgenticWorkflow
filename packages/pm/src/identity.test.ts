@@ -34,6 +34,10 @@ describe("pmAppName", () => {
       "mcp__t3__thread, t3code, t3.json, T3 Connect",
     ],
     ["Set a separate T3CODE_HOME.", "Set a separate T3CODE_PM_HOME."],
+    [
+      "Run: T3CODE_HOME='/srv' '/srv/t3' __service-launcher",
+      "Run: T3CODE_HOME='/srv' '/srv/t3' __service-launcher",
+    ],
   ])("%s", (source, expected) => {
     expect(pmAppName(source)).toBe(expected);
   });
