@@ -1,5 +1,6 @@
 import type { EnvironmentId, PmT3ImportMode, PmT3ImportResult } from "@t3tools/contracts";
 import { useGT } from "gt-react";
+import { ArrowLeftRightIcon, ImportIcon } from "lucide-react";
 import { useState } from "react";
 
 import { SettingsRow, SettingsSection } from "../components/settings/settingsLayout";
@@ -135,6 +136,7 @@ export function T3ImportSection(props: {
               disabled={blocked}
               onClick={() => void run("import")}
             >
+              <ImportIcon />
               {running === "import" ? gt("Importing…") : gt("Import threads")}
             </Button>
             <Button
@@ -143,6 +145,7 @@ export function T3ImportSection(props: {
               disabled={blocked}
               onClick={() => setConfirmReplace(true)}
             >
+              <ArrowLeftRightIcon />
               {running === "replace" ? gt("Replacing…") : gt("Replace threads…")}
             </Button>
           </div>

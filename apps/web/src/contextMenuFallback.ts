@@ -11,6 +11,15 @@ const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<stri
     { tag: "path", attrs: { d: "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" } },
     { tag: "path", attrs: { d: "M10 12h4" } },
   ],
+  // t3code-pm: the PM menu items' icons.
+  briefcase: [
+    { tag: "path", attrs: { d: "M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" } },
+    { tag: "rect", attrs: { width: "20", height: "14", x: "2", y: "6", rx: "2" } },
+  ],
+  "undo-2": [
+    { tag: "path", attrs: { d: "M9 14 4 9l5-5" } },
+    { tag: "path", attrs: { d: "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" } },
+  ],
   check: [{ tag: "path", attrs: { d: "M20 6 9 17l-5-5" } }],
   timer: [
     { tag: "line", attrs: { x1: "10", x2: "14", y1: "2", y2: "2" } },

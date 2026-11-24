@@ -748,6 +748,7 @@ function InboxRow(props: {
                 count: hours,
                 $context: "Snooze for",
               }),
+              image: "moon",
             })),
           },
         ]

@@ -1,7 +1,13 @@
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { PM_PAGE_RESULT, PM_PAGE_SUBMIT, withPmPageTheme } from "@t3tools/pm";
 import { msg, useGT } from "gt-react";
-import { EyeOffIcon, MoreHorizontalIcon, XIcon } from "lucide-react";
+import {
+  DownloadIcon,
+  ExternalLinkIcon,
+  EyeOffIcon,
+  MoreHorizontalIcon,
+  XIcon,
+} from "lucide-react";
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 
 import { Button } from "../components/ui/button";
@@ -129,8 +135,14 @@ function PageWindow(props: { readonly threadRef: ThreadRef; readonly pageId: str
             <MoreHorizontalIcon />
           </MenuTrigger>
           <MenuPopup side="bottom" align="end">
-            <MenuItem onClick={exportPage}>{gt("Export page")}</MenuItem>
-            <MenuItem onClick={openInBrowser}>{gt("Open in browser")}</MenuItem>
+            <MenuItem onClick={exportPage}>
+              <DownloadIcon />
+              {gt("Export page")}
+            </MenuItem>
+            <MenuItem onClick={openInBrowser}>
+              <ExternalLinkIcon />
+              {gt("Open in browser")}
+            </MenuItem>
           </MenuPopup>
         </Menu>
         <Button

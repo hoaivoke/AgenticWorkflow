@@ -132,7 +132,7 @@ export function usePmRowMenu(thread: RowThread) {
           {
             id: "pm-revert",
             title: gt("Turn back into a normal thread"),
-            image: "bubble.left",
+            image: "arrow.uturn.backward",
             attributes: { disabled: summary.runningWorkers > 0 },
           },
         ]
@@ -152,7 +152,7 @@ export function usePmRowMenu(thread: RowThread) {
               },
             ]),
         ...role,
-        { id: "pm-new", title: gt("New PM in this project"), image: "plus.bubble" },
+        { id: "pm-new", title: gt("New PM in this project"), image: "briefcase" },
       ]
     : [];
   const handle = (event: string) => {

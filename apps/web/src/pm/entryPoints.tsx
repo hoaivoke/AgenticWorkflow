@@ -2,7 +2,7 @@ import type { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import type { PmThreadMenuState } from "./threadMenu.logic";
 import type { AnyRouter } from "@tanstack/react-router";
 import { msg, useGT } from "gt-react";
-import { BriefcaseIcon } from "lucide-react";
+import { BriefcaseIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PmIndex } from "@t3tools/pm/client";
 
@@ -107,7 +107,7 @@ const folderProject = (group: FolderGroup) =>
 export function pmFolderMenuItems(group: FolderGroup, resolve: MessageResolver = m) {
   if (!appAtomRegistry.get(pmIndexAtom).enabled.has(group.environmentId) || !folderProject(group))
     return [];
-  return [{ id: "pm:new-in-project" as const, label: resolve(msg("New PM")) }];
+  return [{ id: "pm:new-in-project" as const, label: resolve(msg("New PM")), icon: "briefcase" }];
 }
 
 export function handlePmFolderMenuAction(action: string | null, group: FolderGroup): boolean {
@@ -135,7 +135,7 @@ function roleItems(
         value: "action:pm-revert",
         searchTerms: ["pm", "project manager", "normal thread", "turn back", "stop being a pm"],
         title: gt("Turn back into a normal thread"),
-        icon,
+        icon: <Undo2Icon className="size-4 text-muted-foreground" />,
         run: async () => revertPmThread(thread.environmentId, thread.id),
       },
     ];

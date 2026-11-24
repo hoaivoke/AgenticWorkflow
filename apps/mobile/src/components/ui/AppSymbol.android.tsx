@@ -141,11 +141,19 @@ import IconWifi from "@tabler/icons-react-native/IconWifi";
 import IconWifiOff from "@tabler/icons-react-native/IconWifiOff";
 import IconWorld from "@tabler/icons-react-native/IconWorld";
 import IconX from "@tabler/icons-react-native/IconX";
+// t3code-pm: the PM menus' icons.
+import IconBriefcase from "@tabler/icons-react-native/IconBriefcase";
+import IconQuote from "@tabler/icons-react-native/IconQuote";
+import IconZzz from "@tabler/icons-react-native/IconZzz";
 import type { AndroidSymbol, SFSymbol, SymbolViewProps } from "expo-symbols";
 import { StyleSheet, View } from "react-native";
 import { withUniwind } from "uniwind";
 
 const ANDROID_ICON_BY_SF_SYMBOL = {
+  // t3code-pm: the PM menus' icons.
+  briefcase: IconBriefcase,
+  "moon.zzz": IconZzz,
+  "quote.opening": IconQuote,
   plusminus: IconPlusMinus,
   "git.pull-request.closed": IconGitPullRequestClosed,
   "git.pull-request.draft": IconGitPullRequestDraft,

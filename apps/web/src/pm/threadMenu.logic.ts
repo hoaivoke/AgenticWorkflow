@@ -34,7 +34,7 @@ export function pmThreadMenuItems(
           {
             id: "pm:revert" as const,
             label: resolve(msg("Turn back into a normal thread")),
-            icon: "message-square",
+            icon: "undo-2",
             disabled: state.runningWorkers > 0,
           },
         ]

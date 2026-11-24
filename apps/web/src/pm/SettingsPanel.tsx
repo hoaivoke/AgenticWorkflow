@@ -1,6 +1,7 @@
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { PM_PLAYBOOK } from "@t3tools/pm";
 import { useGT } from "gt-react";
+import { BookOpenIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -79,6 +80,7 @@ export function PmSettingsPanel() {
           )}
           control={
             <Button size="compact" variant="outline" onClick={() => setPlaybookOpen(true)}>
+              <BookOpenIcon />
               {gt("View")}
             </Button>
           }
