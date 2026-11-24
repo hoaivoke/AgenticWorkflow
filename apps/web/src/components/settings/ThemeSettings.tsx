@@ -54,8 +54,11 @@ import {
 } from "./ThemePreviewCircles";
 import { ThemeWireframe } from "./ThemeWireframe";
 import { T, useGT } from "gt-react";
+import { PM_GHOSTEX_THEME } from "../../pm/ghostexTheme";
 
 const MAINTAINER_THEMES: ReadonlyArray<ThemeDefinition> = [
+  // t3code-pm: PM3code's default theme leads the built-ins.
+  PM_GHOSTEX_THEME,
   T3_CHAT_THEME,
   GROVE_THEME,
   OCEAN_THEME,

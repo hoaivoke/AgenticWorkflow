@@ -84,7 +84,7 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 
 **One switch.** Settings, Project managers turns the whole feature off (on the phone: Settings, Environments, your environment, Project managers). PM threads then show as normal threads, and nothing is deleted.
 
-**The Ghostex look.** The screenshots use a theme of frosted glass over Ghostex's Polar Night art. It's one CSS file: in Settings, Appearance, choose **Create theme**, set it to Dark, open **Custom CSS**, paste [pm3code-ghostex.css](./docs/pm/theme/pm3code-ghostex.css), set **Accent** to `#5581A9`, and create the theme. Web and desktop only.
+**The Ghostex look.** PM3code starts on Ghostex, its built-in theme of frosted glass over Ghostex's Polar Night art, first-run setup included. Pick another theme in Settings, Appearance, and pick **Ghostex** there to come back; a theme you already chose stays. Web and desktop only. On PM3code 0.2.2 and older, paste [pm3code-ghostex.css](./docs/pm/theme/pm3code-ghostex.css) instead: **Create theme**, set it to Dark, open **Custom CSS**, paste the file, set **Accent** to `#5581A9`, and create the theme.
 
 ## Install
 

@@ -1,8 +1,9 @@
 /*
  * PM3code Ghostex: see-through glass over Ghostex's Polar Night art.
  *
- * Apply it in PM3code (web or desktop): Settings > Appearance > Create theme, open Custom CSS,
- * paste this whole file, save, then pick the theme. Use it as a dark theme.
+ * PM3code ships it built in as the Ghostex theme and its default (apps/web/src/pm/ghostexTheme.ts
+ * bundles this file and reads its colors from the :root block below). On PM3code 0.2.2 and older,
+ * paste it as a dark theme's Custom CSS instead: Settings > Appearance > Create theme.
  *
  * The art is Ghostex's "Polar Night" (https://github.com/maddada/Ghostex, MIT, see
  * docs/pm/theme/LICENSE-ghostex), embedded below because theme CSS cannot load files.
@@ -89,6 +90,12 @@ html {
   --message-action-hover: #6794bd !important;
   --update: #5581a9 !important;
   --update-foreground: #8fb3d4 !important;
+}
+
+/* Primary buttons lift to the lighter accent on hover rather than dimming. */
+[data-slot="button"].bg-primary:not(:disabled):is(:hover, [data-pressed]) {
+  background: #6794bd !important;
+  border-color: #6794bd !important;
 }
 
 /* The Inbox's recommended star takes the accent, not Ghostex's amber. */
@@ -186,4 +193,24 @@ body {
   background: var(--pm-glass-strong) !important;
   border: 1px solid var(--pm-glass-border) !important;
   backdrop-filter: blur(24px) saturate(1.3);
+}
+
+/* First-run setup: one glass card over the art instead of loose text, its links in the accent. */
+[data-pm-welcome] {
+  width: min(48rem, 100% - 2rem);
+  min-height: 0;
+  margin: clamp(1rem, 8vh, 5rem) auto clamp(1rem, 6vh, 3rem);
+  padding: 2.25rem 2.5rem 1.5rem !important;
+  border-radius: 1.25rem;
+  background: rgb(10 11 14 / 0.42);
+  border: 1px solid var(--pm-glass-border);
+  box-shadow: var(--pm-glass-shine);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(24px) saturate(1.2);
+}
+[data-pm-welcome] a {
+  color: #8fb3d4;
+}
+[data-pm-welcome] a:hover {
+  color: #a9c6e0;
 }

@@ -78,6 +78,7 @@ import {
 } from "../../modelSelection";
 import { useTextGenerationTargets } from "../../textGenerators";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
+import { PM_DEFAULT_THEME } from "../../pm/ghostexTheme";
 import { isMacPlatform } from "../../lib/utils";
 import {
   useEnvironmentProviders,
@@ -487,7 +488,8 @@ export function useSettingsRestore(onRestored?: () => void) {
   const isBackgroundActivityDirty = hasChangedBackgroundActivitySettings(settings);
 
   const changedSettingLabels = [
-    ...(theme !== "system" ? [gt("Theme")] : []),
+    // t3code-pm: PM3code's default theme is Ghostex, not T3's stock "system".
+    ...(theme !== PM_DEFAULT_THEME ? [gt("Theme")] : []),
     ...(!followSystem ? [gt("Follow system")] : []),
     ...(themeHalves !== null ? [gt("Theme mix")] : []),
     ...(settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast
@@ -660,7 +662,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       previousTheme = readThemePreference();
     } catch {}
     const liveHalves = readThemeHalves();
-    const needsThemeReset = previousTheme !== "system";
+    const needsThemeReset = previousTheme !== PM_DEFAULT_THEME;
     const needsMixReset = liveHalves !== null;
     const needsFollowSystemReset = readAppearanceModePreference(previousTheme) !== "system";
     const notifyThemeRestoreFailure = () => {
@@ -679,7 +681,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       if (previousHalves?.light) setThemeHalf("light", previousHalves.light);
       if (previousHalves?.dark) setThemeHalf("dark", previousHalves.dark);
     };
-    if (needsThemeReset && !setTheme("system")) {
+    if (needsThemeReset && !setTheme(PM_DEFAULT_THEME)) {
       notifyThemeRestoreFailure();
       return;
     }
