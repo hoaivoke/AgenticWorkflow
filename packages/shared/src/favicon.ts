@@ -71,7 +71,16 @@ export function toolActivityFaviconUrl(
   );
 }
 
-export function faviconUrlForOrigin(rawUrl: string | null | undefined, size = 32): string | null {
+/**
+ * t3code-pm: PM3code never asks Google for a link's icon, so no third party sees the hostnames in
+ * a chat; callers show their generic link icon. Only upstream's tests pass `pmBuild = false`.
+ */
+export function faviconUrlForOrigin(
+  rawUrl: string | null | undefined,
+  size = 32,
+  pmBuild = true,
+): string | null {
+  if (pmBuild) return null; // t3code-pm:
   if (!rawUrl) return null;
   try {
     const url = new URL(rawUrl);
@@ -82,4 +91,17 @@ export function faviconUrlForOrigin(rawUrl: string | null | undefined, size = 32
   } catch {
     return null;
   }
+}
+
+/**
+ * t3code-pm: Google's favicon service, which a provider can name as a tool's icon. PM3code drops
+ * these so no third party learns which sites an agent used.
+ */
+export function isFaviconServiceUrl(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  return (
+    ((host === "www.google.com" || host === "google.com") &&
+      url.pathname.startsWith("/s2/favicons")) ||
+    (host.endsWith(".gstatic.com") && url.pathname.startsWith("/faviconV2"))
+  );
 }

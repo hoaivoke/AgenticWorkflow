@@ -89,7 +89,12 @@ const liveProcess = Effect.acquireRelease(
     }),
 );
 
-it.layer(NodeServices.layer)("cli config resolution", (it) => {
+it.layer(
+  Layer.mergeAll(
+    NodeServices.layer,
+    Layer.succeed(OtelEnvironment.PmNoOtlpExport, false), // t3code-pm: upstream's exporter config
+  ),
+)("cli config resolution", (it) => {
   const defaultObservabilityConfig = {
     traceMinLevel: "Info",
     traceTimingEnabled: true,

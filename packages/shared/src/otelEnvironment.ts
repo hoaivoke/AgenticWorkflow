@@ -1,5 +1,6 @@
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -268,7 +269,17 @@ const sdkFlags = {
   ),
 };
 
-export const load: Effect.Effect<OtelEnvironment> = Config.all({
+/**
+ * t3code-pm: PM3code exports no traces, metrics or logs over OTLP, so no OTEL_* or T3CODE_OTLP_*
+ * variable, setting or desktop bootstrap URL names an endpoint. Local trace files still work.
+ * Only upstream's tests set it to false.
+ */
+export const PmNoOtlpExport = Context.Reference<boolean>(
+  "@t3tools/shared/otelEnvironment/PmNoOtlpExport",
+  { defaultValue: () => true },
+);
+
+const loadConfigured: Effect.Effect<OtelEnvironment> = Config.all({
   ...sdkFlags,
   resource: resourceAttributes,
   generic: settings("OTEL_EXPORTER_OTLP_"),
@@ -317,6 +328,10 @@ export const load: Effect.Effect<OtelEnvironment> = Config.all({
   }),
   Effect.orDie,
 );
+
+export const load: Effect.Effect<OtelEnvironment> = Effect.flatMap(PmNoOtlpExport, (off) =>
+  off ? Effect.succeed({ ...none, disabled: true }) : loadConfigured,
+); // t3code-pm:
 
 export const isRelayTracingEnabled = (env: Readonly<Record<string, string | undefined>>) =>
   Config.all({

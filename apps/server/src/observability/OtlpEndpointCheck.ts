@@ -4,6 +4,7 @@ import type {
   OtlpSignal,
 } from "@t3tools/contracts";
 import { layerOtlpSerialization } from "@t3tools/shared/observability";
+import { PmNoOtlpExport } from "@t3tools/shared/otelEnvironment"; // t3code-pm:
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -40,6 +41,7 @@ const emptyExport = (
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const httpClient = yield* HttpClient.HttpClient;
+  const pmNoExport = yield* PmNoOtlpExport; // t3code-pm:
 
   const running = {
     traces: { url: config.otlpTracesUrl, export: config.otlpTracesExport },
@@ -51,6 +53,8 @@ const make = Effect.gen(function* () {
     signal,
     url,
   }: OtlpEndpointCheckInput) {
+    // t3code-pm: PM3code sends nothing to an OTLP receiver, not even an empty check.
+    if (pmNoExport) return { _tag: "Unreachable", timedOut: false } as const;
     const { url: runningUrl, export: signalExport } = running[signal];
     const headers = url === runningUrl ? signalExport.headers : undefined;
     const body = yield* Effect.gen(function* () {

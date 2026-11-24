@@ -6,6 +6,7 @@ import * as Clock from "effect/Clock";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -176,7 +177,13 @@ const sendFor = (
     return batches;
   });
 
-it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService test", (it) => {
+it.layer(
+  Layer.mergeAll(
+    NodeServices.layer,
+    NodeCrypto.layer,
+    Layer.succeed(AnalyticsService.PmNoAnalytics, false), // t3code-pm: upstream's sender
+  ),
+)("AnalyticsService test", (it) => {
   it.effect("waits for desktop shell consent and honors a late telemetry opt-out", () =>
     Effect.gen(function* () {
       const env: NodeJS.ProcessEnv = { T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING: "1" };
@@ -395,55 +402,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
     }),
   );
 
-  // t3code-pm: a PM3code build never reports to T3's account unless the user points it elsewhere.
-  it.effect("a PM3code build sends nothing until given its own key and host", () =>
-    Effect.gen(function* () {
-      for (const [env, expected] of [
-        [{}, 0],
-        [{ T3CODE_TELEMETRY_ENABLED: true }, 0],
-        [
-          {
-            T3CODE_TELEMETRY_ENABLED: true,
-            T3CODE_POSTHOG_KEY: "phc_own_key",
-            T3CODE_POSTHOG_HOST: "http://localhost",
-          },
-          1,
-        ],
-      ] as const) {
-        const hosts: Array<string> = [];
-        const client = HttpClient.make((request) => {
-          hosts.push(request.url);
-          return respondWithStatus(204)(request);
-        });
-        yield* Effect.gen(function* () {
-          const analytics = yield* AnalyticsService.AnalyticsService;
-          yield* analytics.record("test.pm", { index: 1 });
-          yield* analytics.flush;
-        }).pipe(
-          Effect.provide(
-            AnalyticsService.layer.pipe(
-              Layer.provideMerge(
-                ServerConfig.ServerConfig.layerTest(process.cwd(), { prefix: "t3-telemetry-pm-" }),
-              ),
-              Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(env))),
-              Layer.provide(
-                Layer.mergeAll(
-                  Layer.succeed(AnalyticsService.PmForkTelemetryDefaults, true),
-                  Layer.succeed(HostProcess.Platform, "darwin"),
-                  Layer.succeed(HostProcess.Architecture, "arm64"),
-                  Layer.succeed(HttpClient.HttpClient, client),
-                  ManagedPolicy.layerTest(),
-                ),
-              ),
-            ),
-          ),
-        );
-        assert.equal(hosts.length, expected, JSON.stringify(env));
-        assert.isFalse(hosts.some((url) => url.includes("t3.codes")));
-      }
-    }),
-  );
-
   it.effect("does not send batch requests when telemetry is disabled", () =>
     Effect.gen(function* () {
       const capturedPaths: Array<string> = [];
@@ -485,6 +443,56 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
       }).pipe(Effect.provide(layerRuntime));
 
       assert.deepEqual(capturedPaths, []);
+    }),
+  );
+});
+
+// t3code-pm: no env var, key, host or policy makes PM3code send analytics or create an install id.
+it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("PM3code analytics", (it) => {
+  it.effect("sends nothing and writes no install id, even when told to send", () =>
+    Effect.gen(function* () {
+      const requests: Array<string> = [];
+      const client = HttpClient.make((request) => {
+        requests.push(request.url);
+        return respondWithStatus(204)(request);
+      });
+      const anonymousIdPath = yield* Effect.gen(function* () {
+        const analytics = yield* AnalyticsService.AnalyticsService;
+        yield* analytics.record("test.pm", { index: 1 });
+        yield* analytics.recordOwners([{ source: "openai", ownerId: "owner" }], "client");
+        yield* analytics.flush;
+        yield* TestClock.adjust("1 minute");
+        return (yield* ServerConfig.ServerConfig).anonymousIdPath;
+      }).pipe(
+        Effect.provide(
+          AnalyticsService.layer.pipe(
+            Layer.provideMerge(
+              ServerConfig.ServerConfig.layerTest(process.cwd(), { prefix: "t3-telemetry-pm-" }),
+            ),
+            Layer.provide(
+              ConfigProvider.layer(
+                ConfigProvider.fromUnknown({
+                  T3CODE_TELEMETRY_ENABLED: true,
+                  T3CODE_POSTHOG_KEY: "phc_own_key",
+                  T3CODE_POSTHOG_HOST: "http://localhost",
+                }),
+              ),
+            ),
+            Layer.provide(
+              Layer.mergeAll(
+                Layer.succeed(HostProcess.Platform, "darwin"),
+                Layer.succeed(HostProcess.Architecture, "arm64"),
+                Layer.succeed(HttpClient.HttpClient, client),
+                ManagedPolicy.layerTest(),
+              ),
+            ),
+          ),
+        ),
+        Effect.scoped,
+      );
+      assert.deepStrictEqual(requests, []);
+      const fs = yield* FileSystem.FileSystem;
+      assert.isFalse(yield* fs.exists(anonymousIdPath));
     }),
   );
 });

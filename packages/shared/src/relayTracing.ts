@@ -139,6 +139,15 @@ export function nonInterferingTracer(delegate: Tracer.Tracer): Tracer.Tracer {
   });
 }
 
+/**
+ * t3code-pm: PM3code exports no relay traces from the server, web or mobile app, whatever the
+ * build config, env vars, settings or policy say. Only upstream's tests set it to false.
+ */
+export const PmNoRelayTracing = Context.Reference<boolean>(
+  "@t3tools/shared/relayTracing/PmNoRelayTracing",
+  { defaultValue: () => true },
+);
+
 /** Spans started while `isEnabled` says no stay local instead of being exported. */
 function gatedTracer(delegate: Tracer.Tracer, isEnabled: () => boolean): Tracer.Tracer {
   return Tracer.make({
@@ -176,7 +185,7 @@ export function layer(
     },
   }).pipe(Layer.provide(OtlpSerialization.layerJson));
 
-  return Layer.effect(
+  const exporting = Layer.effect(
     RelayClientTracer,
     Tracer.Tracer.pipe(
       Effect.map(nonInterferingTracer),
@@ -186,4 +195,10 @@ export function layer(
       Effect.asSome,
     ),
   ).pipe(Layer.provide(layerTracer));
+  // t3code-pm: the exporter is never built, so no span leaves the machine.
+  return Layer.unwrap(
+    Effect.map(PmNoRelayTracing, (off) =>
+      off ? Layer.succeed(RelayClientTracer, Option.none()) : exporting,
+    ),
+  );
 }

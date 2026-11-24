@@ -19,6 +19,7 @@ import { AsyncResult } from "effect/reactivity";
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
+import { openPmReleases } from "../../pm/releases"; // t3code-pm:
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { m } from "../../i18n/messages";
 
@@ -321,6 +322,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                       loading={pending === "check"}
                       onPress={() => {
                         if (disabled) return;
+                        if (openPmReleases()) return; // t3code-pm:
                         const fromVersion = config.environment.serverVersion;
                         void run("check", async () => {
                           const exit = await checkRelease(async () => fromVersion);

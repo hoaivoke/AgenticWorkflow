@@ -10,6 +10,8 @@ import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
+import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
+
 import * as DesktopConfig from "./DesktopConfig.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopObservability from "./DesktopObservability.ts";
@@ -94,7 +96,12 @@ const layerCollector = (requests: Array<ExportedRequest>) =>
   );
 
 // A developer's own OTEL_* variables would otherwise pick the endpoints.
-const layerEmptyEnv = ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }));
+// t3code-pm: upstream's cases read upstream's exporter config.
+const layerUpstreamOtlp = Layer.succeed(OtelEnvironment.PmNoOtlpExport, false);
+const layerEmptyEnv = Layer.merge(
+  ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+  layerUpstreamOtlp,
+);
 
 const encodeObservabilitySettingsFile = Schema.encodeSync(
   Schema.fromJsonString(
@@ -330,6 +337,7 @@ describe("DesktopObservability", () => {
           NodeServices.layer,
           layerCollector(requests),
           ConfigProvider.layer(ConfigProvider.fromEnv({ env: { OTEL_SDK_DISABLED: "true" } })),
+          layerUpstreamOtlp,
         ),
       ),
     );

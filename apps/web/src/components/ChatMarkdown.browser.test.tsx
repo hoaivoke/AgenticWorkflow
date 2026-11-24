@@ -351,15 +351,15 @@ describe("ChatMarkdown favicon privacy", () => {
     const markdown = (url: string) => <ChatMarkdown cwd="/tmp/project" text={`[Link](${url})`} />;
     await using screen = await render(markdown("https://example.com"));
     const { container, rerender } = screen;
-    expect([...container.querySelectorAll("img")].map((image) => image.src)).toEqual([
-      "https://www.google.com/s2/favicons?domain=example.com&sz=32",
-    ]);
+    // t3code-pm: PM3code asks no favicon service, so public links show the generic icon too.
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    expect(container.querySelector("a svg")).not.toBeNull();
     for (const url of ["http://192.168.1.10:8080", "http://localhost:3000", "http://home.arpa"]) {
       await rerender(markdown(url));
       expect(container.querySelectorAll("img")).toHaveLength(0);
     }
     await rerender(markdown("https://example.com"));
-    expect(container.querySelectorAll("img")).toHaveLength(1);
+    expect(container.querySelectorAll("img")).toHaveLength(0); // t3code-pm:
     await rerender(markdown("https://github.com/pingdotgg/t3code/pull/1"));
     expect(container.querySelectorAll("img")).toHaveLength(0);
     expect(container.querySelector("a svg")).not.toBeNull();

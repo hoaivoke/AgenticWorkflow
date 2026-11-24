@@ -6,7 +6,11 @@ import assetLinks from "../web/public/.well-known/assetlinks.json";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
-  loadRepoEnv: () => ({ APP_VARIANT: process.env.APP_VARIANT }),
+  loadRepoEnv: () => ({
+    APP_VARIANT: process.env.APP_VARIANT,
+    T3CODE_RELAY_URL: process.env.T3CODE_RELAY_URL, // t3code-pm:
+    T3CODE_MOBILE_UPDATES_ENABLED: process.env.T3CODE_MOBILE_UPDATES_ENABLED, // t3code-pm:
+  }),
 }));
 
 afterEach(() => {
@@ -45,3 +49,15 @@ it.each([
   ]);
   expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
 });
+
+// t3code-pm: no build env turns on T3's update channel or crash reports to the relay.
+it.each(["pm", "production"])(
+  "APP_VARIANT=%j checks no updates and sends no crash reports",
+  async (value) => {
+    vi.stubEnv("T3CODE_RELAY_URL", "https://relay.example.test");
+    vi.stubEnv("T3CODE_MOBILE_UPDATES_ENABLED", "1");
+    const config = await loadConfig(value);
+    expect(config.updates?.enabled).toBe(false);
+    expect(config.extra?.eas?.observe).toEqual({ endpointUrl: "https://observe.invalid" });
+  },
+);

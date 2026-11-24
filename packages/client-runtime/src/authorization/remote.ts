@@ -10,6 +10,7 @@ import {
 } from "@t3tools/contracts";
 import { encodeOAuthScope } from "@t3tools/shared/oauthScope";
 import { hashTelemetryId } from "@t3tools/shared/telemetryId";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
@@ -49,10 +50,20 @@ export interface ClientOwnerParams {
 }
 
 /**
+ * t3code-pm: PM3code clients tell no environment, PM3code's or T3's, who is connecting. Only
+ * upstream's tests set this to false.
+ */
+export const PmNoClientOwners = Context.Reference<boolean>(
+  "@t3tools/client-runtime/authorization/PmNoClientOwners",
+  { defaultValue: () => true },
+);
+
+/**
  * Tells the environment, for analytics, which T3 Connect account and device
  * are connecting, so it can count the environment as theirs.
  */
 export const readClientOwnerParams = Effect.gen(function* () {
+  if (yield* PmNoClientOwners) return {} satisfies ClientOwnerParams; // t3code-pm:
   const session = yield* Effect.serviceOption(ClientCapabilities.CloudSession);
   const account = Option.isSome(session) ? yield* session.value.identity : Option.none();
   const device = yield* (yield* ClientCapabilities.AnalyticsDevice).id;
