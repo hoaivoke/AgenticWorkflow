@@ -31,15 +31,26 @@
   color: #f5b301;
 }
 
+/* The composer's glass (ComposerSurface): the card colour at --glass-opacity over a blur, so a
+   theme's art shows through the Inbox as it does through the composer under it. */
+@utility pm-inbox-glass {
+  background: color-mix(in srgb, var(--card) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  @variant dark {
+    background: color-mix(in srgb, var(--surface-raised) var(--glass-opacity), transparent);
+  }
+}
+
 @utility pm-inbox-row {
   &:hover {
-    background: color-mix(in srgb, var(--foreground) 4%, var(--card));
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
   }
   &[data-focused],
   &[data-focused]:hover {
-    background: color-mix(in srgb, #f472b6 10%, var(--card));
+    background: color-mix(in srgb, #f472b6 10%, transparent);
     @variant dark {
-      background: color-mix(in srgb, #f472b6 14%, var(--card));
+      background: color-mix(in srgb, #f472b6 14%, transparent);
     }
     box-shadow: inset 2px 0 0 #f472b6;
   }

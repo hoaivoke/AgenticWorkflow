@@ -204,7 +204,7 @@ function InboxSurface(props: {
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocus(-1);
       }}
-      className="mb-2 overflow-hidden rounded-xl border border-border bg-card text-foreground text-sm outline-none"
+      className="pm-inbox-glass mb-2 overflow-hidden rounded-xl border border-border text-foreground text-sm outline-none"
     >
       <InboxHeader
         target={target}
@@ -337,6 +337,7 @@ function InboxHeader(props: {
   const quiet = counts.pings + counts.blocked + counts.inProgress === 0;
   return (
     <div
+      data-pm-inbox-head=""
       onClick={props.collapsible ? props.onFold : undefined}
       className={cn(
         "flex h-[34px] min-w-0 cursor-default items-center gap-1.5 overflow-hidden ps-3 pe-1.25 pm-inbox-text",

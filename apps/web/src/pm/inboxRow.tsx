@@ -110,6 +110,7 @@ function IconButton(props: {
               event.stopPropagation();
               props.onClick?.();
             }}
+            data-pm-button=""
             className={cn(ICON_BUTTON, props.className)}
           />
         }
@@ -146,6 +147,7 @@ export function TextButton(props: {
         event.stopPropagation();
         props.onClick();
       }}
+      data-pm-button=""
       className={TEXT_BUTTON}
     >
       {props.children}
@@ -377,6 +379,7 @@ function ReplyButton(props: {
             aria-label={gt("Reply")}
             disabled={!context.canOperate}
             onClick={(event) => event.stopPropagation()}
+            data-pm-button=""
             className={ICON_BUTTON}
           />
         }
@@ -477,6 +480,7 @@ function MenuTriggerButton(props: { readonly label: string; readonly disabled: b
         <button
           type="button"
           onClick={(event) => event.stopPropagation()}
+          data-pm-button=""
           className={TEXT_BUTTON}
         />
       }
@@ -737,7 +741,9 @@ export function InboxRowView(props: {
         {...swipe.handlers}
         style={swipe.dx === 0 ? undefined : { transform: `translateX(${swipe.dx}px)` }}
         className={cn(
-          "pm-inbox-row group/row relative cursor-default touch-pan-y rounded-lg bg-card px-2 py-1.5",
+          "pm-inbox-row group/row relative cursor-default touch-pan-y rounded-lg px-2 py-1.5",
+          // Opaque only while it slides over its swipe strip.
+          swipe.dx !== 0 && "bg-card",
           props.drawer && "opacity-72",
         )}
       >
