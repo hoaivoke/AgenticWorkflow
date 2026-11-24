@@ -244,7 +244,77 @@ describe("Live pages", () => {
       const page = (yield* service.detail(pm))!.pages[0]!;
       yield* service.pageMarkSeen(page.pageId, undefined);
       assert.lengthOf(messagesTo(world, pm), 0);
-      assert.strictEqual((yield* service.detail(pm))!.pages[0]!.state, "seen");
+      const seen = (yield* service.detail(pm))!.pages[0]!;
+      assert.strictEqual(seen.state, "seen");
+      assert.isString(seen.settledAt);
+      // The Inbox's Undo of an Archive: the PM never heard of it, so the page opens again.
+      yield* service.pageReopen(page.pageId);
+      expect((yield* service.detail(pm))!.pages[0]).toMatchObject({
+        state: "open",
+        settledAt: null,
+      });
+      yield* service.pageMarkSeen(page.pageId, "Looks good");
+      assert.lengthOf(messagesTo(world, pm), 1);
+      assert.strictEqual((yield* Effect.flip(service.pageReopen(page.pageId))).code, "conflict");
+    }).pipe(Effect.provide(harness(world)));
+  });
+
+  it.effect("the Inbox's open and snooze reach the page and send the PM nothing", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      const service = yield* PmService;
+      const pm = yield* createPm(world);
+      yield* service.pageShow(pm, { html: "<p>FYI</p>", title: "Plan", sourceName: "plan.html" });
+      const { pageId } = (yield* service.detail(pm))!.pages[0]!;
+      assert.isNull((yield* service.detail(pm))!.pages[0]!.openedAt);
+      yield* service.pageOpen(pageId);
+      const opened = (yield* service.detail(pm))!.pages[0]!.openedAt;
+      assert.isString(opened);
+      yield* service.pageOpen(pageId);
+      assert.strictEqual((yield* service.detail(pm))!.pages[0]!.openedAt, opened);
+      yield* service.pageSnooze(pageId, "2026-01-01T10:00:00.000Z");
+      assert.strictEqual(
+        (yield* service.detail(pm))!.pages[0]!.snoozedUntil,
+        "2026-01-01T10:00:00.000Z",
+      );
+      yield* service.pageSnooze(pageId, null);
+      assert.isNull((yield* service.detail(pm))!.pages[0]!.snoozedUntil);
+      assert.strictEqual(
+        (yield* Effect.flip(service.pageSnooze(pageId, "tomorrow"))).code,
+        "invalid_request",
+      );
+      yield* service.pageMarkSeen(pageId, undefined);
+      assert.strictEqual(
+        (yield* Effect.flip(service.pageSnooze(pageId, "2026-01-01T10:00:00.000Z"))).code,
+        "conflict",
+      );
+      assert.lengthOf(messagesTo(world, pm), 0);
+    }).pipe(Effect.provide(harness(world)));
+  });
+});
+
+describe("the Inbox's Done rows", () => {
+  it.effect("archive and its undo leave the item finished and its update time alone", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      const service = yield* PmService;
+      const pm = yield* createPm(world);
+      yield* service.itemAdd(pm, { title: "Launch" });
+      yield* service.itemUpdate(pm, { item: "W1", status: "done", done: "Shipped." });
+      const finished = (yield* service.detail(pm))!.items[0]!;
+      assert.isNull(finished.archivedAt);
+      yield* service.archiveItems(pm, [1], true);
+      const archived = (yield* service.detail(pm))!.items[0]!;
+      assert.isString(archived.archivedAt);
+      assert.strictEqual(archived.updatedAt, finished.updatedAt);
+      assert.strictEqual(archived.status, "finished");
+      yield* service.archiveItems(pm, [1], false);
+      assert.isNull((yield* service.detail(pm))!.items[0]!.archivedAt);
+      assert.strictEqual(
+        (yield* Effect.flip(service.archiveItems(pm, [9], true))).code,
+        "not_found",
+      );
+      assert.lengthOf(messagesTo(world, pm), 0);
     }).pipe(Effect.provide(harness(world)));
   });
 });

@@ -91,6 +91,22 @@ export function createPmClient<R, ER>(
       label: "environment-data:pm:page-mark-seen",
       tag: PM_WS_METHODS.pageMarkSeen,
     }),
+    pageOpen: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:page-open",
+      tag: PM_WS_METHODS.pageOpen,
+    }),
+    pageSnooze: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:page-snooze",
+      tag: PM_WS_METHODS.pageSnooze,
+    }),
+    pageReopen: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:page-reopen",
+      tag: PM_WS_METHODS.pageReopen,
+    }),
+    itemArchive: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:item-archive",
+      tag: PM_WS_METHODS.itemArchive,
+    }),
     settingsSet: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pm:settings-set",
       tag: PM_WS_METHODS.settingsSet,

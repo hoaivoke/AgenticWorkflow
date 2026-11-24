@@ -57,6 +57,7 @@ export interface PmItemRow {
   readonly updatedAt: string;
   readonly finishedAt: string | null;
   readonly droppedAt: string | null;
+  readonly archivedAt: string | null;
 }
 
 export interface PmStepRow {
@@ -136,6 +137,9 @@ export interface PmPageRow {
   readonly messageId: string | null;
   readonly answersMessageId: string | null;
   readonly createdAt: string;
+  readonly openedAt: string | null;
+  readonly snoozedUntil: string | null;
+  readonly settledAt: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -189,6 +193,7 @@ const toItem = (row: Row): PmItemRow => ({
   updatedAt: String(row.updated_at),
   finishedAt: str(row.finished_at),
   droppedAt: str(row.dropped_at),
+  archivedAt: str(row.archived_at),
 });
 
 const toStep = (row: Row): PmStepRow => ({
@@ -268,6 +273,9 @@ const toPage = (row: Row): PmPageRow => ({
   messageId: str(row.message_id),
   answersMessageId: str(row.answers_message_id),
   createdAt: String(row.created_at),
+  openedAt: str(row.opened_at),
+  snoozedUntil: str(row.snoozed_until),
+  settledAt: str(row.settled_at),
 });
 
 export type PmItemPatch = Partial<{
@@ -278,6 +286,7 @@ export type PmItemPatch = Partial<{
   done_line: string | null;
   finished_at: string | null;
   dropped_at: string | null;
+  archived_at: string | null;
 }>;
 
 export type PmAskPatch = Partial<{
@@ -313,7 +322,10 @@ export type PmPagePatch = Partial<{
   state: PmPageRow["state"];
   answers_json: string;
   message_id: string;
-  answers_message_id: string;
+  answers_message_id: string | null;
+  opened_at: string;
+  snoozed_until: string | null;
+  settled_at: string | null;
 }>;
 
 const make = Effect.gen(function* () {
@@ -500,6 +512,13 @@ const make = Effect.gen(function* () {
       exec(
         "updateItem",
         sql`UPDATE pm_items SET ${sql.update({ ...patch, updated_at: at })}
+            WHERE pm_thread_id = ${pm} AND item_no = ${itemNo}`,
+      ),
+    /** The Inbox's Archive on a Done row: not a change to the item, so `updated_at` stays. */
+    archiveItem: (pm: string, itemNo: number, archivedAt: string | null) =>
+      exec(
+        "archiveItem",
+        sql`UPDATE pm_items SET archived_at = ${archivedAt}
             WHERE pm_thread_id = ${pm} AND item_no = ${itemNo}`,
       ),
 
@@ -699,7 +718,12 @@ const make = Effect.gen(function* () {
         sql`SELECT * FROM pm_reports WHERE delivered_at IS NULL ORDER BY created_at`,
       ).pipe(Effect.map((found) => found.map(toReport))),
 
-    insertPage: (page: Omit<PmPageRow, "answersJson" | "answersMessageId">) =>
+    insertPage: (
+      page: Omit<
+        PmPageRow,
+        "answersJson" | "answersMessageId" | "openedAt" | "snoozedUntil" | "settledAt"
+      >,
+    ) =>
       exec(
         "insertPage",
         sql`INSERT INTO pm_pages ${sql.insert({

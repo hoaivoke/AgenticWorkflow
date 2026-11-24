@@ -39,6 +39,10 @@ const unavailableHandlers = PmServerRpcGroup.of({
   [PM_WS_METHODS.pageGet]: refuse,
   [PM_WS_METHODS.pageAnswer]: refuse,
   [PM_WS_METHODS.pageMarkSeen]: refuse,
+  [PM_WS_METHODS.pageOpen]: refuse,
+  [PM_WS_METHODS.pageSnooze]: refuse,
+  [PM_WS_METHODS.pageReopen]: refuse,
+  [PM_WS_METHODS.itemArchive]: refuse,
   [PM_WS_METHODS.settingsGet]: refuse,
   [PM_WS_METHODS.settingsSet]: refuse,
 });
@@ -71,6 +75,11 @@ export const makePmRpcHandlers = Effect.gen(function* () {
     [PM_WS_METHODS.pageGet]: ({ pageId }) => pm.pageGet(pageId),
     [PM_WS_METHODS.pageAnswer]: ({ pageId, answers }) => ok(pm.pageAnswer(pageId, answers)),
     [PM_WS_METHODS.pageMarkSeen]: ({ pageId, reply }) => ok(pm.pageMarkSeen(pageId, reply)),
+    [PM_WS_METHODS.pageOpen]: ({ pageId }) => ok(pm.pageOpen(pageId)),
+    [PM_WS_METHODS.pageSnooze]: ({ pageId, until }) => ok(pm.pageSnooze(pageId, until)),
+    [PM_WS_METHODS.pageReopen]: ({ pageId }) => ok(pm.pageReopen(pageId)),
+    [PM_WS_METHODS.itemArchive]: ({ pm: thread, items, archived }) =>
+      ok(pm.archiveItems(thread, items, archived)),
     [PM_WS_METHODS.settingsGet]: () => pm.getSettings,
     [PM_WS_METHODS.settingsSet]: (input) => pm.setSettings(input),
   });

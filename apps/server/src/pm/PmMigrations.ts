@@ -166,7 +166,19 @@ const createTables = Effect.gen(function* () {
   `;
 });
 
-const pmMigrationEntries = [[1, "PmTables", createTables]] as const;
+// The Inbox: a page's opened, snoozed and settled times, and a finished item archived from Done.
+const addInboxColumns = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`ALTER TABLE pm_pages ADD COLUMN opened_at TEXT`;
+  yield* sql`ALTER TABLE pm_pages ADD COLUMN snoozed_until TEXT`;
+  yield* sql`ALTER TABLE pm_pages ADD COLUMN settled_at TEXT`;
+  yield* sql`ALTER TABLE pm_items ADD COLUMN archived_at TEXT`;
+});
+
+const pmMigrationEntries = [
+  [1, "PmTables", createTables],
+  [2, "PmInbox", addInboxColumns],
+] as const;
 
 const run = Migrator.make({});
 

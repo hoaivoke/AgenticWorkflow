@@ -1341,6 +1341,7 @@ const make = Effect.gen(function* () {
       state: "answered",
       answers_json: json,
       answers_message_id: messageId,
+      settled_at: yield* nowIso,
     });
     if (!recorded) return yield* conflict(`Page ${pageId} was already ${page.state}.`);
     yield* dispatchMessage({
@@ -1361,6 +1362,7 @@ const make = Effect.gen(function* () {
     const key = `page-seen:${pageId}`;
     const recorded = yield* store.answerPage(pageId, {
       state: "seen",
+      settled_at: yield* nowIso,
       ...(text.length === 0 ? {} : { answers_message_id: `message:pm:${key}` }),
     });
     if (!recorded) return yield* conflict(`Page ${pageId} was already ${page.state}.`);
@@ -1379,6 +1381,52 @@ const make = Effect.gen(function* () {
     yield* changed(page.pmThreadId);
   });
 
+  // t3code-pm: the Inbox's page and Done-row state. None of it reaches the PM: an archived page
+  // or item, a snooze and a first open are the user's own housekeeping.
+  const pageOpen = Effect.fn("PmService.pageOpen")(function* (pageId: string) {
+    const page = yield* requirePage(pageId);
+    if (page.openedAt !== null) return;
+    yield* store.updatePage(pageId, { opened_at: yield* nowIso });
+    yield* changed(page.pmThreadId);
+  });
+
+  const pageSnooze = Effect.fn("PmService.pageSnooze")(function* (
+    pageId: string,
+    until: string | null,
+  ) {
+    const page = yield* requirePage(pageId);
+    if (page.state !== "open") return yield* conflict(`Page ${pageId} is ${page.state}.`);
+    if (until !== null && Number.isNaN(Date.parse(until)))
+      return yield* invalid("Snooze needs an ISO time.");
+    yield* store.updatePage(pageId, { snoozed_until: until });
+    yield* changed(page.pmThreadId);
+  });
+
+  /** Undo of an Archive: only a page marked seen with no reply, which the PM never heard of. */
+  const pageReopen = Effect.fn("PmService.pageReopen")(function* (pageId: string) {
+    const page = yield* requirePage(pageId);
+    if (page.state !== "seen" || page.answersMessageId !== null)
+      return yield* conflict(`Page ${pageId} can no longer be reopened.`);
+    yield* store.updatePage(pageId, { state: "open", settled_at: null });
+    yield* changed(page.pmThreadId);
+  });
+
+  const archiveItems = Effect.fn("PmService.archiveItems")(function* (
+    pm: string,
+    itemNos: ReadonlyArray<number>,
+    archived: boolean,
+  ) {
+    yield* requirePm(pm);
+    const items = new Map((yield* store.listItems(pm)).map((item) => [item.itemNo, item]));
+    const missing = itemNos.find((itemNo) => !items.has(itemNo));
+    if (missing !== undefined) return yield* notFound(`There is no ${formatItemTag(missing)}.`);
+    const at = archived ? yield* nowIso : null;
+    yield* Effect.forEach(itemNos, (itemNo) => store.archiveItem(pm, itemNo, at), {
+      discard: true,
+    });
+    yield* changed(pm);
+  });
+
   const detail = Effect.fn("PmService.detail")(function* (pm: string) {
     const row = yield* store.getPm(pm);
     if (row === null || !(yield* isEnabled)) return null;
@@ -1394,6 +1442,7 @@ const make = Effect.gen(function* () {
       projectId: row.projectId as ProjectId,
       mission: row.mission,
       instructions: row.instructions,
+      turnStartedAt: row.turnStartedAt,
       memory: memory.map((note) => ({
         number: note.position,
         text: note.text,
@@ -1456,6 +1505,9 @@ const make = Effect.gen(function* () {
         answersMessageId:
           page.answersMessageId === null ? null : MessageId.make(page.answersMessageId),
         createdAt: page.createdAt,
+        openedAt: page.openedAt,
+        snoozedUntil: page.snoozedUntil,
+        settledAt: page.settledAt,
       })),
       reports: reports.map((report) => ({
         reportId: report.reportId,
@@ -1662,6 +1714,10 @@ const make = Effect.gen(function* () {
     pageGet,
     pageAnswer,
     pageMarkSeen,
+    pageOpen,
+    pageSnooze,
+    pageReopen,
+    archiveItems,
     detail,
     summaries,
     subscribe,

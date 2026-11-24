@@ -71,7 +71,7 @@ describe("PM migrations", () => {
       `;
       assert.deepStrictEqual(
         pmLedger.map((row) => row.migration_id),
-        [1],
+        [1, 2],
       );
     }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
   );
