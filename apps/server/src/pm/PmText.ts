@@ -66,8 +66,11 @@ export function workerBrief(input: {
     "",
     "How to report:",
     "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. PM3code passes it to the project manager.",
-    "- Never message the project manager's thread yourself.",
+    "- Never message the project manager's thread yourself (t3_thread_send or the like).",
+    '- Right after every push, send a short note with `pm_worker_note` ("<commit> <one line on what landed>"), then keep going and still end your turn with the full report.',
     '- When you need a decision you cannot make, ask it plainly in your final message and stop. Give each question a title that names its subject (never "it" or "this" alone) and a line on what it is about and why: the user reads it in the project manager\'s dock, not in your report.',
+    "- When the user must paste, post or run something, put the whole text and its link in the question's description, not only in the report.",
+    "- Never ask the user to run or paste a command you can run yourself (setup, connect, sign-in, opening a setting): run it yourself and ask only for the step that needs their hands (Touch ID or fingerprint, clicking Approve, signing in in the browser window that opened). Never approve permission, Keychain, consent, pairing or sign-in prompts for the user, and never type passwords or 2FA.",
     "- Do not merge, push, delete branches or run destructive commands unless this brief asks for it.",
     "- Stop every background job you no longer need before your final report.",
     "- Start your report's sections with markers: ✅ Done, 🧪 Untested, ⚠️ Read this, 🛑 Blocked, ❓ Needs you.",
@@ -91,6 +94,8 @@ export const firstLine = (text: string, limit = 160) => {
 };
 
 const REPORT_OPENER = "Worker report from ";
+const NOTE_OPENER = "Worker note from ";
+export const NOTE_LIMIT = 600;
 const PAGE_ANSWERS_OPENER = "<pm-page-answers";
 
 /**
@@ -100,6 +105,7 @@ const PAGE_ANSWERS_OPENER = "<pm-page-answers";
 const withoutForgedMarkers = (text: string) =>
   text
     .replaceAll(REPORT_OPENER, `Worker\u200b report from `)
+    .replaceAll(NOTE_OPENER, `Worker\u200b note from `)
     .replaceAll(PAGE_ANSWERS_OPENER, "<\u200bpm-page-answers");
 
 export function reportMessage(input: {
@@ -111,18 +117,37 @@ export function reportMessage(input: {
   return `${REPORT_OPENER}"${withoutForgedMarkers(input.workerTitle)}" (thread ${input.workerThreadId}): ${REPORT_LABELS[input.kind]}\n\n${withoutForgedMarkers(input.body)}`;
 }
 
+/** Ghostex's "Ghostex thread note": a worker's one line right after a push, while it keeps working. */
+export function noteMessage(input: {
+  readonly workerTitle: string;
+  readonly workerThreadId: string;
+  readonly note: string;
+}): string {
+  return `${NOTE_OPENER}"${withoutForgedMarkers(input.workerTitle)}" (thread ${input.workerThreadId}): ${withoutForgedMarkers(input.note)}`;
+}
+
 const RUNNING_STATUSES = new Set(["preparing", "queued", "starting", "running"]);
 const millis = (value: DateTime.DateTime | null | undefined) =>
   value === null || value === undefined ? 0 : DateTime.toEpochMillis(value);
 
-/** A running worker's run and when it last showed activity; one quiet streak per pair. */
-export function quietStreakOf(shell: OrchestrationV2ThreadShell) {
-  if (!RUNNING_STATUSES.has(shell.status) || shell.activeRunId === null) return null;
-  const lastActivity = Math.max(
+const activityOf = (shell: OrchestrationV2ThreadShell) =>
+  Math.max(
     millis(shell.updatedAt),
     millis(shell.latestVisibleMessage?.updatedAt),
     millis(shell.activityRunStartedAt),
   );
+
+/**
+ * A running worker's run and when it last showed activity; one quiet streak per pair. Its
+ * subagents' output counts as its own, so a lead whose subagents write is not quiet (Ghostex
+ * c2c3cc445).
+ */
+export function quietStreakOf(
+  shell: OrchestrationV2ThreadShell,
+  subagents: ReadonlyArray<OrchestrationV2ThreadShell> = [],
+) {
+  if (!RUNNING_STATUSES.has(shell.status) || shell.activeRunId === null) return null;
+  const lastActivity = Math.max(activityOf(shell), ...subagents.map(activityOf));
   return { runId: shell.activeRunId, lastActivity, streak: `${shell.activeRunId}@${lastActivity}` };
 }
 

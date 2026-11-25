@@ -16,12 +16,6 @@
   color: color-mix(in srgb, var(--foreground) 50%, var(--muted-foreground));
 }
 
-/* The description line under a title: 0.93 of the body size. */
-@utility pm-inbox-preview {
-  font-size: 13.02px;
-  line-height: 20px;
-}
-
 /* One title line tall: the mark and the age sit on the title's middle. */
 @utility pm-inbox-line {
   height: 22.75px;

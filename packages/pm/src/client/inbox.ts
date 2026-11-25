@@ -10,8 +10,6 @@ const DAY_MS = 24 * HOUR_MS;
 /** How long an answered ask or page stays in the Recent drawer. */
 const HANDLED_KEPT_MS = HOUR_MS;
 const HANDLED_MAX = 12;
-/** A description this short and on one line is the row's second line, not Details. */
-const SHORT_DESCRIPTION = 90;
 /** Same-turn pages that only wait to be seen bundle once there are this many. */
 const BUNDLE_MIN = 2;
 const BUNDLE_WINDOW_MS = 2 * MINUTE_MS;
@@ -44,10 +42,8 @@ export type PmInboxRow =
       readonly ask: PmAsk;
       /** An ask with no answers of its own: Done, and Archive beside it. */
       readonly todo: boolean;
-      /** A long description: a Details button opens it, the answers wait there. */
+      /** It has a description: a Details button beside the answers opens it (Ghostex 274a6851b). */
       readonly details: boolean;
-      /** A one-line description under the title, or its first line when `details`. */
-      readonly preview: string;
     })
   | (RowBase & {
       readonly kind: "page";
@@ -101,38 +97,6 @@ const sorted = <A>(items: ReadonlyArray<A>, order: (a: A, b: A) => number): Arra
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : Number.NaN);
 const snoozedNow = (until: string | null | undefined, now: number) => ms(until) > now;
 
-/** Ghostex's `details_fields`: a short one-line description stays on the row. */
-export function pmDescription(detail: string): {
-  readonly details: boolean;
-  readonly preview: string;
-} {
-  const text = detail.trim();
-  if (text.length === 0) return { details: false, preview: "" };
-  const plain = (line: string) =>
-    line
-      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/[*`]/g, "")
-      .split(/\s+/)
-      .filter(Boolean)
-      .join(" ");
-  const listed = ["- ", "* ", "+ ", "#", ">", "|", "```"].some((marker) => text.startsWith(marker));
-  if (!text.includes("\n") && !listed) {
-    const line = plain(text);
-    if (line.length <= SHORT_DESCRIPTION) return { details: false, preview: line };
-  }
-  const first =
-    text
-      .split("\n")
-      .map((line) =>
-        line
-          .trim()
-          .replace(/^[#>\-*+]+/, "")
-          .trim(),
-      )
-      .find((line) => line.length > 0 && !line.startsWith("```")) ?? "";
-  return { details: true, preview: plain(first) };
-}
-
 const askRow = (ask: PmAsk): PmInboxRow => {
   const todo = ask.answers.length === 0;
   return {
@@ -144,7 +108,8 @@ const askRow = (ask: PmAsk): PmInboxRow => {
     snoozedUntil: ask.snoozedUntil,
     ask,
     todo,
-    ...pmDescription(ask.detail),
+    // Ghostex bb2aaafc7: the row shows the title only; the description lives in Details.
+    details: ask.detail.trim().length > 0,
   };
 };
 
@@ -257,7 +222,7 @@ export function pmInbox(
     input.items
       .filter(
         (item) =>
-          item.status === "finished" &&
+          item.shownStatus === "done" &&
           ms(item.finishedAt) >= turnStartedAt &&
           !(ms(item.archivedAt) >= ms(item.finishedAt)),
       )

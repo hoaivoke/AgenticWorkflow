@@ -1,5 +1,5 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import { MessageId, RunId, RuntimeRequestId } from "@t3tools/contracts";
+import { MessageId, RunId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,6 +15,7 @@ import {
   requestPending,
   runOf,
   runUpdated,
+  shellFor,
   type PmWorld,
 } from "./Pm.testkit.ts";
 import { PmReportWatcher } from "./PmReportWatcher.ts";
@@ -287,6 +288,43 @@ describe("PmReportWatcher", () => {
       }).pipe(Effect.provide(layerPmWithWatcher(world).pipe(Layer.provideMerge(harness))));
     },
   );
+
+  it.effect("a worker whose subagent still writes is not quiet", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      const { pm, worker } = yield* setup(world);
+      const start = yield* DateTime.now;
+      world.shells.set(worker, {
+        ...world.shells.get(worker)!,
+        status: "running",
+        activeRunId: RunId.make("run-1"),
+        updatedAt: start,
+        activityRunStartedAt: start,
+      });
+      const child = ThreadId.make("thread-subagent");
+      const subagent = (at: DateTime.Utc) =>
+        shellFor(child, {
+          status: "running",
+          updatedAt: at,
+          lineage: {
+            parentThreadId: ThreadId.make(worker),
+            relationshipToParent: "subagent",
+            rootThreadId: ThreadId.make(worker),
+          },
+        });
+      const watcher = yield* PmReportWatcher;
+      yield* TestClock.adjust("6 minutes");
+      world.shells.set(child, subagent(yield* DateTime.now));
+      yield* TestClock.adjust("3 minutes");
+      yield* watcher.sweep;
+      assert.lengthOf(reportsTo(world, pm), 0);
+      assert.lengthOf(messagesTo(world, worker), 0);
+      // Eight minutes after the subagent's last write, the worker is quiet.
+      yield* TestClock.adjust("5 minutes");
+      yield* watcher.sweep;
+      assert.lengthOf(reportsTo(world, pm), 1);
+    }).pipe(Effect.provide(layerPmWithWatcher(world).pipe(Layer.provideMerge(harness))));
+  });
 
   it.effect(
     "stopped mid-turn is reported at once, then idle while owing work after 10 minutes",

@@ -45,6 +45,8 @@ export interface PmWorkerRow {
   readonly lastReportKind: PmReportKind | null;
   readonly lastReportAt: string | null;
   readonly lastReportLine: string | null;
+  readonly lastNote: string | null;
+  readonly lastNoteAt: string | null;
   readonly watch: PmWorkerWatch;
 }
 
@@ -182,6 +184,8 @@ const toWorker = (row: Row): PmWorkerRow => ({
   lastReportKind: str(row.last_report_kind) as PmReportKind | null,
   lastReportAt: str(row.last_report_at),
   lastReportLine: str(row.last_report_line),
+  lastNote: str(row.last_note),
+  lastNoteAt: str(row.last_note_at),
   watch: parseJson<PmWorkerWatch>(row.watch_json, {}),
 });
 
@@ -318,6 +322,8 @@ export type PmWorkerPatch = Partial<{
   last_report_kind: PmReportKind;
   last_report_at: string;
   last_report_line: string;
+  last_note: string;
+  last_note_at: string;
   watch_json: string;
 }>;
 

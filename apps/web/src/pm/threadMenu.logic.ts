@@ -59,12 +59,17 @@ const PM_WORDING: Record<string, string> = {
   delete: msg("Delete PM…"),
 };
 
-/** A PM's row keeps upstream's menu, worded for the PM where the item acts on it. */
+/**
+ * A PM's row keeps upstream's menu, worded for the PM where the item acts on it. A worker always
+ * stays under its PM, so its menu offers no Pin or Snooze; Unpin and Wake stay (Ghostex 4e483cd6f).
+ */
 export function pmRelabel<I extends string>(
   state: PmThreadMenuState | undefined,
   items: ReadonlyArray<ContextMenuItem<I>>,
   resolve: MessageResolver = m,
 ): ReadonlyArray<ContextMenuItem<I>> {
+  if (state?.isWorker === true && state.enabled)
+    return items.filter((item) => item.id !== "pin" && item.id !== "snooze");
   if (state?.isPm !== true) return items;
   return items.map((item) => {
     const wording = PM_WORDING[item.id];

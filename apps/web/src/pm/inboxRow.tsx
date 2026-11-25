@@ -661,16 +661,6 @@ export function InboxRowView(props: {
             ? gt("{count} pages from last turn", { count: row.pages.length })
             : gt("{count} pages from an earlier turn", { count: row.pages.length })
           : row.item.title;
-  const preview = props.nested
-    ? ""
-    : row.kind === "ask"
-      ? row.preview
-      : row.kind === "blocked"
-        ? (row.item.nowLine ?? "")
-        : row.kind === "finished"
-          ? (row.item.doneLine ?? "")
-          : "";
-
   const buttons: Array<ReactNode> = [];
   if (props.nested || finished) {
     // A finished row's Archive is its hover check; a bundle's page has no buttons.
@@ -855,9 +845,6 @@ export function InboxRowView(props: {
             )}
           </div>
         </div>
-        {preview ? (
-          <div className="truncate ps-5.75 pm-inbox-preview pm-card-muted">{preview}</div>
-        ) : null}
       </div>
       {props.nested ? null : <RowMenu row={row} context={context} anchor={more} />}
       {row.kind === "ask" ? (

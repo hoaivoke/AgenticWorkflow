@@ -196,10 +196,18 @@ const createImportAndRetiredTables = Effect.gen(function* () {
   `;
 });
 
+// Ghostex 6d04b0ffe: a worker's latest push note, sent with pm_worker_note.
+const addWorkerNoteColumns = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`ALTER TABLE pm_workers ADD COLUMN last_note TEXT`;
+  yield* sql`ALTER TABLE pm_workers ADD COLUMN last_note_at TEXT`;
+});
+
 const pmMigrationEntries = [
   [1, "PmTables", createTables],
   [2, "PmInbox", addInboxColumns],
   [3, "PmImportAndRetired", createImportAndRetiredTables],
+  [4, "PmWorkerNotes", addWorkerNoteColumns],
 ] as const;
 
 const run = Migrator.make({});

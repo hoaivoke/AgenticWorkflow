@@ -7,7 +7,15 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
-import { layerPm, makeWorld, messagesTo, PROJECT, shellFor, type PmWorld } from "./Pm.testkit.ts";
+import {
+  ASK_DETAIL,
+  layerPm,
+  makeWorld,
+  messagesTo,
+  PROJECT,
+  shellFor,
+  type PmWorld,
+} from "./Pm.testkit.ts";
 import { PmService } from "./PmService.ts";
 import { PAGE_ANSWERS_LIMIT, PM_CONVERT_MESSAGE, PM_NEW_TITLE } from "./PmText.ts";
 
@@ -40,7 +48,7 @@ const withAsk = (pm: string, holds = false) =>
     yield* service.ask(pm, {
       item: "W1",
       title: "Ship the iPhone build today?",
-      detail: "CI is green.",
+      detail: ASK_DETAIL,
       answers: "Yes*,No",
       holds,
     });
@@ -195,7 +203,7 @@ describe("asks from the dock", () => {
       const service = yield* PmService;
       const pm = yield* createPm(world);
       yield* withAsk(pm);
-      yield* service.ask(pm, { title: "Keep the old icon?", detail: "Design asked." });
+      yield* service.ask(pm, { title: "Keep the old icon?", detail: ASK_DETAIL });
       assert.isUndefined(
         (yield* service.itemList(pm)).notes?.find((note) => note.startsWith("Still open")),
       );

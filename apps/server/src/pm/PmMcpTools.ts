@@ -12,7 +12,7 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import { PmService } from "./PmService.ts";
-import { hiddenUnlessPm } from "./PmVisibility.ts";
+import { hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
 
 const shared = {
   failure: OrchestratorMcpFailure,
@@ -51,8 +51,8 @@ const pmToolWithoutParameters = <const Name extends string>(name: Name, descript
 
 const PmGuideTool = pmTool(
   "pm_guide",
-  "Your playbook as a project manager, then the user's overrides. Call before your first reply and after every compaction. `changes: true` returns only what changed since your last read.",
-  { changes: Schema.optional(Schema.Boolean) },
+  "Your playbook as a project manager, then the user's overrides. Call before your first reply and after every compaction. `changes: true` returns only what changed since your last read; `pages: true` returns how to write a Live page instead.",
+  { changes: Schema.optional(Schema.Boolean), pages: Schema.optional(Schema.Boolean) },
 );
 const PmStatusTool = pmToolWithoutParameters(
   "pm_status",
@@ -148,7 +148,7 @@ const PmItemListTool = pmTool(
 );
 const PmAskTool = pmTool(
   "pm_ask",
-  'Ask the user one question; it shows above their chat box. Title names its subject (no Q tag); detail says what and why; answers like "A*,B" (* marks yours). `holds` when the work stops until they answer. End your turn after asking.',
+  'Ask the user one question; it shows above their chat box. Title names its subject in plain words (no W or Q tags, thread ids or commit hashes); detail holds the full context to decide (at least 120 characters: what it is, what each answer does, what you recommend and why, risks, links, and any text to paste in a ``` block); answers like "A*,B" (* marks yours). `holds` when the work stops until they answer. End your turn after asking.',
   {
     item: Schema.optional(ItemRef),
     title: TrimmedNonEmptyString,
@@ -170,8 +170,15 @@ const PmAskWithdrawTool = pmTool(
 );
 const PmNextTagTool = pmToolWithoutParameters(
   "pm_next_tag",
-  "The next free W and Q tags, after a compaction or when unsure of the count.",
+  "Reserves the next free Q tag for a Live page question (never handed out again) and shows the next W tag.",
 );
+// t3code-pm: the one tool a PM's workers see (Ghostex's `coordinator note`).
+const PmWorkerNoteTool = Tool.make("pm_worker_note", {
+  ...shared,
+  description:
+    'Right after every push, tell your project manager in one line what landed ("<commit> <what landed>"), then keep working and still end your turn with your full report.',
+  parameters: Schema.Struct({ note: Schema.String }),
+}).annotate(McpSchema.EnabledWhen, hiddenUnlessPmWorker);
 const PmLinkAddTool = pmTool(
   "pm_link_add",
   "Link an issue, PR or page (full URL) to a work item or worker.",
@@ -184,7 +191,7 @@ const PmLinkAddTool = pmTool(
 );
 const PmPageShowTool = pmTool(
   "pm_page_show",
-  "Publish a Live page: self-contained HTML (inline images; no outside requests) for the user to look at and answer. Same `source_name` replaces the older page. Question tags come from pm_next_tag. Fields with a `name` and a `data-pm-send` button send the answers.",
+  "Publish a Live page: self-contained HTML (inline images; no outside requests) for the user to look at and answer. Read pm_guide with `pages: true` first for how to write one. Same `source_name` replaces the older page. Question tags come from pm_next_tag.",
   {
     html: Schema.String,
     title: TrimmedNonEmptyString,
@@ -219,6 +226,7 @@ export const PmToolkit = Toolkit.make(
   PmAskDoneTool,
   PmAskWithdrawTool,
   PmNextTagTool,
+  PmWorkerNoteTool,
   PmLinkAddTool,
   PmPageShowTool,
   PmPageRetireTool,

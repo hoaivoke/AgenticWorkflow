@@ -26,6 +26,9 @@ import * as PmLayer from "./PmLayer.ts";
 import * as PmReportWatcher from "./PmReportWatcher.ts";
 
 export const PROJECT = ProjectId.make("project:mcp-test");
+/** A description long enough for `pm_ask`'s 120-character minimum. */
+export const ASK_DETAIL =
+  "CI is green on the release branch and two reviewers approved it. Shipping today puts the fix in front of users before the weekend.";
 
 /** The orchestration a PM drives, faked: shells by id, and every command and launch sent. */
 export interface PmWorld {
@@ -65,6 +68,12 @@ export const layerFakes = (world: PmWorld) =>
   Layer.mergeAll(
     Layer.mock(ThreadManagement.ThreadManagementService)({
       getThreadShell: (threadId) => Effect.sync(() => world.shells.get(threadId) ?? null),
+      listActiveSubagentThreadIds: () =>
+        Effect.sync(() =>
+          [...world.shells.values()]
+            .filter((shell) => shell.lineage.relationshipToParent === "subagent")
+            .map((shell) => shell.id),
+        ),
       dispatch: (command) =>
         Effect.sync(() => {
           world.commands.push(command);

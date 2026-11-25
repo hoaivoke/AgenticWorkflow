@@ -28,8 +28,10 @@ const asPm = Effect.fn("PmMcp.asPm")(function* <A>(
 });
 
 export const layer = McpToolAccess.toLayer(PmToolkit, {
-  pm_guide: McpToolAccess.reads(({ changes }) =>
-    asPm((service, pm) => service.guide(pm, changes === true)),
+  pm_guide: McpToolAccess.reads(({ changes, pages }) =>
+    asPm((service, pm) =>
+      pages === true ? service.pageGuide(pm) : service.guide(pm, changes === true),
+    ),
   ),
   pm_status: McpToolAccess.reads(() => asPm((service, pm) => service.status(pm))),
   pm_set_name: McpToolAccess.writesWithCapability(({ name }) =>
@@ -103,6 +105,16 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
     asPm((service, pm) => service.askWithdraw(pm, tag)),
   ),
   pm_next_tag: McpToolAccess.reads(() => asPm((service, pm) => service.nextTag(pm))),
+  pm_worker_note: McpToolAccess.writesWithCapability(({ note }) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const caller = yield* McpInvocationContext.requireThreadScope(scope, "This tool");
+      const service = yield* PmService;
+      return yield* service
+        .workerNote(caller.thread.threadId, note)
+        .pipe(Effect.mapError(toFailure));
+    }),
+  ),
   pm_link_add: McpToolAccess.writesWithCapability((input) =>
     asPm((service, pm) => service.linkAdd(pm, input)),
   ),

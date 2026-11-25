@@ -202,7 +202,9 @@ function Dock(props: { readonly target: InboxTarget; readonly draftKey: string |
         disabled={!content}
         onPress={() => setHiddenRows(folded ? null : new Set(inbox.rows.map((row) => row.key)))}
         className={cn(
-          "h-[36px] flex-row items-center gap-1.5 pl-3 pr-1.5",
+          "h-[36px] flex-row items-center gap-1.5 pl-3",
+          // Ghostex 46a69f226: 10px on the right, less beside the fold chevron.
+          content ? "pr-1.5" : "pr-2.5",
           content && !folded && "border-b border-border bg-subtle",
         )}
       >
@@ -729,16 +731,6 @@ function InboxRow(props: {
             ? gt("{count} pages from last turn", { count: row.pages.length })
             : gt("{count} pages from an earlier turn", { count: row.pages.length })
           : row.item.title;
-  const preview = props.nested
-    ? ""
-    : row.kind === "ask"
-      ? row.preview
-      : row.kind === "blocked"
-        ? (row.item.nowLine ?? "")
-        : row.kind === "finished"
-          ? (row.item.doneLine ?? "")
-          : "";
-
   const openAsk = (askNo: number) =>
     navigation.navigate("PmAsk", { ...context.target, askNo, draftKey: context.draftKey });
   const openPage = (pageId: string, openedAt: string | null | undefined) => {
@@ -969,11 +961,6 @@ function InboxRow(props: {
                 )}
               </View>
             </View>
-            {preview ? (
-              <Text className="pl-[23px] text-[13px] text-foreground-muted" numberOfLines={1}>
-                {preview}
-              </Text>
-            ) : null}
           </Pressable>
         </Menu>
       </RowSwipe>

@@ -351,8 +351,9 @@ function InboxHeader(props: {
       data-pm-inbox-head=""
       onClick={props.collapsible ? props.onFold : undefined}
       className={cn(
-        "flex h-[34px] min-w-0 cursor-default items-center gap-1.5 overflow-hidden ps-3 pe-1.25 pm-inbox-text pm-card-muted",
-        props.collapsible && "pm-inbox-head",
+        "flex h-[34px] min-w-0 cursor-default items-center gap-1.5 overflow-hidden ps-3 pm-inbox-text pm-card-muted",
+        // Ghostex 46a69f226: the pills' 10px inset, 5px less beside the fold chevron.
+        props.collapsible ? "pm-inbox-head pe-1.25" : "pe-2.5",
         open && "h-[35px] rounded-t-xl border-border border-b bg-foreground/[3.5%]",
       )}
     >

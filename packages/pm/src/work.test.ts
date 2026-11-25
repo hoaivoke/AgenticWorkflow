@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import {
-  bareItemTags,
   derivePmItemStatus,
   formatPmAnswerMessage,
   handsWorkToUser,
@@ -27,8 +26,18 @@ describe("derivePmItemStatus", () => {
   it.each([
     ["dropped wins over everything", { status: "dropped", workers: ["running"] }, "dropped"],
     [
-      "done wins over a holding ask",
+      "a finished item with a holding ask is blocked again",
       { status: "finished", asks: [{ state: "open", holds: true }] },
+      "blocked",
+    ],
+    [
+      "a finished item with an open ask needs the user again",
+      { status: "finished", asks: [{ state: "open", holds: false }], workers: ["running"] },
+      "needs_you",
+    ],
+    [
+      "a finished item is done again once nothing is asked",
+      { status: "finished", asks: [{ state: "answered", holds: true }] },
       "done",
     ],
     [
@@ -116,15 +125,6 @@ describe("tags and answers", () => {
       "W4 Q3: iPhone only",
     );
     expect(formatPmAnswerMessage({ itemNo: null, askNo: 3, answer: "Yes" })).toBe("Q3: Yes");
-  });
-
-  it("finds bare tags of existing items, never quoted ones or look-alikes", () => {
-    expect(bareItemTags("Rebuild with W34, w37 and W34 again?", [34, 37])).toEqual([34, 37]);
-    expect(bareItemTags("Ship W9?", [34])).toEqual([]);
-    expect(
-      bareItemTags('Is "W34" or `W34` the W3C, W-2, W34-b, /w34 or W34.dev one?', [3, 34]),
-    ).toEqual([]);
-    expect(bareItemTags("W34. Then ship.", [34])).toEqual([34]);
   });
 
   it("refuses lines that hand work to the user", () => {

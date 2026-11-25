@@ -22,7 +22,7 @@ import {
   pmWorkerListKeys,
   withPmWorkers,
 } from "./logic.ts";
-import { pmDescription, pmInbox, pmInboxHidden } from "./inbox.ts";
+import { pmInbox, pmInboxHidden } from "./inbox.ts";
 
 const LISTED = {
   rootThreadId: ThreadId.make("w-1"),
@@ -210,6 +210,8 @@ describe("pmInbox", () => {
           item(3, { ...finished, finishedAt: at(10), archivedAt: at(2) }),
           // Finished again after an archive: back in Recent.
           item(4, { ...finished, finishedAt: at(1), archivedAt: at(20) }),
+          // Asked on after it finished: it needs the user again, so not in Recent.
+          item(5, { status: "finished", shownStatus: "needs_you", finishedAt: at(2) }),
         ],
         asks: [
           ask(1, { state: "answered", answer: "Yes", settledAt: at(5) }),
@@ -242,12 +244,23 @@ describe("pmInbox", () => {
   });
 });
 
-describe("pmDescription", () => {
-  it("keeps a short one-line description on the row and sends a long one to Details", () => {
-    expect(pmDescription("CI is **green**.")).toEqual({ details: false, preview: "CI is green." });
-    expect(pmDescription("- one\n- two")).toEqual({ details: true, preview: "one" });
-    expect(pmDescription("x ".repeat(60)).details).toBe(true);
-    expect(pmDescription("")).toEqual({ details: false, preview: "" });
+describe("Inbox ask rows", () => {
+  it("show the title only, with Details whenever the ask has a description", () => {
+    const result = pmInbox(
+      {
+        items: [],
+        asks: [ask(1, { detail: "CI is green." }), ask(2, { detail: "  " })],
+        pages: [],
+        turnStartedAt: at(30),
+      },
+      NOW,
+    );
+    expect(
+      result.rows.map((row) => (row.kind === "ask" ? [row.ask.askNo, row.details] : null)),
+    ).toEqual([
+      [1, true],
+      [2, false],
+    ]);
   });
 });
 

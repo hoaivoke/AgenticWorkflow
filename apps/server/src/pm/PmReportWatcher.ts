@@ -49,6 +49,18 @@ const make = Effect.gen(function* () {
     threads.getThreadShell(ThreadId.make(threadId)).pipe(Effect.orElseSucceed(() => null));
 
   /** The worker and its PM, when reports should flow: linked, unresolved, PM live, switch on. */
+  /** The worker's provider subagents, each a child thread of its own. */
+  const subagentsOf = Effect.fn("PmReportWatcher.subagentsOf")(function* (workerThreadId: string) {
+    const ids = yield* threads.listActiveSubagentThreadIds().pipe(Effect.orElseSucceed(() => []));
+    const shells = yield* Effect.forEach(ids, shellOf);
+    return shells.filter(
+      (child): child is NonNullable<typeof child> =>
+        child !== null &&
+        (child.lineage.parentThreadId === workerThreadId ||
+          child.lineage.rootThreadId === workerThreadId),
+    );
+  });
+
   const watched = Effect.fn("PmReportWatcher.watched")(function* (workerThreadId: string) {
     if (!(yield* pm.isEnabled)) return null;
     const worker = yield* store.getWorker(workerThreadId).pipe(Effect.orElseSucceed(() => null));
@@ -275,7 +287,10 @@ const make = Effect.gen(function* () {
       if (worker === null) continue;
       const shell = yield* shellOf(worker.workerThreadId);
       if (shell === null) continue;
-      const quiet = quietStreakOf(shell);
+      let quiet = quietStreakOf(shell);
+      // Only a worker quiet itself pays for reading its subagents.
+      if (quiet !== null && now - quiet.lastActivity >= QUIET_AFTER_MS)
+        quiet = quietStreakOf(shell, yield* subagentsOf(worker.workerThreadId));
       let watch = worker.watch;
       // It moved again after it showed as not moving: clear that so clients drop the chip.
       if (watch.notMovingStreak !== undefined && watch.notMovingStreak !== quiet?.streak) {

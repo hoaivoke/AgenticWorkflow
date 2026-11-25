@@ -31,7 +31,6 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 import {
-  bareItemTags,
   derivePmItemStatus,
   diffPmParagraphs,
   formatAskTag,
@@ -43,7 +42,11 @@ import {
   parsePmAnswers,
   parsePmWait,
   isPmPageSeen,
+  PM_PAGE_GUIDE,
   PM_PLAYBOOK_VERSION,
+  pmAskRefusal,
+  pmMixedChoiceWarnings,
+  pmTodoRefusal,
   preparePmPage,
   type PmShownItemStatus,
   type PmWaitOn,
@@ -65,9 +68,12 @@ import {
 } from "./PmStore.ts";
 import {
   composeGuide,
+  firstLine,
   linkKind,
   MEMORY_LIMIT,
   MEMORY_TEXT_LIMIT,
+  NOTE_LIMIT,
+  noteMessage,
   PAGE_ANSWERS_LIMIT,
   PAGE_HTML_LIMIT,
   pageAnswersMessage,
@@ -214,6 +220,15 @@ const make = Effect.gen(function* () {
     yield* Ref.get(enabled),
     (yield* store.listPms().pipe(Effect.orElseSucceed(() => []))).map((pm) => pm.threadId),
   );
+  // t3code-pm: which threads see the worker tools (pm_worker_note); every worker row counts, and a
+  // resolved worker's note is refused by the tool itself.
+  const syncWorkerTools = store.listWorkers().pipe(
+    Effect.tap((workers) =>
+      Effect.sync(() => pmVisibility.setWorkers(workers.map((worker) => worker.workerThreadId))),
+    ),
+    Effect.ignore,
+  );
+  yield* syncWorkerTools;
 
   const changed = (pm: string) => PubSub.publish(changes, pm).pipe(Effect.asVoid);
 
@@ -670,6 +685,8 @@ const make = Effect.gen(function* () {
       }),
     );
 
+  const pageGuide = (pm: string) => tool(pm, () => Effect.succeed(PM_PAGE_GUIDE));
+
   const playbookOverride = (
     pm: string,
     input: {
@@ -1037,7 +1054,7 @@ const make = Effect.gen(function* () {
                 .filter((entry) => entry.state !== "resolved")
                 .map(
                   ({ worker, shell: workerShell, state, notMoving }) =>
-                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : notMoving && state === "running" ? "running, quiet after the nudge" : notMoving ? "stopped again after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}`,
+                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : notMoving && state === "running" ? "running, quiet after the nudge" : notMoving ? "stopped again after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}${worker.lastNote !== null && (worker.lastReportAt === null || (worker.lastNoteAt ?? "") > worker.lastReportAt) ? `; pushed at ${worker.lastNoteAt}: ${firstLine(worker.lastNote, 70)}` : ""}`,
                 )),
         ];
         return lines.join("\n");
@@ -1050,20 +1067,17 @@ const make = Effect.gen(function* () {
         const title = input.title.trim();
         if (title.length === 0)
           return yield* invalid("An ask needs a title that names its subject.");
-        if (/\bQ\d+\b/.test(title)) return yield* invalid("Leave the Q tag out of the title.");
-        const items = yield* store.listItems(pm);
-        const bare = bareItemTags(
-          title,
-          items.map((entry) => entry.itemNo),
-        ).map((itemNo) => items.find((entry) => entry.itemNo === itemNo)!);
-        if (bare.length > 0)
-          return yield* invalid(
-            `Work-item tags (${bare.map((entry) => formatItemTag(entry.itemNo)).join(", ")}) are tool handles, not how to talk to the user. Name what the work is in plain words instead: ${bare.map((entry) => `${formatItemTag(entry.itemNo)} ("${entry.title}")`).join(", ")}.`,
-          );
-        if (input.detail.trim().length === 0)
-          return yield* invalid("An ask always has a detail: what it is about and why you ask.");
-        const item = yield* parseItemRef(pm, input.item);
         const parsed = parsePmAnswers(input.answers ?? "", input.recommended);
+        const [items, workers] = yield* Effect.all([store.listItems(pm), store.listWorkers(pm)]);
+        const refusal =
+          pmAskRefusal({
+            title,
+            detail: input.detail,
+            items,
+            threadIds: workers.map((worker) => worker.workerThreadId),
+          }) ?? pmTodoRefusal({ title, detail: input.detail, answers: parsed.answers });
+        if (refusal !== null) return yield* invalid(refusal);
+        const item = yield* parseItemRef(pm, input.item);
         const at = yield* nowIso;
         const askNo = yield* store.transaction(
           Effect.gen(function* () {
@@ -1104,11 +1118,17 @@ const make = Effect.gen(function* () {
       }),
     );
 
+  // Ghostex 9394798dd: the tag it prints is taken, so a page and a later pm_ask never share one.
   const nextTag = (pm: string) =>
     tool(pm, (row) =>
-      Effect.succeed(
-        `Next free tags: ${formatItemTag(row.nextItemNo)} and ${formatAskTag(row.nextAskNo)}.`,
-      ),
+      store
+        .allocate(pm, "next_ask_no")
+        .pipe(
+          Effect.map(
+            (askNo) =>
+              `Reserved ${formatAskTag(askNo ?? row.nextAskNo)} for your next question; the next work item is ${formatItemTag(row.nextItemNo)}.`,
+          ),
+        ),
     );
 
   const answerAsk = Effect.fn("PmService.answerAsk")(function* (
@@ -1207,6 +1227,7 @@ const make = Effect.gen(function* () {
           itemNo: item?.itemNo ?? null,
           linkedAt: at,
         });
+        yield* syncWorkerTools;
         yield* launches
           .launch({
             commandId: CommandId.make(`command:pm-worker:${id}`),
@@ -1233,7 +1254,11 @@ const make = Effect.gen(function* () {
             ...(input.linkOrigin === undefined ? {} : { linkOrigin: input.linkOrigin }),
           })
           .pipe(
-            Effect.tapError(() => store.deleteWorker(workerThreadId).pipe(Effect.ignore)),
+            Effect.tapError(() =>
+              store
+                .deleteWorker(workerThreadId)
+                .pipe(Effect.ignore, Effect.andThen(syncWorkerTools)),
+            ),
             Effect.mapError(
               (cause) =>
                 new PmError({
@@ -1264,6 +1289,8 @@ const make = Effect.gen(function* () {
           itemNo: item?.itemNo ?? null,
           linkedAt: yield* nowIso,
         });
+        yield* syncWorkerTools;
+        yield* refreshTools(ThreadId.make(input.thread));
         return `Linked "${shell.title}" (thread ${input.thread}) as your worker. Its reports now come to you.`;
       }),
     );
@@ -1282,6 +1309,8 @@ const make = Effect.gen(function* () {
     tool(pm, () =>
       requireOwnWorker(pm, thread).pipe(
         Effect.andThen(store.deleteWorker(thread)),
+        Effect.andThen(syncWorkerTools),
+        Effect.andThen(refreshTools(ThreadId.make(thread))),
         Effect.as(`Unlinked thread ${thread}: it is an ordinary thread again.`),
       ),
     );
@@ -1295,6 +1324,42 @@ const make = Effect.gen(function* () {
         return `Resolved thread ${thread}: no more reports from it.`;
       }),
     );
+
+  /** Ghostex's `coordinator note`: a worker tells its PM what it just pushed, and keeps working. */
+  const workerNote = Effect.fn("PmService.workerNote")(function* (thread: string, note: string) {
+    yield* requireEnabled;
+    const worker = yield* store.getWorker(thread);
+    if (worker === null)
+      return yield* invalid(
+        "This thread is not a project manager's worker, so pm_worker_note does not apply.",
+      );
+    if (worker.resolvedAt !== null)
+      return yield* conflict("This worker is already resolved, so its note was not sent.");
+    const line = note.split(/\s+/).filter(Boolean).join(" ");
+    if (line.length === 0)
+      return yield* invalid('Give a short one-line note (e.g. "<commit> <what landed>").');
+    if (line.length > NOTE_LIMIT)
+      return yield* invalid(`Keep the note to one line under ${NOTE_LIMIT} characters.`);
+    const at = yield* nowIso;
+    yield* store.updateWorker(thread, { last_note: line, last_note_at: at });
+    const shell = yield* shellOf(thread).pipe(Effect.orElseSucceed(() => null));
+    const workerTitle = shell?.title ?? thread;
+    yield* dispatchMessage({
+      threadId: worker.pmThreadId,
+      key: `note:${thread}:${yield* newId}`,
+      text: noteMessage({ workerTitle, workerThreadId: thread, note: line }),
+      createdBy: "agent",
+      senderThreadId: thread,
+      notification: {
+        source: { kind: "system" },
+        outcome: "updated",
+        summary: `Worker note: ${workerTitle}`,
+        detail: line,
+      },
+    });
+    yield* changed(worker.pmThreadId);
+    return { result: `Sent note to the project manager: ${line}` } satisfies PmToolResult;
+  });
 
   const linkAdd = (
     pm: string,
@@ -1344,15 +1409,31 @@ const make = Effect.gen(function* () {
         if (input.title.trim().length === 0)
           return yield* invalid("A page needs a title that names its subject.");
         const item = yield* parseItemRef(pm, input.item);
+        const pages = yield* store.listPages(pm);
+        const replaced = pages.filter(
+          (page) =>
+            page.sourceName === input.sourceName &&
+            (page.state === "open" || page.state === "seen"),
+        );
         const tags: Array<string> = [];
         for (const tag of input.questionTags ?? []) {
           const askNo = parseAskTag(tag);
           if (askNo === null) return yield* invalid(`"${tag}" is not a question tag such as Q3.`);
-          if (askNo < row.nextAskNo || (yield* store.getAsk(pm, askNo)) !== null)
+          const label = formatAskTag(askNo);
+          const ask = yield* store.getAsk(pm, askNo);
+          // A tag from pm_next_tag sits below the counter but is free; one an ask or another page
+          // holds is not, since an answer on this page would settle that question too.
+          const holder =
+            ask !== null
+              ? `${label} is ${ask.itemNo === null ? "" : `${formatItemTag(ask.itemNo)}'s `}question "${ask.title}"`
+              : pages.some((page) => !replaced.includes(page) && page.questionTags.includes(label))
+                ? `${label} is asked on another page`
+                : null;
+          if (holder !== null)
             return yield* conflict(
-              `${formatAskTag(askNo)} was already used. Call pm_next_tag for a free one.`,
+              `This page's question tag is already taken: ${holder}. A tag means one question, and an answer on the page would settle that one. Give the page's question a new tag (${formatAskTag(row.nextAskNo)} is free; pm_next_tag reserves one) and publish it again.`,
             );
-          tags.push(formatAskTag(askNo));
+          tags.push(label);
         }
         // Tags a page uses count as used, so pm_ask never hands them out again.
         const highest = Math.max(0, ...tags.map((tag) => parseAskTag(tag) ?? 0));
@@ -1360,13 +1441,8 @@ const make = Effect.gen(function* () {
           yield* Effect.repeat(store.allocate(pm, "next_ask_no"), {
             times: highest - row.nextAskNo,
           });
-        const pages = yield* store.listPages(pm);
         yield* Effect.forEach(
-          pages.filter(
-            (page) =>
-              page.sourceName === input.sourceName &&
-              (page.state === "open" || page.state === "seen"),
-          ),
+          replaced,
           (page) => store.updatePage(page.pageId, { state: "replaced" }),
           { discard: true },
         );
@@ -1383,7 +1459,11 @@ const make = Effect.gen(function* () {
           messageId: null,
           createdAt: yield* nowIso,
         });
-        return `Published page ${pageId} "${input.title.trim()}"${tags.length === 0 ? "" : ` asking ${tags.join(", ")}`}. Its answers arrive as a <pm-page-answers> message.`;
+        const warnings = pmMixedChoiceWarnings(input.html);
+        return [
+          `Published page ${pageId} "${input.title.trim()}"${tags.length === 0 ? "" : ` asking ${tags.join(", ")}`}. Its answers arrive as a <pm-page-answers> message.`,
+          ...(warnings.length === 0 ? [] : ["", "Choices:", ...warnings]),
+        ].join("\n");
       }),
     );
 
@@ -1778,6 +1858,7 @@ const make = Effect.gen(function* () {
     if ((yield* store.getPm(threadId)) !== null || (yield* store.isRetiredPm(threadId))) {
       yield* store.deletePm(threadId);
       pmVisibility.remove(threadId);
+      yield* syncWorkerTools;
       yield* changed(threadId);
       return;
     }
@@ -1802,6 +1883,7 @@ const make = Effect.gen(function* () {
     forget,
     editMemory,
     guide,
+    pageGuide,
     playbookOverride,
     status,
     itemAdd,
@@ -1820,6 +1902,7 @@ const make = Effect.gen(function* () {
     linkWorker,
     unlinkWorker,
     resolveWorker,
+    workerNote,
     linkAdd,
     pageShow,
     pageRetire,

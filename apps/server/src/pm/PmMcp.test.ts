@@ -1,6 +1,6 @@
 import { assert, describe, expect, it } from "@effect/vitest";
 import { EnvironmentId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
-import { PM_PLAYBOOK } from "@t3tools/pm";
+import { PM_PAGE_GUIDE, PM_PLAYBOOK } from "@t3tools/pm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
@@ -9,12 +9,20 @@ import { advertisedJsonSchema } from "../mcp/advertisedJsonSchema.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
-import { layerPm, makeWorld, messagesTo, PROJECT, shellFor, type PmWorld } from "./Pm.testkit.ts";
+import {
+  ASK_DETAIL,
+  layerPm,
+  makeWorld,
+  messagesTo,
+  PROJECT,
+  shellFor,
+  type PmWorld,
+} from "./Pm.testkit.ts";
 import * as PmMcpHandlers from "./PmMcpHandlers.ts";
 import { PmToolkit } from "./PmMcpTools.ts";
 import { PmService } from "./PmService.ts";
 import { PmStore } from "./PmStore.ts";
-import { hiddenUnlessPm } from "./PmVisibility.ts";
+import { hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
 
 const scopeFor = (threadId: string) => ({
   environmentId: EnvironmentId.make("environment:pm"),
@@ -122,6 +130,8 @@ describe("pm_* tools", () => {
       const guide = yield* callAs(pm, "pm_guide", {});
       assert.strictEqual(guide.result, PM_PLAYBOOK);
       assert.isUndefined(guide.notes);
+      // The page guide is read on demand and never counts as a playbook read.
+      assert.strictEqual((yield* callAs(pm, "pm_guide", { pages: true })).result, PM_PAGE_GUIDE);
       expect(
         (yield* callAs(pm, "pm_playbook_override", {
           op: "add",
@@ -241,19 +251,31 @@ describe("pm_* tools", () => {
       const pm = yield* createPm(world);
       yield* callAs(pm, "pm_item_add", { title: "Launch" });
       expect(
-        yield* callAs(pm, "pm_ask", { item: "W1", title: "Ship Q3 build?", detail: "x" }),
-      ).toMatchObject({ message: "Leave the Q tag out of the title." });
+        yield* callAs(pm, "pm_ask", { item: "W1", title: "Ship Q3 build?", detail: ASK_DETAIL }),
+      ).toMatchObject({ message: expect.stringContaining("internal references (Q3)") });
       expect(
         yield* callAs(pm, "pm_ask", { item: "W1", title: "Ship W1 today?", detail: "x" }),
       ).toMatchObject({
-        message:
-          'Work-item tags (W1) are tool handles, not how to talk to the user. Name what the work is in plain words instead: W1 ("Launch").',
+        message: expect.stringMatching(
+          /^This question cannot be asked yet:\n- The title contains internal references \(W1\).*Matching work items: W1 \("Launch"\)\.\n- Description is too short \(1 characters/,
+        ),
       });
+      expect(
+        yield* callAs(pm, "pm_ask", {
+          title: "Pick the icon on the Live page",
+          detail: ASK_DETAIL,
+        }),
+      ).toMatchObject({
+        message: expect.stringContaining('points at a Live page (matched "on the live page")'),
+      });
+      expect(
+        yield* callAs(pm, "pm_ask", { title: "Post the release notes", detail: ASK_DETAIL }),
+      ).toMatchObject({ message: expect.stringContaining('"Post …" asks the user to act') });
       expect(
         (yield* callAs(pm, "pm_ask", {
           item: "W1",
           title: "Ship the iPhone build today?",
-          detail: "CI is green.",
+          detail: ASK_DETAIL,
           answers: "Yes*,No",
           holds: true,
         })).result,
@@ -264,18 +286,20 @@ describe("pm_* tools", () => {
         message: "Q1 is already withdrawn.",
       });
       yield* callAs(pm, "pm_item_update", { item: "W1", status: "drop" });
-      expect((yield* callAs(pm, "pm_next_tag", {})).result).toBe("Next free tags: W2 and Q2.");
+      expect((yield* callAs(pm, "pm_next_tag", {})).result).toBe(
+        "Reserved Q2 for your next question; the next work item is W2.",
+      );
+      // The reserved tag is never handed out again.
       expect(
-        (yield* callAs(pm, "pm_ask", { title: "Use the old icon?", detail: "Design asked." }))
-          .result,
-      ).toContain("Asked Q2");
-      expect((yield* callAs(pm, "pm_ask_done", { tag: 2 })).result).toBe("Q2 closed as done.");
+        (yield* callAs(pm, "pm_ask", { title: "Use the old icon?", detail: ASK_DETAIL })).result,
+      ).toContain("Asked Q3");
+      expect((yield* callAs(pm, "pm_ask_done", { tag: 3 })).result).toBe("Q3 closed as done.");
       const store = yield* PmStore;
       assert.deepStrictEqual(
         (yield* store.listAsks(pm)).map((ask) => [ask.askNo, ask.state]),
         [
           [1, "withdrawn"],
-          [2, "done"],
+          [3, "done"],
         ],
       );
     }).pipe(Effect.provide(harness(world)));
@@ -297,6 +321,7 @@ describe("pm_* tools", () => {
       expect(launch?.initialMessage?.text).toContain("Fix the pairing screen layout.");
       expect(launch?.initialMessage?.text).toContain("Its mission: Ship the app.");
       expect(launch?.initialMessage?.text).toContain("Never message the project manager's thread");
+      expect(launch?.initialMessage?.text).toContain("Right after every push, send a short note");
       assert.strictEqual(launch?.initialMessage?.senderThreadId, pm);
       expect((yield* callAs(pm, "pm_item_list", {})).result).toContain("W1 Pairing: In progress");
 
@@ -337,6 +362,58 @@ describe("pm_* tools", () => {
     }).pipe(Effect.provide(harness(world)));
   });
 
+  it.effect("a worker's push note reaches its PM and pm_status; only workers see the tool", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      const pm = yield* createPm(world);
+      yield* callAs(pm, "pm_worker_start", { title: "Fix pairing", brief: "Fix it." });
+      const worker = world.launches.at(-1)!.threadId!;
+      world.shells.set(
+        worker,
+        shellFor(worker, {
+          projectId: PROJECT,
+          title: "Fix pairing",
+          status: "running",
+          activeRunId: RunId.make(`run:${worker}`),
+        }),
+      );
+      const visibleTo = (threadId: string) =>
+        Effect.sync(hiddenUnlessPmWorker).pipe(
+          Effect.provideService(McpInvocationContext.McpInvocationContext, scopeFor(threadId)),
+        );
+      assert.isTrue(yield* visibleTo(worker));
+      assert.isFalse(yield* visibleTo(pm));
+      assert.isFalse(yield* visibleTo("thread-plain"));
+
+      expect(yield* callAs(worker, "pm_worker_note", { note: " " })).toMatchObject({
+        message: 'Give a short one-line note (e.g. "<commit> <what landed>").',
+      });
+      expect(yield* callAs(worker, "pm_worker_note", { note: "x".repeat(601) })).toMatchObject({
+        message: "Keep the note to one line under 600 characters.",
+      });
+      expect(
+        (yield* callAs(worker, "pm_worker_note", { note: "abc1234 pairing\n  fix landed" })).result,
+      ).toBe("Sent note to the project manager: abc1234 pairing fix landed");
+      const sent = messagesTo(world, pm).at(-1);
+      expect(sent?.text).toBe(
+        `Worker note from "Fix pairing" (thread ${worker}): abc1234 pairing fix landed`,
+      );
+      assert.strictEqual(sent?.senderThreadId, worker);
+      expect((yield* callAs(pm, "pm_status", {})).result).toContain(": abc1234 pairing fix landed");
+      world.shells.set(
+        "thread-plain",
+        shellFor("thread-plain", { status: "running", activeRunId: RunId.make("run:plain") }),
+      );
+      expect(yield* callAs("thread-plain", "pm_worker_note", { note: "x" })).toMatchObject({
+        message: "This thread is not a project manager's worker, so pm_worker_note does not apply.",
+      });
+      yield* callAs(pm, "pm_worker_resolve", { thread: worker });
+      expect(yield* callAs(worker, "pm_worker_note", { note: "late" })).toMatchObject({
+        message: "This worker is already resolved, so its note was not sent.",
+      });
+    }).pipe(Effect.provide(harness(world)));
+  });
+
   it.effect("links and Live pages", () => {
     const world = makeWorld();
     return Effect.gen(function* () {
@@ -356,8 +433,10 @@ describe("pm_* tools", () => {
         question_tags: ["Q1"],
       });
       expect(first.result).toContain("asking Q1");
-      // A page's tag counts as used.
-      expect((yield* callAs(pm, "pm_next_tag", {})).result).toBe("Next free tags: W2 and Q2.");
+      // A page's tag counts as used, and pm_next_tag reserves the next one for another page.
+      expect((yield* callAs(pm, "pm_next_tag", {})).result).toBe(
+        "Reserved Q2 for your next question; the next work item is W2.",
+      );
       expect(
         yield* callAs(pm, "pm_page_show", {
           html: "<p>Again</p>",
@@ -367,8 +446,31 @@ describe("pm_* tools", () => {
         }),
       ).toMatchObject({
         code: "invalid_request",
-        message: "Q1 was already used. Call pm_next_tag for a free one.",
+        message:
+          "This page's question tag is already taken: Q1 is asked on another page. A tag means one question, and an answer on the page would settle that one. Give the page's question a new tag (Q3 is free; pm_next_tag reserves one) and publish it again.",
       });
+      yield* callAs(pm, "pm_ask", { item: "W1", title: "Ship the new icon?", detail: ASK_DETAIL });
+      expect(
+        yield* callAs(pm, "pm_page_show", {
+          html: "<p>Q3</p>",
+          title: "Icons",
+          source_name: "other.html",
+          question_tags: ["Q3"],
+        }),
+      ).toMatchObject({
+        message: expect.stringContaining(
+          'already taken: Q3 is W1\'s question "Ship the new icon?".',
+        ),
+      });
+      const seven = ["A", "B", "C", "D", "E", "F", "G"].map((c) => `<gx-choice>${c}</gx-choice>`);
+      const reserved = yield* callAs(pm, "pm_page_show", {
+        html: `<gx-question tag="Q2" title="Which look?">${seven.join("")}</gx-question>`,
+        title: "Icon looks",
+        source_name: "looks.html",
+        question_tags: ["Q2"],
+      });
+      expect(reserved.result).toContain("asking Q2");
+      expect(reserved.result).toContain('Choices:\nWarning: Q2 ("Which look?"): it has 7 pick-one');
       yield* callAs(pm, "pm_page_show", {
         html: "<p>v2</p>",
         title: "Icon options",
@@ -376,8 +478,12 @@ describe("pm_* tools", () => {
       });
       const store = yield* PmStore;
       const pages = yield* store.listPages(pm);
-      assert.deepStrictEqual(pages.map((page) => page.state).toSorted(), ["open", "replaced"]);
-      const open = pages.find((page) => page.state === "open")!;
+      assert.deepStrictEqual(pages.map((page) => page.state).toSorted(), [
+        "open",
+        "open",
+        "replaced",
+      ]);
+      const open = pages.find((page) => page.sourceName === "icons.html" && page.state === "open")!;
       assert.strictEqual(open.html, "<p>v2</p>");
       const retired = yield* callAs(pm, "pm_page_retire", { page: open.pageId });
       expect(retired.result).toContain("Retired page");
