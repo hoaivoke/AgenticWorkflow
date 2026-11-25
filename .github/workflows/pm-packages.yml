@@ -21,7 +21,8 @@ permissions:
 jobs:
   build_bundle:
     name: Build JS bundle
-    if: github.repository == 'maddada/pm3code'
+    # pipelines: also build in this fork.
+    if: github.repository == 'maddada/pm3code' || github.repository_owner == 'hoaivoke'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
