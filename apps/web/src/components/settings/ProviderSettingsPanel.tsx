@@ -921,6 +921,38 @@ export function EnvironmentProviderSettings({
     },
   );
 
+  const [refreshingModelInstanceIds, setRefreshingModelInstanceIds] = useState<
+    ReadonlySet<ProviderInstanceId>
+  >(() => new Set());
+  const refreshInstanceModels = useStableCallback(async (instanceId: ProviderInstanceId) => {
+    if (!canRefreshProviders) return;
+    setRefreshingModelInstanceIds((current) => new Set(current).add(instanceId));
+    try {
+      const result = await refreshServerProviders({
+        environmentId,
+        input: { instanceId, refreshModels: true, reloadSecrets: true },
+      });
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add({
+          type: "error",
+          title: gt("Could not refresh provider models"),
+          description:
+            error instanceof Error
+              ? (thrownErrorMessage(error, resolveNow) ?? error.message)
+              : gt("The model refresh failed."),
+        });
+      }
+    } finally {
+      setRefreshingModelInstanceIds((current) => {
+        if (!current.has(instanceId)) return current;
+        const next = new Set(current);
+        next.delete(instanceId);
+        return next;
+      });
+    }
+  });
+
   const resetDefaultInstance = useStableCallback(async (driverKind: ProviderDriverKind) => {
     const instanceId = defaultInstanceIdForDriver(driverKind);
     const instance = settings.providerInstances?.[instanceId] ?? { driver: driverKind };
@@ -966,6 +998,7 @@ export function EnvironmentProviderSettings({
   const actions: ProviderInstanceRowActions = {
     acceptUrlAuthentication,
     runProviderUpdate,
+    refreshInstanceModels,
     updateInstance,
     enableInstance,
     deleteInstance,
@@ -998,6 +1031,8 @@ export function EnvironmentProviderSettings({
         canWriteSettings={canWriteSettings}
         liveProvider={serverProviders.find((candidate) => candidate.instanceId === row.instanceId)}
         isUpdateDispatching={updatingProviderInstanceIds.has(row.instanceId)}
+        isRefreshingModels={refreshingModelInstanceIds.has(row.instanceId)}
+        canRefreshProviders={canRefreshProviders}
         showProjectOverride={showProjectOverride}
         projectOverrideValue={
           showProjectOverride
@@ -1261,6 +1296,7 @@ interface ProviderInstanceRowActions {
     candidate: Pick<ProviderSettingsUpdateCandidate, "driver" | "instanceId">,
     targetVersion?: string,
   ) => Promise<void>;
+  readonly refreshInstanceModels: (instanceId: ProviderInstanceId) => Promise<void>;
   readonly updateInstance: (
     instanceId: ProviderInstanceId,
     previous: ProviderInstanceConfig,
@@ -1301,6 +1337,8 @@ function ProviderInstanceRow({
   canWriteSettings,
   liveProvider,
   isUpdateDispatching,
+  isRefreshingModels,
+  canRefreshProviders,
   showProjectOverride,
   projectOverrideValue,
   projectOverrideEffectiveEnabled,
@@ -1321,6 +1359,8 @@ function ProviderInstanceRow({
   readonly canWriteSettings: boolean;
   readonly liveProvider: ServerProvider | undefined;
   readonly isUpdateDispatching: boolean;
+  readonly isRefreshingModels: boolean;
+  readonly canRefreshProviders: boolean;
   readonly showProjectOverride: boolean;
   readonly projectOverrideValue: boolean | undefined;
   readonly projectOverrideEffectiveEnabled: boolean;
@@ -1516,6 +1556,10 @@ function ProviderInstanceRow({
           : undefined
       }
       isUpdating={isInstanceUpdateRunning}
+      onRefreshModels={
+        canRefreshProviders ? () => void actions.refreshInstanceModels(instanceId) : undefined
+      }
+      isRefreshingModels={isRefreshingModels}
     />
   );
 }

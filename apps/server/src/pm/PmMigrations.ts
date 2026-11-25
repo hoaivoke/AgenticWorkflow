@@ -196,10 +196,69 @@ const createImportAndRetiredTables = Effect.gen(function* () {
   `;
 });
 
+const createSwarmTables = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_swarms (
+      swarm_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      coordinator_thread_id TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'active',
+      next_seq INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) WITHOUT ROWID
+  `;
+  yield* sql`CREATE INDEX IF NOT EXISTS pm_swarms_coordinator ON pm_swarms (coordinator_thread_id)`;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_swarm_channels (
+      swarm_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      topic TEXT NOT NULL DEFAULT '',
+      archived INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (swarm_id, name)
+    ) WITHOUT ROWID
+  `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_swarm_members (
+      swarm_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      thread_id TEXT NOT NULL UNIQUE,
+      role TEXT,
+      workspace_mode TEXT NOT NULL DEFAULT 'inherit',
+      channels_json TEXT NOT NULL DEFAULT '["main"]',
+      primary_channel TEXT NOT NULL DEFAULT 'main',
+      added_by TEXT NOT NULL DEFAULT 'coordinator',
+      state TEXT NOT NULL DEFAULT 'working',
+      wait_since_seq INTEGER NOT NULL DEFAULT 0,
+      mentions_only INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (swarm_id, name)
+    ) WITHOUT ROWID
+  `;
+  yield* sql`CREATE INDEX IF NOT EXISTS pm_swarm_members_thread ON pm_swarm_members (thread_id)`;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_swarm_posts (
+      swarm_id TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'main',
+      sender TEXT NOT NULL,
+      text TEXT NOT NULL,
+      mentions_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (swarm_id, seq)
+    ) WITHOUT ROWID
+  `;
+});
+
 const pmMigrationEntries = [
   [1, "PmTables", createTables],
   [2, "PmInbox", addInboxColumns],
   [3, "PmImportAndRetired", createImportAndRetiredTables],
+  [4, "PmSwarm", createSwarmTables],
 ] as const;
 
 const run = Migrator.make({});

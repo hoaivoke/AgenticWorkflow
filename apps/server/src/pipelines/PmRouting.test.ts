@@ -320,3 +320,14 @@ describe("pm_worker_schedule", () => {
     }).pipe(Effect.provide(harness(world)));
   });
 });
+
+describe("pm_run_gates", () => {
+  it.effect("refuses when the project has no workspace root on disk", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      const pm = yield* createPm(world);
+      const result = yield* callAs(pm, "pm_run_gates", { commands: ["pnpm typecheck"] });
+      expect(result.message).toContain("no workspace root on disk");
+    }).pipe(Effect.provide(harness(world)));
+  });
+});

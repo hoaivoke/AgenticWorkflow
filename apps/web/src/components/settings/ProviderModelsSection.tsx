@@ -121,6 +121,8 @@ interface ProviderModelsSectionProps {
   readonly onFavoriteModelsChange: (next: ReadonlyArray<string>) => void;
   readonly onToggleFavorite: (model: string) => void;
   readonly onModelOrderChange: (next: ReadonlyArray<string>) => void;
+  readonly onRefreshModels?: (() => void) | undefined;
+  readonly isRefreshingModels?: boolean | undefined;
 }
 
 export function ProviderModelsSection({
@@ -138,6 +140,8 @@ export function ProviderModelsSection({
   onFavoriteModelsChange,
   onToggleFavorite,
   onModelOrderChange,
+  onRefreshModels,
+  isRefreshingModels = false,
 }: ProviderModelsSectionProps) {
   const gt = useGT();
   const [input, setInput] = useState("");
@@ -404,6 +408,18 @@ export function ProviderModelsSection({
           >
             <PlusIcon className="size-3" />
             <T>Add custom model</T>
+          </Button>
+        ) : driverKind === "antigravity" && onRefreshModels ? (
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost-muted"
+            className="-me-2 ml-auto"
+            disabled={isRefreshingModels}
+            aria-busy={isRefreshingModels}
+            onClick={onRefreshModels}
+          >
+            {isRefreshingModels ? <T>Refreshing…</T> : <T>Refresh models</T>}
           </Button>
         ) : null}
       </div>

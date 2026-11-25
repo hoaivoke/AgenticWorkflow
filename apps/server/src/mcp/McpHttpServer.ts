@@ -63,6 +63,8 @@ import * as ThemeHandlers from "./toolkits/theme/handlers.ts";
 import { PmToolkit } from "../pm/PmMcpTools.ts"; // t3code-pm:
 import * as PmMcpHandlers from "../pm/PmMcpHandlers.ts"; // t3code-pm:
 import * as PmLayer from "../pm/PmLayer.ts"; // t3code-pm:
+import { SwarmToolkit } from "../swarm/SwarmMcpTools.ts";
+import * as SwarmMcpHandlers from "../swarm/SwarmMcpHandlers.ts";
 import { ProjectToolkit } from "./toolkits/project/tools.ts";
 import * as ProjectHandlers from "./toolkits/project/handlers.ts";
 import { AttachmentToolkit } from "./toolkits/attachment/tools.ts";
@@ -1447,6 +1449,10 @@ const layerPmToolkit = toolkitRegistration(PmToolkit, PmMcpHandlers.layer).pipe(
   Layer.provide(OrchestratorMcpService.layer),
 );
 
+const layerSwarmToolkit = toolkitRegistration(SwarmToolkit, SwarmMcpHandlers.layer).pipe(
+  Layer.provide(PmLayer.layer),
+);
+
 export const layer = layerMcpTransport(
-  Layer.mergeAll(layerTools, layerToolSearch, layerPmToolkit), // t3code-pm:
+  Layer.mergeAll(layerTools, layerToolSearch, layerPmToolkit, layerSwarmToolkit), // t3code-pm:
 );

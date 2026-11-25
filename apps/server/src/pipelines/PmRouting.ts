@@ -93,7 +93,7 @@ export interface RoutedWorker {
 export const routeWorker = Effect.fn("PmRouting.routeWorker")(function* (input: RouteWorkerInput) {
   const pipelines = yield* PipelineService;
   const pmShell = yield* projectOf(input.pm);
-  const { config, problems } = yield* pipelines.configFor(pmShell.projectId);
+  const { config, problems, root } = yield* pipelines.configFor(pmShell.projectId);
   const role = config.roles.get(input.role);
   if (role === undefined) {
     return yield* invalid(
@@ -101,11 +101,14 @@ export const routeWorker = Effect.fn("PmRouting.routeWorker")(function* (input: 
     );
   }
   const problemNote = problems.length === 0 ? "" : ` Ignored config: ${problems.join(" ")}`;
+  const harness = yield* pipelines
+    .resolveHarness(role, root)
+    .pipe(Effect.orElseSucceed(() => undefined));
 
   if (input.modelSelection !== undefined) {
     return {
       modelSelection: input.modelSelection,
-      preamble: renderRoleBrief(role, role.tier),
+      preamble: renderRoleBrief(role, role.tier, harness),
       summary: `Role ${role.name} on ${input.modelSelection.instanceId}/${input.modelSelection.model}, the model you chose.${problemNote}`,
     } satisfies RoutedWorker;
   }
@@ -144,7 +147,7 @@ export const routeWorker = Effect.fn("PmRouting.routeWorker")(function* (input: 
     .join(", ");
   return {
     modelSelection,
-    preamble: renderRoleBrief(resolution.role, resolution.tier),
+    preamble: renderRoleBrief(resolution.role, resolution.tier, harness),
     summary: `Role ${role.name} on ${selection.instanceId}/${selection.model}${effort === "" ? "" : ` (${effort})`}, ${resolution.tier} tier.${resolution.notes.length === 0 ? "" : ` ${resolution.notes.join(" ")}`}${problemNote}`,
   } satisfies RoutedWorker;
 });
@@ -178,6 +181,45 @@ export const rolesText = Effect.fn("PmRouting.rolesText")(function* (pm: string)
   const providers = yield* pipelines.providers;
   const limited = yield* limitedAccounts(pm);
   return renderRoles(config, providers, limited, problems);
+});
+
+/** `pm_run_gates`: execute deterministic check commands without spending an LLM turn. */
+export const runGatesText = Effect.fn("PmRouting.runGatesText")(function* (input: {
+  readonly pm: string;
+  readonly commands?: ReadonlyArray<string> | undefined;
+  readonly stage?: string | undefined;
+  readonly pipeline?: string | undefined;
+  readonly cwd?: string | undefined;
+  readonly runFolder?: string | undefined;
+}) {
+  const pipelines = yield* PipelineService;
+  const shell = yield* projectOf(input.pm);
+  const { config, root } = yield* pipelines.configFor(shell.projectId);
+  if (root === null) {
+    return yield* invalid("This project has no workspace root on disk.");
+  }
+  let commands = input.commands ?? [];
+  if (commands.length === 0 && input.pipeline) {
+    const pipeline = config.pipelines.get(input.pipeline);
+    if (pipeline === undefined) {
+      return yield* invalid(`There is no pipeline "${input.pipeline}".`);
+    }
+    const stageId = input.stage ?? "gates";
+    const stage = pipeline.stages.find((candidate) => candidate.id === stageId);
+    commands = stage?.run ?? [];
+  }
+  if (commands.length === 0) {
+    return yield* invalid(
+      "Pass `commands` (non-empty array) or a `pipeline` whose `gates` stage defines `run` commands.",
+    );
+  }
+  const outcome = yield* pipelines.runGates({
+    commands,
+    workspaceRoot: root,
+    cwd: input.cwd,
+    runFolder: input.runFolder,
+  });
+  return outcome.report;
 });
 
 export interface ScheduleWorkerInput {

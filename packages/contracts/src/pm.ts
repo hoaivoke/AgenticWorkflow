@@ -246,6 +246,74 @@ export const PmT3ImportResult = Schema.Struct({
 });
 export type PmT3ImportResult = typeof PmT3ImportResult.Type;
 
+export const PmSwarmState = Schema.Literals(["active", "done"]);
+export type PmSwarmState = typeof PmSwarmState.Type;
+
+export const PmSwarmMemberState = Schema.Literals(["working", "waiting", "stopped", "killed"]);
+export type PmSwarmMemberState = typeof PmSwarmMemberState.Type;
+
+export const PmSwarmWorkspaceMode = Schema.Literals(["inherit", "worktree"]);
+export type PmSwarmWorkspaceMode = typeof PmSwarmWorkspaceMode.Type;
+
+export const PmSwarm = Schema.Struct({
+  swarmId: Schema.String,
+  projectId: Schema.String,
+  coordinatorThreadId: Schema.String,
+  title: Schema.String,
+  status: PmSwarmState,
+  nextSeq: Schema.Number,
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+});
+export type PmSwarm = typeof PmSwarm.Type;
+
+export const PmSwarmChannel = Schema.Struct({
+  swarmId: Schema.String,
+  name: Schema.String,
+  topic: Schema.String,
+  archived: Schema.Boolean,
+  createdBy: Schema.String,
+  createdAt: Schema.String,
+});
+export type PmSwarmChannel = typeof PmSwarmChannel.Type;
+
+export const PmSwarmMember = Schema.Struct({
+  swarmId: Schema.String,
+  name: Schema.String,
+  threadId: Schema.String,
+  role: Schema.NullOr(Schema.String),
+  workspaceMode: PmSwarmWorkspaceMode,
+  channels: Schema.Array(Schema.String),
+  primaryChannel: Schema.String,
+  addedBy: Schema.String,
+  state: PmSwarmMemberState,
+  waitSinceSeq: Schema.Number,
+  mentionsOnly: Schema.Boolean,
+  createdAt: Schema.String,
+});
+export type PmSwarmMember = typeof PmSwarmMember.Type;
+
+export const PmSwarmPost = Schema.Struct({
+  swarmId: Schema.String,
+  seq: Schema.Number,
+  channel: Schema.String,
+  sender: Schema.String,
+  text: Schema.String,
+  mentions: Schema.Array(Schema.String),
+  createdAt: Schema.String,
+});
+export type PmSwarmPost = typeof PmSwarmPost.Type;
+
+export const PmSwarmBoard = Schema.Struct({
+  swarm: PmSwarm,
+  members: Schema.Array(PmSwarmMember),
+  channels: Schema.Array(PmSwarmChannel),
+  posts: Schema.Array(PmSwarmPost),
+  viewerRole: Schema.Literals(["coordinator", "member"]),
+  viewerName: Schema.String,
+});
+export type PmSwarmBoard = typeof PmSwarmBoard.Type;
+
 const PmRpcError = Schema.Union([PmError, EnvironmentAuthorizationError]);
 const PmTarget = { pm: ThreadId };
 const Ok = Schema.Struct({});
@@ -278,6 +346,8 @@ export const PM_WS_METHODS = {
   t3Status: "pm.t3.status",
   t3SetSync: "pm.t3.setSync",
   t3Import: "pm.t3.import",
+  swarmGet: "pm.swarm.get",
+  swarmPost: "pm.swarm.post",
 } as const;
 
 /** The streaming `pm.*` methods, for the client runtime's subscription factory. */
@@ -437,6 +507,20 @@ export const PmRpcGroup = RpcGroup.make(
     success: PmT3ImportResult,
     error: PmRpcError,
   }),
+  Rpc.make(PM_WS_METHODS.swarmGet, {
+    payload: Schema.Struct({ threadId: ThreadId }),
+    success: Schema.NullOr(PmSwarmBoard),
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.swarmPost, {
+    payload: Schema.Struct({
+      threadId: ThreadId,
+      text: TrimmedNonEmptyString,
+      channel: Schema.optional(TrimmedNonEmptyString),
+    }),
+    success: PmSwarmPost,
+    error: PmRpcError,
+  }),
 );
 
 /** What a client needs before it offers a PM action; the server checks `PM_RPC_SCOPES`. */
@@ -463,6 +547,7 @@ export const PM_CLIENT_GUARDED_RPC_SCOPES = {
   [PM_WS_METHODS.revert]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.t3SetSync]: AuthSettingsWriteScope,
   [PM_WS_METHODS.t3Import]: AuthSettingsWriteScope,
+  [PM_WS_METHODS.swarmPost]: AuthOrchestrationOperateScope,
 } as const;
 
 /** Read methods; with the guarded ones above, every `pm.*` method has exactly one scope. */
@@ -472,4 +557,5 @@ export const PM_READ_RPC_SCOPES = {
   [PM_WS_METHODS.pageGet]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.settingsGet]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.t3Status]: AuthSettingsWriteScope,
+  [PM_WS_METHODS.swarmGet]: AuthOrchestrationReadScope,
 } as const;

@@ -6,6 +6,8 @@ import {
   type ConfigFile,
   type LoadResult,
   type ProviderSnapshot,
+  type ResolvedRoleHarness,
+  type Role,
 } from "@t3tools/pipelines";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -16,6 +18,8 @@ import * as Path from "effect/Path";
 
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import { resolveRoleHarness } from "./HarnessResolver.ts";
+import { runDeterministicGates, type RunGatesResult } from "./PipelineGateRunner.ts";
 
 /** Effort controls go by different ids per provider. */
 const REASONING_IDS = new Set(["effort", "reasoningEffort", "thinkingLevel", "thought_level"]);
@@ -59,6 +63,18 @@ export interface PipelineServiceShape {
   ) => Effect.Effect<LoadResult & { readonly root: string | null }>;
   /** Every provider account the server knows, as the router sees it. */
   readonly providers: Effect.Effect<ReadonlyArray<ProviderSnapshot>>;
+  /** Resolve role skills and context files into a bounded harness packet. */
+  readonly resolveHarness: (
+    role: Role,
+    workspaceRoot: string | null,
+  ) => Effect.Effect<ResolvedRoleHarness>;
+  /** Run deterministic shell checks for a gatekeeper stage without spawning an LLM worker. */
+  readonly runGates: (input: {
+    readonly commands: ReadonlyArray<string>;
+    readonly workspaceRoot: string;
+    readonly cwd?: string | undefined;
+    readonly runFolder?: string | undefined;
+  }) => Effect.Effect<RunGatesResult>;
 }
 
 export class PipelineService extends Context.Service<PipelineService, PipelineServiceShape>()(
@@ -118,7 +134,19 @@ const make = Effect.gen(function* () {
 
   const providers = registry.getProviders.pipe(Effect.map((list) => list.map(toSnapshot)));
 
-  return { configFor, providers } satisfies PipelineServiceShape;
+  const resolveHarness: PipelineServiceShape["resolveHarness"] = (role, workspaceRoot) =>
+    resolveRoleHarness({ role, workspaceRoot }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, path),
+    );
+
+  const runGates: PipelineServiceShape["runGates"] = (input) =>
+    runDeterministicGates(input).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, path),
+    );
+
+  return { configFor, providers, resolveHarness, runGates } satisfies PipelineServiceShape;
 });
 
 export const layer = Layer.effect(PipelineService, make);
@@ -135,4 +163,14 @@ export const layerTest = (input: {
       Effect.sync(() => ({ ...loadPipelineConfig(input.files ?? []), root: null })),
     ),
     providers: Effect.succeed(input.providers ?? []),
+    resolveHarness: Effect.fn("PipelineService.test.resolveHarness")(() => Effect.succeed({})),
+    runGates: Effect.fn("PipelineService.test.runGates")(
+      ({ commands }: Parameters<PipelineServiceShape["runGates"]>[0]) =>
+        Effect.succeed({
+          passed: true,
+          results: commands.map((command) => ({ command, exitCode: 0, summary: "" })),
+          gatesFile: null,
+          report: `PASS (${commands.length}/${commands.length} commands passed)`,
+        }),
+    ),
   });

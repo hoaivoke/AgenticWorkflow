@@ -1195,10 +1195,6 @@ export default function ChatView(props: ChatViewProps) {
     !isServerThread && draftFallback
       ? draftFallback.selection
       : activeProjectSettings.settings.defaultModelSelection;
-  const handleNewThreadInActiveProject = () => {
-    startNewThreadForProject(activeProjectRef, handleNewThread);
-  };
-  const handleNewThreadInActiveProjectStable = useStableCallback(handleNewThreadInActiveProject);
   const projectGroupingSettings = selectProjectGroupingSettings(settings);
   const activeDraftLogicalProjectKey =
     !isServerThread && activeProject
@@ -1931,6 +1927,12 @@ export default function ChatView(props: ChatViewProps) {
 
   const { focusComposer: focusComposerStable, scheduleComposerFocus: scheduleComposerFocusStable } =
     useComposerFocus(composerRef);
+  const handleNewThreadInActiveProject = () => {
+    if (startNewThreadForProject(activeProjectRef, handleNewThread)) {
+      scheduleComposerFocusStable();
+    }
+  };
+  const handleNewThreadInActiveProjectStable = useStableCallback(handleNewThreadInActiveProject);
   const canInterruptRunningThread =
     canOperateThread && deriveCanInterruptRunningThread(activeThread !== undefined, activeRuntime);
   const onInterrupt = async () => {

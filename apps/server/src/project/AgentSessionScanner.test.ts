@@ -122,6 +122,19 @@ const layerScannerTest = (input: ScannerTestInput) =>
               ],
               config: {},
             },
+            // Keeps the default Antigravity instance off the developer's real ~/.gemini.
+            [ProviderInstanceId.make("antigravity")]: {
+              driver: ProviderDriverKind.make("antigravity"),
+              enabled: true,
+              environment: [
+                {
+                  name: "ANTIGRAVITY_CLI_HOME",
+                  value: `${input.claudeHomePath}/antigravity-cli`,
+                  sensitive: false,
+                },
+              ],
+              config: {},
+            },
             ...input.providerInstances,
           },
         }),
@@ -3943,4 +3956,92 @@ describe("parseAgentSessionTranscript", () => {
         : { title: thread.title, texts: thread.messages.map((message) => message.text) },
     ).toEqual(expected);
   });
+
+  it.effect("scans and imports Antigravity SQLite conversation transcripts", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const nowMs = Date.parse("2026-11-25T20:30:00.000Z");
+      yield* TestClock.setTime(nowMs);
+      const claudeHomePath = yield* makeTempDir("t3code-ag-scan-claude-");
+      const codexHomePath = yield* makeTempDir("t3code-ag-scan-codex-");
+      const antigravityHome = path.join(claudeHomePath, "antigravity-cli");
+      const conversationsDir = path.join(antigravityHome, "conversations");
+      const workspace = yield* makeTempDir("t3code-ag-workspace-");
+      yield* fileSystem.makeDirectory(conversationsDir, { recursive: true });
+
+      const varint = (n: number): number[] => {
+        const out: number[] = [];
+        let v = n;
+        while (v >= 0x80) {
+          out.push((v & 0x7f) | 0x80);
+          v = Math.floor(v / 128);
+        }
+        out.push(v);
+        return out;
+      };
+      const fieldBytes = (field: number, data: Uint8Array) =>
+        Uint8Array.from([...varint(field * 8 + 2), ...varint(data.length), ...data]);
+      const fieldStr = (field: number, text: string) =>
+        fieldBytes(field, new TextEncoder().encode(text));
+      const fieldVarint = (field: number, value: number) =>
+        Uint8Array.from([...varint(field * 8), ...varint(value)]);
+      const concat = (...parts: ReadonlyArray<Uint8Array>) => {
+        const out = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
+        let offset = 0;
+        for (const p of parts) {
+          out.set(p, offset);
+          offset += p.length;
+        }
+        return out;
+      };
+
+      const sessionId = "8b3b926d-3678-4100-8b21-c42395d1950b";
+      const dbPath = path.join(conversationsDir, `${sessionId}.db`);
+      const db = new NodeSqlite.DatabaseSync(dbPath);
+      try {
+        db.exec(
+          "CREATE TABLE trajectory_metadata_blob (id TEXT PRIMARY KEY, data BLOB); CREATE TABLE steps (idx INTEGER PRIMARY KEY, step_type INTEGER NOT NULL, step_format INTEGER NOT NULL DEFAULT 0, step_payload BLOB);",
+        );
+        const workspaceUri = `file://${workspace}`;
+        db.prepare("INSERT INTO trajectory_metadata_blob (id, data) VALUES (?, ?)").run(
+          "main",
+          concat(fieldStr(7, workspaceUri)),
+        );
+        const tsMeta = fieldBytes(5, fieldBytes(1, fieldVarint(1, Math.floor(nowMs / 1000))));
+        const userPayload = concat(tsMeta, fieldBytes(19, fieldStr(2, "Build Ragnarok simulator")));
+        const assistantPayload = concat(
+          tsMeta,
+          fieldBytes(20, fieldStr(8, "Implemented the simulator loop.")),
+        );
+        db.prepare(
+          "INSERT INTO steps (idx, step_type, step_format, step_payload) VALUES (?, ?, 0, ?)",
+        ).run(0, 14, userPayload);
+        db.prepare(
+          "INSERT INTO steps (idx, step_type, step_format, step_payload) VALUES (?, ?, 0, ?)",
+        ).run(1, 15, assistantPayload);
+      } finally {
+        db.close();
+      }
+      const seconds = nowMs / 1000;
+      yield* fileSystem.utimes(dbPath, seconds, seconds);
+
+      const scanResult = yield* runScan({ claudeHomePath, codexHomePath });
+      expect(scanResult.candidates.some((c) => c.sources.includes("antigravity"))).toBe(true);
+
+      const threads = yield* runRecentThreads({
+        claudeHomePath,
+        codexHomePath,
+        workspaceRoot: workspace,
+      });
+      expect(threads).toHaveLength(1);
+      expect(threads[0]?.source).toBe("antigravity");
+      expect(threads[0]?.providerSessionId).toBe(sessionId);
+      expect(threads[0]?.title).toBe("Build Ragnarok simulator");
+      expect(threads[0]?.messages.map((m) => [m.role, m.text])).toEqual([
+        ["user", "Build Ragnarok simulator"],
+        ["assistant", "Implemented the simulator loop."],
+      ]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
 });

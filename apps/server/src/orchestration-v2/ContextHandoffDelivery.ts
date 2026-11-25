@@ -14,12 +14,39 @@ import {
 
 // A first word with a second slash is a path, not a command.
 const SLASH_COMMAND = /^\s*\/[^\s/]+(?:\s|$)/u;
+const SWARM_COMMAND = /^\s*\/swarm(?:\s+([\s\S]*))?$/iu;
+
+export function expandSwarmCommandText(text: string): string | null {
+  const match = SWARM_COMMAND.exec(text.trim());
+  if (!match) return null;
+  const goal = (match[1] ?? "").trim();
+  const objective =
+    goal.length > 0
+      ? goal
+      : "Coordinate and execute this task in Swarm mode. Clarify or decompose into specialized worker roles now.";
+  return [
+    "[Swarm Mode Coordinator Brief]",
+    "You are coordinating a multi-agent Swarm in this thread using the Swarm board tools.",
+    "- Swarm tools: `swarm` (actions: `title`, `status`, `models`, `add`, `channel`, `kill`, `done`), `post_message`, `read_board`, `swarm_wait`, plus `pm_pipelines` / `pm_roles` / `pm_run_gates` when available. If using deferred tool discovery, call `tool_search` with `swarm` first.",
+    "- Workflow:",
+    '  1. Set a concise swarm `title`, inspect `swarm(action: "models")`, and spawn specialized workers with `swarm(action: "add", name, role, brief, workspace: "worktree" | "inherit", tasks?, n?)`. Use `workspace: "worktree"` for parallel writers editing files; keep readers/reviewers/verifiers on `inherit`.',
+    "  2. Coordinate on the shared message board with `post_message` (`@<name>`, `@all`, `@#<channel>`) and refer to prior messages by `#seq` rather than repeating them.",
+    "  3. When waiting for workers to finish or report, call `swarm_wait(since)` right before ending your turn to park at zero token cost and auto-wake on `@coordinator` mentions.",
+    '  4. Run `pm_run_gates` (or verify directly) before calling `swarm(action: "done")` and reporting the final result.',
+    "",
+    "User goal:",
+    objective,
+  ].join("\n");
+}
 
 /** Providers only run a native command that opens the prompt, so its turn defers inline context to the next one. */
 export const isSlashCommandMessage = (message: {
   readonly role: string;
   readonly text: string;
-}): boolean => message.role === "user" && SLASH_COMMAND.test(message.text);
+}): boolean =>
+  message.role === "user" &&
+  SLASH_COMMAND.test(message.text) &&
+  expandSwarmCommandText(message.text) === null;
 
 /** The provider prompt for a turn that carries inline context ahead of the user's text. */
 export const withInlineContext = (context: string, userText: string): string =>

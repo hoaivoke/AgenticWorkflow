@@ -40,6 +40,12 @@ export function createPmClient<R, ER>(
     staleTimeMs: 0,
     idleTtlMs: 0,
   });
+  const swarmBoard = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:swarm-board",
+    tag: PM_WS_METHODS.swarmGet,
+    staleTimeMs: 0,
+    idleTtlMs: 30_000,
+  });
   const commands = {
     create: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pm:create",
@@ -133,6 +139,10 @@ export function createPmClient<R, ER>(
       label: "environment-data:pm:t3-import",
       tag: PM_WS_METHODS.t3Import,
     }),
+    swarmPost: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:swarm-post",
+      tag: PM_WS_METHODS.swarmPost,
+    }),
   };
 
   /** Every connected environment's PMs in one index: a thread list's single read. */
@@ -157,5 +167,13 @@ export function createPmClient<R, ER>(
     return index;
   }).pipe(Atom.withLabel("pm-index"));
 
-  return { summaries, threadDetail, settingsQuery, t3StatusQuery, commands, indexAtom };
+  return {
+    summaries,
+    threadDetail,
+    settingsQuery,
+    t3StatusQuery,
+    swarmBoard,
+    commands,
+    indexAtom,
+  };
 }

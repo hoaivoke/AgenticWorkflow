@@ -336,7 +336,9 @@ export const AntigravityDriver: ProviderDriver<
       }).pipe(Effect.provideService(SecureRandom.SecureRandom, random));
       // A custom or PATH executable has no version until it answers initialize.
       const startCompatible = Effect.fn("AntigravityDriver.startCompatible")(function* () {
-        const version = (yield* runtime.initialize()).agentInfo?.version;
+        const version =
+          (yield* runtime.initialize()).agentInfo?.version ??
+          (executable.version === null ? yield* resolveExternalVersion(executable) : null);
         const advisory = version ? yield* installation.compatibility(version) : undefined;
         const refused =
           version &&
@@ -353,7 +355,20 @@ export const AntigravityDriver: ProviderDriver<
         if (refused) {
           return yield* new AcpErrors.AcpTransportError({ detail: refused.detail, cause: refused });
         }
-        return yield* runtime.start();
+        const started = yield* runtime.start();
+        if (!started.initializeResult.agentInfo?.version && version) {
+          return {
+            ...started,
+            initializeResult: {
+              ...started.initializeResult,
+              agentInfo: {
+                ...(started.initializeResult.agentInfo ?? { name: "antigravity-acp" }),
+                version,
+              },
+            },
+          };
+        }
+        return started;
       });
       return {
         ...runtime,
@@ -493,11 +508,45 @@ export const AntigravityDriver: ProviderDriver<
       };
     });
 
+    const resolveExternalVersion = Effect.fn("AntigravityDriver.resolveExternalVersion")(function* (
+      executable: AntigravityInstallation.AntigravityExecutable,
+    ): Effect.fn.Return<string | null> {
+      if (executable.version !== null) return executable.version;
+      const command = ChildProcess.make(executable.executablePath, ["--version"], {
+        env: processEnvironment,
+        extendEnv: false,
+        shell: false,
+      });
+      return yield* Effect.scoped(
+        spawner.spawn(command).pipe(
+          Effect.flatMap((child) =>
+            Effect.gen(function* () {
+              const text = yield* child.stdout.pipe(
+                Stream.decodeText(),
+                Stream.runFold(
+                  () => "",
+                  (acc, chunk) => (acc.length < 256 ? acc + chunk : acc),
+                ),
+              );
+              const exitCode = yield* child.exitCode;
+              if (Number(exitCode) !== 0) return null;
+              const match = /^\d+\.\d+\.\d+(?:[-+.\w]*)?$/u.exec(text.trim());
+              return match ? match[0] : null;
+            }),
+          ),
+        ),
+      ).pipe(
+        Effect.timeoutOption("3 seconds"),
+        Effect.map((value) => Option.getOrElse(value, () => null)),
+        Effect.orElseSucceed(() => null),
+      );
+    });
+
     const publishCatalog = Effect.fn("AntigravityDriver.publishCatalog")(function* (
       started: AcpSessionRuntime.AcpSessionRuntimeStartResult,
       runtime: Pick<
         AcpSessionRuntime.AcpSessionRuntime["Service"],
-        "getEvents" | "drainEvents" | "setModel"
+        "getEvents" | "drainEvents" | "setModel" | "getConfigOptions"
       >,
     ) {
       yield* provider.onSessionStarted(started);
@@ -522,6 +571,10 @@ export const AntigravityDriver: ProviderDriver<
         }
       }
       yield* runtime.drainEvents;
+      const settledConfigOptions = yield* runtime.getConfigOptions;
+      if (antigravityModelOptions(settledConfigOptions).length > 0) {
+        yield* provider.onConfigOptionsUpdated(settledConfigOptions);
+      }
     }, Effect.scoped);
 
     const authFlow: AntigravityAuth = yield* makeAntigravityAuth({

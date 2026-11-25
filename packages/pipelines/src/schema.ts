@@ -67,6 +67,14 @@ export const Role = Schema.Struct({
   /** Overrides the tier map for this role. Tried before nothing else; escalation still uses tiers. */
   candidates: Schema.optional(Schema.Array(Candidate)),
   effort: Schema.optional(Effort),
+  /** Skill names or paths bundled into this role's harness (`SKILL.md`). */
+  skills: Schema.optional(Schema.Array(NonEmpty)),
+  /** Repo-relative context/guideline files loaded into this role's harness. */
+  contextFiles: Schema.optional(Schema.Array(NonEmpty)),
+  /** Scoped MCP toolkits/capabilities recommended or enforced for this role. */
+  toolkits: Schema.optional(Schema.Array(NonEmpty)),
+  /** Expected output artifact path and format for this role. */
+  outputContract: Schema.optional(NonEmpty),
   /** Instructions added to every brief in this role. */
   instructions: NonEmpty,
 });

@@ -731,6 +731,8 @@ interface ProviderInstanceCardProps {
   readonly onRunUpdate?: (() => void) | undefined;
   readonly onInstallRecommended?: (() => void) | undefined;
   readonly isUpdating?: boolean | undefined;
+  readonly onRefreshModels?: (() => void) | undefined;
+  readonly isRefreshingModels?: boolean | undefined;
   readonly onAcceptUrlAuth?: ((action: AcpRegistryUrlAuthAction) => void) | undefined;
   readonly environmentId?: EnvironmentId | undefined;
   readonly secretSources?: ReadonlyArray<SecretSource>;
@@ -802,6 +804,8 @@ export function ProviderInstanceCard({
   onRunUpdate,
   onInstallRecommended,
   isUpdating = false,
+  onRefreshModels,
+  isRefreshingModels = false,
   onAcceptUrlAuth,
   environmentId,
   acpProjects = EMPTY_ACP_PROJECTS,
@@ -1508,6 +1512,8 @@ export function ProviderInstanceCard({
               onFavoriteModelsChange={onFavoriteModelsChange}
               onToggleFavorite={onToggleFavorite}
               onModelOrderChange={onModelOrderChange}
+              onRefreshModels={onRefreshModels}
+              isRefreshingModels={isRefreshingModels}
             />
           </div>
         </SettingsSection>

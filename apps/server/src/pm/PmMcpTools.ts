@@ -254,6 +254,18 @@ const PmPageRetireTool = pmTool(
   { page: TrimmedNonEmptyString },
 );
 
+const PmRunGatesTool = pmTool(
+  "pm_run_gates",
+  "Run deterministic gatekeeper commands (lint, typecheck, tests) directly in the workspace without spawning an LLM worker, and write gates.json.",
+  {
+    commands: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+    pipeline: Schema.optional(TrimmedNonEmptyString),
+    stage: Schema.optional(TrimmedNonEmptyString),
+    cwd: Schema.optional(TrimmedNonEmptyString),
+    run_folder: Schema.optional(TrimmedNonEmptyString),
+  },
+);
+
 export const PmToolkit = Toolkit.make(
   PmGuideTool,
   PmStatusTool,
@@ -280,4 +292,5 @@ export const PmToolkit = Toolkit.make(
   PmWorkerScheduleTool, // pipelines:
   PmPipelinesTool, // pipelines:
   PmRolesTool, // pipelines:
+  PmRunGatesTool, // pipelines:
 );

@@ -167,4 +167,12 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
       ),
     ),
   ),
+  pm_run_gates: McpToolAccess.reads(({ run_folder, ...input }) =>
+    // pipelines:
+    asPm((service, pm) =>
+      PmRouting.runGatesText({ pm, ...input, runFolder: run_folder }).pipe(
+        Effect.flatMap((text) => service.toolResult(pm, () => Effect.succeed(text))),
+      ),
+    ),
+  ),
 });

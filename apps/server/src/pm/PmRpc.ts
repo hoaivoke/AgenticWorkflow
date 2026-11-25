@@ -5,6 +5,7 @@ import * as Stream from "effect/Stream";
 import { PM_WS_METHODS, PmError, PmRpcGroup, RpcScopeAuthorization } from "@t3tools/contracts";
 
 import { RpcInstrumentation } from "../observability/RpcInstrumentation.ts";
+import { SwarmService } from "../swarm/SwarmService.ts";
 
 import { PmService } from "./PmService.ts";
 import { PmT3Import } from "./t3/PmT3Import.ts";
@@ -51,6 +52,8 @@ const unavailableHandlers = PmServerRpcGroup.of({
   [PM_WS_METHODS.t3Status]: refuse,
   [PM_WS_METHODS.t3SetSync]: refuse,
   [PM_WS_METHODS.t3Import]: refuse,
+  [PM_WS_METHODS.swarmGet]: () => Effect.succeed(null),
+  [PM_WS_METHODS.swarmPost]: refuse,
 });
 
 /** Thin transport: each handler calls one PmService method. */
@@ -59,8 +62,11 @@ export const makePmRpcHandlers = Effect.gen(function* () {
   if (Option.isNone(service)) return unavailableHandlers;
   const pm = service.value;
   const t3 = Option.getOrUndefined(yield* Effect.serviceOption(PmT3Import));
+  const swarm = Option.getOrUndefined(yield* Effect.serviceOption(SwarmService));
   const t3Call = <A>(run: (service: PmT3Import["Service"]) => Effect.Effect<A, PmError>) =>
     t3 === undefined ? Effect.fail(missing) : run(t3);
+  const swarmCall = <A>(run: (service: SwarmService["Service"]) => Effect.Effect<A, PmError>) =>
+    swarm === undefined ? Effect.fail(missing) : run(swarm);
   return PmServerRpcGroup.of({
     [PM_WS_METHODS.subscribe]: ({ projectId }) => pm.subscribe(projectId),
     [PM_WS_METHODS.subscribeThread]: ({ pm: thread }) => pm.subscribeThread(thread),
@@ -97,6 +103,10 @@ export const makePmRpcHandlers = Effect.gen(function* () {
     [PM_WS_METHODS.t3SetSync]: ({ enabled }) =>
       t3Call((service) => service.setSyncEnabled(enabled)),
     [PM_WS_METHODS.t3Import]: ({ mode }) => t3Call((service) => service.importThreads(mode)),
+    [PM_WS_METHODS.swarmGet]: ({ threadId }) =>
+      swarm === undefined ? Effect.succeed(null) : swarm.getBoardForThread(threadId),
+    [PM_WS_METHODS.swarmPost]: ({ threadId, text, channel }) =>
+      swarmCall((service) => service.postFromUser(threadId, text, channel)),
   });
 });
 
@@ -104,8 +114,10 @@ export const makePmRpcHandlers = Effect.gen(function* () {
 export const capturePmService = Effect.gen(function* () {
   const service = yield* Effect.serviceOption(PmService);
   const t3 = yield* Effect.serviceOption(PmT3Import);
+  const swarm = yield* Effect.serviceOption(SwarmService);
   return Layer.mergeAll(
     Option.isNone(service) ? Layer.empty : Layer.succeed(PmService, service.value),
     Option.isNone(t3) ? Layer.empty : Layer.succeed(PmT3Import, t3.value),
+    Option.isNone(swarm) ? Layer.empty : Layer.succeed(SwarmService, swarm.value),
   );
 });

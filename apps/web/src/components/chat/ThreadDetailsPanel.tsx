@@ -49,6 +49,7 @@ import {
 } from "./threadDetailsPanelStyles";
 import { Menu, MenuPopup } from "../ui/menu";
 import { pmHiddenSections, PmDetailsSections, usePmThread } from "../../pm/details"; // t3code-pm:
+import { SwarmBoardSection } from "../../pm/SwarmBoard"; // t3code-pm:
 
 interface ThreadDetailsPanelProps extends Pick<
   ComponentProps<typeof ThreadDetailsCard>,
@@ -203,6 +204,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
         };
         return (
           <>
+            <SwarmBoardSection threadRef={activeThreadRef} /* t3code-pm: */ />
             <PmDetailsSections threadRef={activeThreadRef} /* t3code-pm: */ />
             <div className="group/details-items">
               {show.environment || show.openIn || show.scripts ? (
