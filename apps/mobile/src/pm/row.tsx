@@ -162,13 +162,15 @@ function PmRemoteWorkerRow(props: {
   const openRemote = useOpenRemoteWorker();
   const { worker } = props;
   const { computer } = worker;
-  const off = computer.lost !== null || computer.unreachableSince !== null;
+  const unreachable = computer.lost === null && computer.unreachableSince !== null;
+  const off = computer.lost !== null || unreachable;
   const open = () => openRemote(props.viaEnvironmentId, worker);
+  // Unreachable is said by the red computer name alone, so a narrow row keeps the title.
   const status =
     computer.lost !== null
       ? gt("Lost", { $context: "worker status: its computer's link is gone" })
-      : computer.unreachableSince !== null
-        ? gt("Unreachable", { $context: "worker status: its computer does not answer" })
+      : unreachable
+        ? null
         : worker.state === "running"
           ? gt("Working")
           : worker.state === "waiting"
@@ -181,6 +183,9 @@ function PmRemoteWorkerRow(props: {
         title: worker.title,
         computer: computer.label,
       })}
+      accessibilityHint={
+        unreachable ? gt("Unreachable on {computer}", { computer: computer.label }) : undefined
+      }
       className="flex-row items-center gap-2 py-1"
       onPress={open}
     >

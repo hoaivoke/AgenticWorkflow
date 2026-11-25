@@ -364,18 +364,20 @@ function PmRemoteWorkerRow(props: {
     },
     worker.title,
   );
-  const off = worker.computer.lost !== null || worker.computer.unreachableSince !== null;
+  const unreachable = worker.computer.lost === null && worker.computer.unreachableSince !== null;
+  const off = worker.computer.lost !== null || unreachable;
+  const unreachableLabel = gt("Unreachable", {
+    $context: "worker status: its computer does not answer",
+  });
+  // Unreachable is said by the red computer name alone, so a narrow sidebar keeps the title.
   const status =
     worker.computer.lost !== null
       ? {
           label: gt("Lost", { $context: "worker status: its computer's link is gone" }),
           className: "text-destructive-foreground",
         }
-      : worker.computer.unreachableSince !== null
-        ? {
-            label: gt("Unreachable", { $context: "worker status: its computer does not answer" }),
-            className: "text-destructive-foreground",
-          }
+      : unreachable
+        ? null
         : worker.state === "running"
           ? {
               label: gt("Working", { $context: "thread status" }),
@@ -396,15 +398,23 @@ function PmRemoteWorkerRow(props: {
       onClick={() => opener?.open("main")}
     >
       <span className="min-w-0 flex-1 truncate">{worker.title}</span>
-      <span
-        className={cn(
-          "inline-flex min-w-0 max-w-[45%] shrink items-center gap-1 text-2xs",
-          off ? "text-destructive-foreground" : "text-muted-foreground",
-        )}
-      >
-        <MonitorIcon aria-hidden className="size-3 shrink-0" />
-        <span className="truncate">{worker.computer.label}</span>
-      </span>
+      <Tooltip disabled={!unreachable}>
+        <TooltipTrigger
+          render={
+            <span
+              className={cn(
+                "inline-flex min-w-0 max-w-[45%] shrink items-center gap-1 text-2xs",
+                off ? "text-destructive-foreground" : "text-muted-foreground",
+              )}
+            />
+          }
+        >
+          <MonitorIcon aria-hidden className="size-3 shrink-0" />
+          <span className="truncate">{worker.computer.label}</span>
+          {unreachable ? <span className="sr-only">{unreachableLabel}</span> : null}
+        </TooltipTrigger>
+        <TooltipPopup side="top">{unreachableLabel}</TooltipPopup>
+      </Tooltip>
       {status === null ? null : (
         <span className={cn("shrink-0 text-2xs", status.className)}>{status.label}</span>
       )}
