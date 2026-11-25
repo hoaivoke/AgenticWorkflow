@@ -2737,15 +2737,15 @@ export function resolveDesktopRuntimeDependencies(
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
   updateChannel: "latest" | "nightly",
 ) {
-  // t3code-pm: no update feed, so a fork app never follows one; testers install releases by hand.
-  if (pmBuild(true, false)) return undefined;
   const env = yield* Config.all({
     updateRepository: Config.String("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
     githubRepository: Config.String("GITHUB_REPOSITORY").pipe(Config.option),
   });
+  // t3code-pm: no inferred update feed, so a fork app never follows one by accident.
+  // pipelines: a fork that names its own update repository gets in-app updates from it.
   const rawRepo = (
     Option.getOrUndefined(env.updateRepository)?.trim() ||
-    Option.getOrUndefined(env.githubRepository)?.trim() ||
+    pmBuild("", Option.getOrUndefined(env.githubRepository)?.trim()) ||
     ""
   ).trim();
   if (!rawRepo) return undefined;
@@ -2827,8 +2827,15 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   wslRuntimeBundled = false,
   arch?: typeof BuildArch.Type,
 ) {
+  // pipelines: the fork's CI signs its Mac app with a self-signed identity for in-app updates.
+  const pmMacSignIdentity = yield* Config.String("PM_MAC_SIGN_IDENTITY").pipe(Config.option);
   const buildConfig: Record<string, unknown> = {
-    afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
+    afterPack: (yield* Path.Path).join(
+      yield* RepoRoot,
+      platform === "mac" && Option.isSome(pmMacSignIdentity)
+        ? "scripts/pm-mac-self-sign-after-pack.ts"
+        : "scripts/prepare-server-compile-cache.cjs",
+    ),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
     artifactName: pmBuild("PM3code-${version}-${arch}.${ext}", "T3-Code-${version}-${arch}.${ext}"), // t3code-pm:

@@ -30,6 +30,8 @@
         "fixtures/*/*.js",
         "knip-schemas.ts",
         "linux-after-pack.ts",
+        // pipelines: electron-builder loads this hook by path.
+        "pm-mac-self-sign-after-pack.ts",
         "mobile-behavior/run.ts",
         "mobile-native-client.ts",
         // e2e loads its config and the scenarios by path, and starts the app script.

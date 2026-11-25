@@ -1,0 +1,101 @@
+name: Fork Mac release
+
+# pipelines: builds the fork's Apple Silicon app on every push to pm and publishes it as a GitHub
+# release, which the installed app finds through its in-app updater. The app is signed with the
+# fork's self-signed certificate (scripts/pm-create-signing-cert.sh), the same one every time,
+# because macOS only installs an update signed by the identity of the app it replaces.
+
+on:
+  push:
+    branches: [pm]
+  workflow_dispatch:
+
+concurrency:
+  group: fork-mac-release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  mac_arm64:
+    name: Build and publish (Apple Silicon)
+    if: github.repository_owner == 'hoaivoke'
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+
+      - name: Import signing certificate
+        env:
+          CERT_P12: ${{ secrets.PM_MAC_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.PM_MAC_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$CERT_P12" || -z "$CERT_PASSWORD" ]]; then
+            echo "::error::Missing PM_MAC_CERT_P12 or PM_MAC_CERT_PASSWORD. Run scripts/pm-create-signing-cert.sh once on your Mac."
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/pm-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 16)"
+          echo "::add-mask::$keychain_password"
+          printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/pm-signing.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/pm-signing.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/pm-signing.p12"
+          identity="$(security find-identity -p codesigning "$keychain" | awk '/[0-9A-F]{40}/ { print $2; exit }')"
+          if [[ -z "$identity" ]]; then
+            echo "::error::No code-signing identity in PM_MAC_CERT_P12."
+            exit 1
+          fi
+          echo "PM_MAC_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "PM_MAC_SIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Build app
+        env:
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          T3CODE_TELEMETRY_CHANNEL: dev
+        run: |
+          set -euo pipefail
+          version="1.${{ github.run_number }}.0"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          vp run dist:desktop:dmg:arm64 --build-version "$version" --verbose
+
+      # A wrong signature only shows up when an update fails to install, so check it here.
+      - name: Check signature and update manifest
+        run: |
+          set -euo pipefail
+          test -f release/latest-mac.yml
+          unpacked="$RUNNER_TEMP/unpacked"
+          mkdir -p "$unpacked"
+          ditto -x -k release/*-arm64.zip "$unpacked"
+          app="$(ls -d "$unpacked"/*.app)"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          requirement="$(codesign -d -r- "$app" 2>&1)"
+          echo "$requirement"
+          grep -q "certificate leaf" <<<"$requirement"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" \
+            release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml \
+            --target "$GITHUB_SHA" \
+            --title "PM3code $VERSION" \
+            --notes "Built from $GITHUB_SHA. Installed copies update themselves; for a first install, see docs/user/pipelines.md."

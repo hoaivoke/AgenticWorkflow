@@ -186,3 +186,22 @@ Role fields: `name`, `description`, `tier`, `maxTier`, `access`, `multimodal`, `
 - **Usage limits are seen through this PM's workers.** An account counts as limited once one of
   the PM's workers stopped on its limit. Limits hit elsewhere are not seen until then.
 - **No UI yet.** Roles and pipelines are files and tool output; there is no editor or board.
+
+## Installing and updating this fork
+
+Every push to `pm` builds the Apple Silicon app on GitHub and publishes it on the
+repository's Releases page. Installed copies find new releases on their own and
+offer the update like any other app, in **Settings → About**.
+
+The first install is by hand. Download the `.dmg` from the latest release, drag
+PM3code into Applications, then run this once, because the app is signed with the
+fork's own certificate rather than an Apple one:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/PM3code.app
+```
+
+Before the first release, run `scripts/pm-create-signing-cert.sh` once from your
+clone (it needs the GitHub CLI, signed in). It stores the signing certificate as
+repository secrets. Keep that certificate: if you replace it, installed copies
+refuse the next update, and you install that release by hand again.
