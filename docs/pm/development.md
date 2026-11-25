@@ -43,7 +43,8 @@ The free `Replay (dev)` provider has a `pm` scenario that drives the real `pm_*`
 
 The desktop app is **PM3code** (`com.t3codepm.desktop`, URL scheme `t3code-pm`, command
 `t3-pm`). It keeps its data in `~/.t3-pm` and its Electron profile in
-`~/Library/Application Support/t3code-pm`, and has no update feed. Its ids, folders, scheme and command keep the
+`~/Library/Application Support/t3code-pm`. It updates from this repository's GitHub releases
+(`PM_UPDATE_FEED` in `packages/pm/src/identity.ts`), and offers only `pm-v*` tags. Its ids, folders, scheme and command keep the
 older `t3code-pm` spelling on purpose: installs from 0.1.0 and 0.2.0, which were named T3 Code PM,
 keep their data.
 
@@ -59,9 +60,35 @@ T3CODE_DESKTOP_SIGNED=true CSC_NAME=<team ID> T3CODE_DESKTOP_VERSION=<version> v
 another profile. The app is signed with the hardened runtime and
 `scripts/pm-entitlements.mac.plist`, notarized and stapled, then the DMG is signed, notarized and
 stapled too. Unsigned builds stay ad-hoc signed; each one has a new signature, so macOS asks again
-for the "t3code-pm Safe Storage" keychain item after updating to one.
+for the "t3code-pm Safe Storage" keychain item after updating to one. Signed builds share one
+designated requirement (bundle id and team), so updates between them keep the keychain grant.
+Squirrel.Mac also refuses an update signed by another identity, so an ad-hoc build cannot
+update itself at all.
 
 The resource monitor needs Rust 1.95 or newer when building.
+
+## Releasing
+
+Tag `pm-v<version>` and upload these files to the release. The updater reads the newest release
+marked Latest, so publish it as a full release, never a pre-release.
+
+- **macOS**, from the signed local build in `release/`: `PM3code-<version>-arm64.dmg`,
+  `PM3code-<version>-arm64.zip`, `PM3code-<version>-arm64.zip.blockmap` and `latest-mac.yml`.
+  The zip is what installed apps download.
+- **Windows and Linux**, from the `release-assets` artifact of the **PM desktop packages**
+  workflow run: `PM3code-<version>-x64.exe`, its `.blockmap`, `latest.yml`,
+  `PM3code-x86_64.AppImage` and `latest-linux.yml`.
+- **Android**: the APK, unchanged.
+
+Each `latest*.yml` names its version, so every file must come from builds of the same version.
+To try an update before releasing, build a lower and a higher version with
+`T3CODE_DESKTOP_MOCK_UPDATES=true T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT=<port>`, which bakes
+`http://localhost:<port>` into the app instead of GitHub. Serve the higher one's `latest-mac.yml`,
+zip and zip blockmap with `T3CODE_DESKTOP_MOCK_UPDATE_SERVER_ROOT=<folder>
+T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT=<port> vp run start:mock-update-server`, and open the lower
+one unzipped from its zip, outside Applications. The app the update relaunches does not inherit
+your shell, so `launchctl setenv T3CODE_PM_HOME <throwaway>` first (and `unsetenv` after), or it
+opens your real `~/.t3-pm`. Both builds must be signed with the same Developer ID.
 
 ## Building the Android APK
 
@@ -100,7 +127,9 @@ and runs `vp run check:changed` against upstream plus the PM translation and mob
 On a conflict it lists the files and which of them hold `t3code-pm:` hunks: keep upstream's change,
 put the marked lines back, `git add` the files and run the command it prints (`... --continue`),
 which finishes the rebase and then the checks. A failing check may be upstream's own: it says so.
-It never pushes.
+It never pushes. One of its checks, `scripts/pm-protocol-check.sh`, fails when the fork's
+orchestration protocol differs from upstream's: the official apps refuse a server on another
+protocol.
 
 ## Translations
 

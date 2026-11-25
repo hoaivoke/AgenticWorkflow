@@ -8,7 +8,9 @@ import { channelSwitchLabel } from "./sidebar/updateEverything.logic";
 
 export type DesktopUpdateButtonAction = "download" | "install" | "none";
 
-const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "pingdotgg/t3code";
+// t3code-pm: PM3code's own releases, tagged pm-v<version>.
+const DEFAULT_DESKTOP_RELEASE_REPOSITORY = "maddada/pm3code";
+const RELEASE_TAG_PREFIX = "pm-v";
 const GITHUB_REPOSITORY_SEGMENT = /^[A-Za-z0-9._-]+$/u;
 
 function isValidRepositorySegment(value: string | undefined): value is string {
@@ -38,7 +40,7 @@ export function getDesktopUpdateReleaseUrl(
 ): string | null {
   const normalizedVersion = version?.trim();
   if (!normalizedVersion) return null;
-  return `${desktopReleaseRepositoryUrl(repository)}/tag/v${encodeURIComponent(normalizedVersion)}`;
+  return `${desktopReleaseRepositoryUrl(repository)}/tag/${RELEASE_TAG_PREFIX}${encodeURIComponent(normalizedVersion)}`; // t3code-pm:
 }
 
 export function getDesktopUpdateReleaseHistoryUrl(

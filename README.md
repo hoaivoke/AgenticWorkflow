@@ -1,4 +1,3 @@
-
 > [!NOTE]
 > <b>PM3code sends zero telemetry:</b><br/>
 > No analytics, no crash reports, no usage pings and no tracking IDs, from the desktop app, the server, the web app or the Android app. No setting or environment variable turns any of it on. Besides the agents and providers you use, it only makes the few feature calls listed under [Runs beside T3 Code](#runs-beside-t3-code), such as fetching the model list from GitHub.
@@ -95,28 +94,32 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 
 Get the files from the [latest release](https://github.com/maddada/pm3code/releases/latest). Like T3 Code, it needs at least one coding agent installed and signed in, such as Claude Code (`claude auth login`) or Codex (`codex login`).
 
+After installing, the desktop app keeps itself up to date (see [Updates](#updates)).
+
 Releases up to 0.2.0 were called T3 Code PM, and their files and app are named `T3-Code-PM-*` and **T3 Code PM**. Newer ones keep the same data, so updating from them loses nothing. On macOS, delete the old **T3 Code PM** app from Applications after installing **PM3code**.
 
 ### macOS (Apple Silicon)
 
 1. Download `PM3code-<version>-arm64.dmg`, open it, and drag **PM3code** to Applications. It's signed and notarized by Apple, so it opens like any other app.
-2. The first time it starts, macOS asks for the "t3code-pm Safe Storage" keychain item. Choose **Always Allow**.
+2. The first time it starts, macOS asks for the "t3code-pm Safe Storage" keychain item. Choose **Always Allow**. Updates are signed the same way, so macOS doesn't ask again after one.
 
 Releases up to 0.2.1 aren't notarized, so macOS blocks their first open: right-click the app in Applications and choose **Open**, or go to System Settings, Privacy & Security, and click **Open Anyway**.
 
 ### Windows (x64)
 
-1. Download `PM3code-<version>-x64.exe` and run it. The installer isn't signed, so if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
+1. Download `PM3code-<version>-x64.exe` and run it. The installer isn't signed, so if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**. Updates the app downloads itself install without that prompt.
 2. It installs for your user only, into `%LOCALAPPDATA%\Programs\t3code-pm`, and adds **PM3code** to the Start menu. Remove it from Settings, Apps, Installed apps, where it has its own **PM3code** entry.
 
 ### Linux (x64)
 
-Download `PM3code-<version>-x86_64.AppImage`, make it executable, and run it:
+Download `PM3code-x86_64.AppImage` (`PM3code-<version>-x86_64.AppImage` up to 0.2.4), make it executable, and run it:
 
 ```sh
-chmod +x PM3code-*-x86_64.AppImage
-./PM3code-*-x86_64.AppImage
+chmod +x PM3code-*x86_64.AppImage
+./PM3code-*x86_64.AppImage
 ```
+
+Updates replace the AppImage file in place, so keep it somewhere you can write to.
 
 On Ubuntu 22.04 and later, AppImages need FUSE 2 first: `sudo apt install libfuse2t64` (`libfuse2` on 22.04). On first launch it registers its own `t3code-pm://` handler and launcher entry, and never replaces T3 Code's.
 
@@ -127,9 +130,15 @@ On Ubuntu 22.04 and later, AppImages need FUSE 2 first: `sudo apt install libfus
 
 It installs as **PM3code**, next to the official T3 Code app. Then [connect it to your computer](#connect-your-phone).
 
-### iOS
+### iOS, and the official phone apps
 
-There is no iOS app. The official T3 Code iOS app can still connect to a PM3code server; PMs show there as plain threads.
+There is no PM3code iOS app. The official T3 Code apps for iPhone and Android can pair with a PM3code computer over Tailscale or your local network, the same way as [the fork's APK](#connect-your-phone) (QR code, or address and pairing code), and use normal threads. PMs and their workers show there as ordinary threads, with no Inbox or work items. T3 Connect sign-in and push notifications don't work with a PM3code computer.
+
+### Updates
+
+From the release after 0.2.4, the desktop app checks [PM3code's releases](https://github.com/maddada/pm3code/releases) at launch and every four hours. A new version shows on the update button at the bottom of the sidebar: click it to download, and a notice says when **PM3code &lt;version&gt; is ready**. **Restart** installs it; **Later** keeps it on the update button for when you're ready. Check by hand with **PM3code > Check for Updates...** (**Help > Check for Updates...** on Windows and Linux) or Settings, About. Turn the automatic checks off under Settings, Maintenance, Updates, **Check for app updates automatically**.
+
+Installs of 0.2.4 and older don't update themselves: install the next release by hand once. The Android app doesn't update itself either.
 
 ## Runs beside T3 Code
 
@@ -138,8 +147,8 @@ PM3code installs as its own app, with its own name, its own `t3-pm` command, and
 - **Bring your threads over:** quit both apps, then copy `~/.t3/userdata/statev2.sqlite` into `~/.t3-pm/userdata/`.
 - **Go back:** open the official T3 Code. It never saw `~/.t3-pm`, so there is nothing to undo. To take your fork threads with you, copy the same file the other way while both apps are closed. PMs open there as plain threads.
 - **Remove it:** delete the app and `~/.t3-pm`.
-- **Updates:** the app does not update itself. Download new versions from [Releases](https://github.com/maddada/pm3code/releases).
-- **Network:** besides your agents and providers, PM3code fetches the model list and token prices from GitHub, checks your agents' download sites for new versions (turn that off under **Settings > Updates**), and reaches Open VSX only when you browse themes. Links in chats show a generic icon, so no favicon service sees which sites you discuss. Logs and traces stay in files on your machine; nothing is exported over OpenTelemetry, whatever `OTEL_*` or `T3CODE_OTLP_*` variables say.
+- **Updates:** the desktop app updates itself from PM3code's own releases, never T3 Code's. See [Updates](#updates).
+- **Network:** besides your agents and providers, PM3code fetches the model list and token prices from GitHub, checks PM3code's GitHub releases for a new desktop version (only the release files, with no ID; turn it off under Settings, Maintenance, Updates, **Check for app updates automatically**), checks your agents' download sites for new versions (turn that off in the same section), and reaches Open VSX only when you browse themes. Links in chats show a generic icon, so no favicon service sees which sites you discuss. Logs and traces stay in files on your machine; nothing is exported over OpenTelemetry, whatever `OTEL_*` or `T3CODE_OTLP_*` variables say.
 
 A new PM's first turn runs on Claude Opus at high effort. Each later PM starts on the model the previous one used, and you can change a PM's model in its composer.
 

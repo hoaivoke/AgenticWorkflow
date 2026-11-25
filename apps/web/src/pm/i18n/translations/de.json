@@ -45,6 +45,9 @@
   "cf88d57a061f7d1b": "Dieser PM konnte nicht wieder zu einem normalen Thread werden",
   "e13fdf24fd036ef5": "Das ist wieder ein normaler Thread",
   "d9f811c0ac255ec2": "Seine Aufgaben bleiben erhalten. Mach ihn wieder zum PM, um sie wieder aufzunehmen.",
+  "214a7087733ebca5": "Prüft beim Start und alle vier Stunden die GitHub-Releases von PM3code auf eine neue Version. Ausgeschaltet prüft es nur, wenn du „Nach Updates suchen“ wählst.",
+  "2bd0bb12ba801228": "App-Update-Prüfung auf Standard zurücksetzen",
+  "33198f2fa997ae3c": "Automatisch nach App-Updates suchen",
   "4e50997e090e97b4": "Der Auftrag konnte nicht gespeichert werden",
   "47ad76661ee23784": "Projektmanager",
   "58362a9759616ed4": "Auftrag und Anweisungen bearbeiten",
@@ -184,6 +187,7 @@
   "018774e53cb736d6": "pm projektmanager koordinator worker ausschalten einschalten",
   "a6863536d2d27a8a": "pm projektmanager playbook regeln jeder pm",
   "fd95dce0b3e1b10b": "t3 code importieren threads ersetzen projekte einstellungen folgen start",
+  "45295fa57acf4d29": "pm3code desktop app neue version release github automatisch update aus",
   "8e17db509aa7c295": "Projektmanager: Neu",
   "f907da1354531259": "Projektmanager: Posteingang fokussieren",
   "c6f9475559c40162": "PM",
@@ -211,5 +215,12 @@
   "8864d8f92b7de6aa": "Bericht von „{worker}“",
   "0c1b912139183fc5": "Archiviert · {title}",
   "5a72e98e40a3f5f7": "Antworten · {title}",
-  "e5dc18fdd5daef98": "Der Projektmanager wurde informiert."
+  "e5dc18fdd5daef98": "Der Projektmanager wurde informiert.",
+  "9cedd1912bb1ce88": "Update konnte nicht installiert werden",
+  "8c24e88e226fce57": "Installation fehlgeschlagen.",
+  "bf0a43379323e4ed": "PM3code {version} ist bereit",
+  "cba27c93209589c4": "Ein PM3code-Update ist bereit",
+  "d5376f9e69109a25": "Neu starten, um zu aktualisieren.",
+  "91486e2aef3c35a6": "Neu starten",
+  "b0d022fe9d78def7": "Später"
 }

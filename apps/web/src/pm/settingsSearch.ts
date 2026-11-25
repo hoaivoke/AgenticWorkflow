@@ -22,6 +22,12 @@ export const PM_SETTINGS_SEARCH_ITEMS = [
     to: PM_SETTINGS_PATH,
     searchTerms: [msg("t3 code import threads replace projects settings follow launch")],
   },
+  {
+    id: "pm-app-update-checks",
+    title: msg("Check for app updates automatically"),
+    to: "/settings/maintenance",
+    searchTerms: [msg("pm3code desktop app new version release github auto update off")],
+  },
 ] as const;
 
 /** The keybinding's label in Settings, Keybindings. */

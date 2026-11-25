@@ -37,6 +37,7 @@ import {
   MacPasskeySigningConfigurationResolutionError,
   MissingMacPasskeyProvisioningProfileError,
   packWindowsServerAsar,
+  pmRestampFeedFileEntry,
   preflightWindowsDesktopBuild,
   renderMacPasskeyEntitlements,
   resolveMacFileExclusions,
@@ -1974,3 +1975,26 @@ it.effect.skipIf(!symlinksSupported)("preserves relative links when replacing di
     assert.equal(yield* fs.readFileString(path.join(output, app, "Current")), "rebuilt-app");
   }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
 );
+
+// t3code-pm: the stapled DMG's entry changes; the zip Squirrel.Mac installs keeps its own.
+it("restamps only the DMG entry of a mac feed file", () => {
+  const feed = [
+    "version: 0.2.5",
+    "files:",
+    "  - url: PM3code-0.2.5-arm64.zip",
+    "    sha512: zipHash",
+    "    size: 100",
+    "  - url: PM3code-0.2.5-arm64.dmg",
+    "    sha512: oldDmgHash",
+    "    size: 200",
+    "path: PM3code-0.2.5-arm64.zip",
+    "sha512: zipHash",
+    "releaseDate: '2026-11-25T00:00:00.000Z'",
+    "",
+  ].join("\n");
+  assert.equal(
+    pmRestampFeedFileEntry(feed, "PM3code-0.2.5-arm64.dmg", "newDmgHash", 250),
+    feed.replace("oldDmgHash", "newDmgHash").replace("size: 200", "size: 250"),
+  );
+  assert.equal(pmRestampFeedFileEntry(feed, "missing.dmg", "x", 1), feed);
+});

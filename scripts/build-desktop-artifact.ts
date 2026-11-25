@@ -61,7 +61,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { PM_DESKTOP_IDENTITY as PM } from "@t3tools/pm/identity"; // t3code-pm:
+import { PM_DESKTOP_IDENTITY as PM, pmUpdatePublishConfig } from "@t3tools/pm/identity"; // t3code-pm:
 // t3code-pm: fork identity in every build; upstream's tests keep pinning upstream's.
 const pmBuild = <T>(fork: T, upstream: T): T =>
   process.env.VITEST === undefined && process.env.T3CODE_PM_DESKTOP_IDENTITY !== "0"
@@ -2736,9 +2736,10 @@ export function resolveDesktopRuntimeDependencies(
 
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
   updateChannel: "latest" | "nightly",
+  mockUpdates = false,
 ) {
-  // t3code-pm: no update feed, so a fork app never follows one; testers install releases by hand.
-  if (pmBuild(true, false)) return undefined;
+  // t3code-pm: PM3code's own releases, never upstream's or GITHUB_REPOSITORY's.
+  if (pmBuild(true, false)) return pmUpdatePublishConfig(updateChannel, mockUpdates);
   const env = yield* Config.all({
     updateRepository: Config.String("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
     githubRepository: Config.String("GITHUB_REPOSITORY").pipe(Config.option),
@@ -2761,6 +2762,26 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
     ...(updateChannel === "nightly" ? { channel: "nightly" as const } : {}),
   };
 });
+
+// t3code-pm: sets one `files` entry's hash and size in an electron-builder feed file.
+export function pmRestampFeedFileEntry(
+  feed: string,
+  url: string,
+  sha512: string,
+  size: number,
+): string {
+  const lines = feed.split("\n");
+  const start = lines.findIndex((line) => line.trim() === `- url: ${url}`);
+  if (start === -1) return feed;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    if (!/^\s+\w/.test(line) || line.trimStart().startsWith("- ")) break;
+    lines[index] = line
+      .replace(/^(\s+sha512: ).*$/, `$1${sha512}`)
+      .replace(/^(\s+size: ).*$/, `$1${size}`);
+  }
+  return lines.join("\n");
+}
 
 export function resolveDesktopUpdateChannel(version: string): "latest" | "nightly" {
   return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
@@ -2861,7 +2882,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   // Missing publish config infers a GitHub feed from tokens; staging has no repository, so manifest generation would crash.
   buildConfig.publish = null;
   if (!isDesktopPreviewVersion(version)) {
-    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
+    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel, mockUpdates); // t3code-pm:
     if (publishConfig) {
       buildConfig.publish = [publishConfig];
     } else if (mockUpdates) {
@@ -2986,7 +3007,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     if (buildConfig.publish) {
       buildConfig.appImage = {
         artifactName:
-          updateChannel === "nightly" ? "T3-Code-Nightly-${arch}.${ext}" : "T3-Code-${arch}.${ext}",
+          updateChannel === "nightly"
+            ? "T3-Code-Nightly-${arch}.${ext}"
+            : pmBuild("PM3code-${arch}.${ext}", "T3-Code-${arch}.${ext}"), // t3code-pm:
       };
     }
     buildConfig.deb = {
@@ -4201,6 +4224,19 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
           label: `xcrun ${args[0]} ${args[1]} ${entry}`,
           verbose: options.verbose,
         });
+      }
+      // Stapling rewrote the DMG after electron-builder hashed it. Squirrel.Mac installs the zip,
+      // whose entry stays right; the DMG's entry is restamped and its stale blockmap dropped.
+      const feedPath = path.join(stageDistDir, "latest-mac.yml");
+      if (yield* fs.exists(feedPath)) {
+        const bytes = yield* fs.readFile(dmgPath);
+        const sha512 = NodeCrypto.createHash("sha512").update(bytes).digest("base64");
+        const feed = yield* fs.readFileString(feedPath);
+        yield* fs.writeFileString(
+          feedPath,
+          pmRestampFeedFileEntry(feed, entry, sha512, bytes.byteLength),
+        );
+        yield* fs.remove(`${dmgPath}.blockmap`, { force: true });
       }
     }
   }

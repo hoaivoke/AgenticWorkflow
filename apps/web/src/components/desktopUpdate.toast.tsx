@@ -8,6 +8,7 @@ import {
 } from "./desktopUpdate.logic";
 import { m } from "../i18n/messages";
 import { toastManager } from "./ui/toast";
+import { PM_UPDATE_READY_NOTICE, showPmUpdateReadyToast } from "../pm/updateReadyToast"; // t3code-pm:
 
 type DesktopUpdateShell = Pick<DesktopBridge, "openExternal">;
 
@@ -47,9 +48,11 @@ function ReleaseNotesLink({
 }
 
 export function showDesktopUpdateDownloadedToast(
-  shell: DesktopUpdateShell,
+  shell: DesktopUpdateShell & Pick<DesktopBridge, "installUpdate">, // t3code-pm:
   state: DesktopUpdateState,
 ): void {
+  // t3code-pm: PM3code offers Restart and Later right in the notice.
+  if (PM_UPDATE_READY_NOTICE) return showPmUpdateReadyToast(shell, state);
   const releaseUrl = getDesktopUpdateReleaseUrl(getDesktopUpdateDownloadedVersion(state));
   toastManager.add({
     type: "success",

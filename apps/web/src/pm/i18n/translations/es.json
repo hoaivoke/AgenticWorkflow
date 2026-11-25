@@ -45,6 +45,9 @@
   "cf88d57a061f7d1b": "No se pudo volver a convertir este PM en un hilo normal",
   "e13fdf24fd036ef5": "Vuelve a ser un hilo normal",
   "d9f811c0ac255ec2": "Sus tareas se conservan. Vuelve a convertirlo en PM para retomarlos.",
+  "214a7087733ebca5": "Busca una versión nueva en las versiones de PM3code en GitHub al abrirse y cada cuatro horas. Si está desactivado, solo busca cuando eliges Buscar actualizaciones.",
+  "2bd0bb12ba801228": "Restablecer la búsqueda de actualizaciones de la app",
+  "33198f2fa997ae3c": "Buscar actualizaciones de la app automáticamente",
   "4e50997e090e97b4": "No se pudo guardar la misión",
   "47ad76661ee23784": "Gestor de proyecto",
   "58362a9759616ed4": "Editar misión e instrucciones",
@@ -184,6 +187,7 @@
   "018774e53cb736d6": "pm gestor de proyecto coordinador trabajadores desactivar activar",
   "a6863536d2d27a8a": "pm gestor de proyecto manual reglas todos los pm",
   "fd95dce0b3e1b10b": "t3 code importar hilos reemplazar proyectos ajustes seguir inicio",
+  "45295fa57acf4d29": "pm3code escritorio app nueva versión release github actualización automática desactivar",
   "8e17db509aa7c295": "Gestor de proyecto: Nuevo",
   "f907da1354531259": "Gestor de proyecto: Enfocar la bandeja de entrada",
   "c6f9475559c40162": "PM",
@@ -211,5 +215,12 @@
   "8864d8f92b7de6aa": "Informe de «{worker}»",
   "0c1b912139183fc5": "Archivado · {title}",
   "5a72e98e40a3f5f7": "Respuestas · {title}",
-  "e5dc18fdd5daef98": "Se avisó al project manager."
+  "e5dc18fdd5daef98": "Se avisó al project manager.",
+  "9cedd1912bb1ce88": "No se pudo instalar la actualización",
+  "8c24e88e226fce57": "La instalación falló.",
+  "bf0a43379323e4ed": "PM3code {version} está listo",
+  "cba27c93209589c4": "Hay una actualización de PM3code lista",
+  "d5376f9e69109a25": "Reinicia para actualizar.",
+  "91486e2aef3c35a6": "Reiniciar",
+  "b0d022fe9d78def7": "Más tarde"
 }

@@ -1,6 +1,48 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { pmAppName, pmAppNameCatalog } from "./identity.ts";
+import {
+  isPmReleaseTag,
+  pmAppName,
+  pmAppNameCatalog,
+  pmReleaseTagUrl,
+  pmUpdatePublishConfig,
+} from "./identity.ts";
+
+describe("PM3code update feed", () => {
+  it("follows PM3code's own stable GitHub releases", () => {
+    expect(pmUpdatePublishConfig("latest", false)).toEqual({
+      provider: "github",
+      owner: "maddada",
+      repo: "pm3code",
+      releaseType: "release",
+    });
+  });
+
+  it.each([
+    ["nightly", false],
+    ["latest", true],
+  ] as const)("bakes no GitHub feed for channel %s with mock updates %s", (channel, mock) => {
+    expect(pmUpdatePublishConfig(channel, mock)).toBeUndefined();
+  });
+
+  it.each([
+    ["pm-v0.2.5", true],
+    ["pm-v10.0.12", true],
+    ["v0.2.5", false],
+    ["v0.1.10-nightly.20261112.4606", false],
+    ["pm-v0.2.5-nightly.20261112.1", false],
+    ["update-feed", false],
+    [undefined, false],
+  ])("treats %s as a PM3code release: %s", (tag, expected) => {
+    expect(isPmReleaseTag(tag)).toBe(expected);
+  });
+
+  it("links release notes to the pm-v tag", () => {
+    expect(pmReleaseTagUrl("0.2.5")).toBe(
+      "https://github.com/maddada/pm3code/releases/tag/pm-v0.2.5",
+    );
+  });
+});
 
 describe("pmAppName", () => {
   it.each([

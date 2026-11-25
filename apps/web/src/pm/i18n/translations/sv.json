@@ -45,6 +45,9 @@
   "cf88d57a061f7d1b": "Det gick inte att göra PM:en till en vanlig tråd igen",
   "e13fdf24fd036ef5": "Det är en vanlig tråd igen",
   "d9f811c0ac255ec2": "Dess uppgifter finns kvar. Gör den till en PM igen för att ta upp dem.",
+  "214a7087733ebca5": "Söker efter en ny version bland PM3codes GitHub-releaser vid start och var fjärde timme. Avstängd söker den bara när du väljer Sök efter uppdateringar.",
+  "2bd0bb12ba801228": "Återställ sökning efter appuppdateringar",
+  "33198f2fa997ae3c": "Sök efter appuppdateringar automatiskt",
   "4e50997e090e97b4": "Det gick inte att spara uppdraget",
   "47ad76661ee23784": "Projektledare",
   "58362a9759616ed4": "Redigera uppdrag och instruktioner",
@@ -184,6 +187,7 @@
   "018774e53cb736d6": "pm projektledare koordinator arbetare stäng av slå på",
   "a6863536d2d27a8a": "pm projektledare handbok regler varje pm",
   "fd95dce0b3e1b10b": "t3 code importera trådar ersätt projekt inställningar följ start",
+  "45295fa57acf4d29": "pm3code skrivbord app ny version release github automatisk uppdatering av",
   "8e17db509aa7c295": "Projektledare: Ny",
   "f907da1354531259": "Projektledare: Fokusera inkorgen",
   "c6f9475559c40162": "PM",
@@ -211,5 +215,12 @@
   "8864d8f92b7de6aa": "Rapport från ”{worker}”",
   "0c1b912139183fc5": "Arkiverad · {title}",
   "5a72e98e40a3f5f7": "Svar · {title}",
-  "e5dc18fdd5daef98": "Projektledaren fick veta det."
+  "e5dc18fdd5daef98": "Projektledaren fick veta det.",
+  "9cedd1912bb1ce88": "Det gick inte att installera uppdateringen",
+  "8c24e88e226fce57": "Installationen misslyckades.",
+  "bf0a43379323e4ed": "PM3code {version} är klar",
+  "cba27c93209589c4": "En PM3code-uppdatering är klar",
+  "d5376f9e69109a25": "Starta om för att uppdatera.",
+  "91486e2aef3c35a6": "Starta om",
+  "b0d022fe9d78def7": "Senare"
 }

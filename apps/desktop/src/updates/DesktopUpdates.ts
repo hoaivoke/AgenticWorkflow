@@ -37,6 +37,7 @@ import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
+import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts"; // t3code-pm:
 import * as DesktopSshEnvironment from "../ssh/DesktopSshEnvironment.ts";
 import * as DesktopUpdatePolicy from "./DesktopUpdatePolicy.ts";
 import {
@@ -58,7 +59,7 @@ import {
   reduceDesktopUpdateStateOnUpdateAvailable,
   resolveNotAppliedInstallVersion,
 } from "./updateMachine.ts";
-import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
+import { isPmReleaseTag, pmBundleAppName, pmDesktop } from "@t3tools/pm/identity"; // t3code-pm:
 
 const CHANNEL_CHANGE_RETRY_DELAY = Duration.seconds(1);
 const CHANNEL_CHANGE_RETRIES = 30;
@@ -81,6 +82,8 @@ const UpdateInfo = Schema.Struct({
   releaseNotes: Schema.optional(Schema.Unknown),
   releaseName: Schema.optional(Schema.NullOr(Schema.String)),
   releaseDate: Schema.optional(Schema.String),
+  // t3code-pm: set by the GitHub feed, absent from a generic one.
+  tag: Schema.optional(Schema.Unknown),
 });
 
 const DownloadProgressInfo = Schema.Struct({
@@ -392,6 +395,12 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
   const policy = yield* DesktopUpdatePolicy.DesktopUpdatePolicy;
+  // t3code-pm: the user can turn automatic checks off; a check they ask for still runs.
+  const clientSettings = yield* DesktopClientSettings.DesktopClientSettings;
+  const automaticChecksOn = clientSettings.get.pipe(
+    Effect.map(Option.match({ onNone: () => true, onSome: (s) => s.pmAutomaticAppUpdateChecks })),
+    Effect.orElseSucceed(() => true),
+  );
   // Any user can set the mock flag, so it never replaces an administrator's update source.
   const mockUpdates = config.mockUpdates && policy.message === null;
 
@@ -1051,9 +1060,16 @@ export const make = Effect.gen(function* () {
     };
   });
 
+  const automaticCheck = (reason: "startup" | "poll") =>
+    Effect.flatMap(automaticChecksOn, (on) =>
+      on
+        ? checkForUpdates(reason)
+        : logUpdaterInfo("automatic update checks are off", { reason }).pipe(Effect.as(false)),
+    );
+
   const startUpdatePollers: Effect.Effect<void, never, Scope.Scope> = Effect.gen(function* () {
     yield* Effect.sleep(AUTO_UPDATE_STARTUP_DELAY).pipe(
-      Effect.andThen(checkForUpdates("startup")),
+      Effect.andThen(automaticCheck("startup")), // t3code-pm:
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
           return Effect.void;
@@ -1068,7 +1084,7 @@ export const make = Effect.gen(function* () {
       Effect.forkScoped,
     );
     yield* Effect.sleep(AUTO_UPDATE_POLL_INTERVAL).pipe(
-      Effect.andThen(checkForUpdates("poll")),
+      Effect.andThen(automaticCheck("poll")), // t3code-pm:
       Effect.forever,
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
@@ -1092,7 +1108,9 @@ export const make = Effect.gen(function* () {
       Effect.flatMap(
         Effect.fn("desktop.updates.applyUpdateAvailable")(function* (info) {
           const state = yield* Ref.get(updateStateRef);
-          if (!(yield* offerable(info.version, state))) {
+          // t3code-pm: PM3code's repository also holds upstream's tags; only pm-v* releases install.
+          const foreignTag = pmDesktop(info.tag !== undefined && !isPmReleaseTag(info.tag), false);
+          if (foreignTag || !(yield* offerable(info.version, state))) {
             yield* logUpdaterInfo("ignoring update outside the selected channel or its floor", {
               version: info.version,
               channel: state.channel,

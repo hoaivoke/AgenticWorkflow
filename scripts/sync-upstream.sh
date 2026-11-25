@@ -141,6 +141,7 @@ check "fast CI checks on the fork's diff" vp run check:changed "$base"
 check "mobile dependency graph" vp test run apps/mobile/src/dependency-graph.test.ts
 check "PM translation catalogs" node scripts/pm-i18n.ts check
 check "upstream translation catalogs" vp run i18n:check
+check "orchestration protocol matches upstream's" scripts/pm-protocol-check.sh "$base"
 
 backup="$(git for-each-ref --sort=-creatordate --count=1 --format='%(refname:short)' "refs/heads/$branch-before-sync-*")"
 if [[ -n "$backup" ]]; then

@@ -80,6 +80,7 @@ import { useTextGenerationTargets } from "../../textGenerators";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { PM_DEFAULT_THEME } from "../../pm/ghostexTheme";
 import { PM_COLLECTS_USAGE_DATA } from "../../pm/usageData"; // t3code-pm:
+import { PmAppUpdateChecksRow } from "../../pm/appUpdateChecks"; // t3code-pm:
 import { isMacPlatform } from "../../lib/utils";
 import {
   useEnvironmentProviders,
@@ -2376,6 +2377,7 @@ export function MaintenanceSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection id="updates" title={gt("Updates")}>
+        <PmAppUpdateChecksRow /> {/* t3code-pm: */}
         <SettingsRow
           serverScoped
           settingKeys={["enableProviderUpdateChecks"]}

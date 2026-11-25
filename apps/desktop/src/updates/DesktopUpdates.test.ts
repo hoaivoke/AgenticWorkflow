@@ -270,6 +270,25 @@ describe("DesktopUpdates", () => {
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });
 
+  // t3code-pm: the reverse of automatic checks; checking by hand still works.
+  it.effect("skips automatic checks when they are turned off, and still checks by hand", () => {
+    const harness = makeHarness({ automaticAppUpdateChecks: false });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+
+        yield* TestClock.adjust("4 hours");
+        assert.equal(harness.checkCount(), 0);
+
+        const result = yield* updates.check("menu");
+        assert.equal(result.checked, true);
+        assert.equal(harness.checkCount(), 1);
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
   it.effect("checks shortly after startup and then every four hours", () => {
     const harness = makeHarness();
 

@@ -45,6 +45,9 @@
   "cf88d57a061f7d1b": "Could not turn this PM back into a normal thread",
   "e13fdf24fd036ef5": "This is a normal thread again",
   "d9f811c0ac255ec2": "Its items are kept. Make it a PM again to pick them back up.",
+  "214a7087733ebca5": "Check PM3code's GitHub releases for a new version at launch and every four hours. When off, it checks only when you choose Check for Updates.",
+  "2bd0bb12ba801228": "Reset app update checks to default",
+  "33198f2fa997ae3c": "Check for app updates automatically",
   "4e50997e090e97b4": "Could not save the mission",
   "47ad76661ee23784": "Project manager",
   "58362a9759616ed4": "Edit mission and instructions",
@@ -184,6 +187,7 @@
   "018774e53cb736d6": "pm project manager coordinator workers turn off on",
   "a6863536d2d27a8a": "pm project manager playbook rules every pm",
   "fd95dce0b3e1b10b": "t3 code import threads replace projects settings follow launch",
+  "45295fa57acf4d29": "pm3code desktop app new version release github auto update off",
   "8e17db509aa7c295": "Project Manager: New",
   "f907da1354531259": "Project Manager: Focus Inbox",
   "c6f9475559c40162": "PM",
@@ -211,5 +215,12 @@
   "8864d8f92b7de6aa": "Report from \"{worker}\"",
   "0c1b912139183fc5": "Archived · {title}",
   "5a72e98e40a3f5f7": "Answers · {title}",
-  "e5dc18fdd5daef98": "The project manager was told."
+  "e5dc18fdd5daef98": "The project manager was told.",
+  "9cedd1912bb1ce88": "Could not install update",
+  "8c24e88e226fce57": "Install failed.",
+  "bf0a43379323e4ed": "PM3code {version} is ready",
+  "cba27c93209589c4": "A PM3code update is ready",
+  "d5376f9e69109a25": "Restart to update.",
+  "91486e2aef3c35a6": "Restart",
+  "b0d022fe9d78def7": "Later"
 }

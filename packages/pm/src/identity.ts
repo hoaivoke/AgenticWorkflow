@@ -26,6 +26,33 @@ export const PM_DESKTOP_IDENTITY = {
   },
 } as const;
 
+/** The desktop app's update feed: PM3code's own GitHub releases, never upstream's. */
+export const PM_UPDATE_FEED = {
+  provider: "github",
+  owner: "maddada",
+  repo: "pm3code",
+  releaseType: "release",
+} as const;
+
+const PM_RELEASE_TAG = /^pm-v\d+\.\d+\.\d+$/;
+
+/** PM3code tags its releases `pm-v<version>`; the repository also holds upstream's `v*` git tags. */
+export const isPmReleaseTag = (tag: unknown): boolean =>
+  typeof tag === "string" && PM_RELEASE_TAG.test(tag);
+
+export const pmReleaseTagUrl = (version: string): string =>
+  `https://github.com/${PM_UPDATE_FEED.owner}/${PM_UPDATE_FEED.repo}/releases/tag/pm-v${encodeURIComponent(version)}`;
+
+/**
+ * What electron-builder bakes into app-update.yml. PM3code publishes stable releases only, and a
+ * mock-update build follows its local server instead.
+ */
+export const pmUpdatePublishConfig = (
+  channel: "latest" | "nightly",
+  mockUpdates: boolean,
+): typeof PM_UPDATE_FEED | undefined =>
+  channel === "latest" && !mockUpdates ? PM_UPDATE_FEED : undefined;
+
 declare const __T3CODE_PM_DESKTOP_IDENTITY__: boolean | undefined;
 
 /**

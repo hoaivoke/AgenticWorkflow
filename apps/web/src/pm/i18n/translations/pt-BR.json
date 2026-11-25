@@ -45,6 +45,9 @@
   "cf88d57a061f7d1b": "Não foi possível transformar este PM de volta em thread normal",
   "e13fdf24fd036ef5": "Voltou a ser um thread normal",
   "d9f811c0ac255ec2": "Os itens são mantidos. Transforme-o em PM de novo para retomá-los.",
+  "214a7087733ebca5": "Procura uma nova versão nos lançamentos do PM3code no GitHub ao abrir e a cada quatro horas. Desligado, só procura quando você escolhe Verificar atualizações.",
+  "2bd0bb12ba801228": "Redefinir a verificação de atualizações do app",
+  "33198f2fa997ae3c": "Verificar atualizações do app automaticamente",
   "4e50997e090e97b4": "Não foi possível salvar a missão",
   "47ad76661ee23784": "Gerente de projeto",
   "58362a9759616ed4": "Editar missão e instruções",
@@ -184,6 +187,7 @@
   "018774e53cb736d6": "pm gerente de projeto coordenador workers desativar ativar",
   "a6863536d2d27a8a": "pm gerente de projeto manual regras todos os pm",
   "fd95dce0b3e1b10b": "t3 code importar threads substituir projetos configurações acompanhar inicialização",
+  "45295fa57acf4d29": "pm3code desktop app nova versão release github atualização automática desligar",
   "8e17db509aa7c295": "Gerente de projeto: Novo",
   "f907da1354531259": "Gerente de projeto: Focar a caixa de entrada",
   "c6f9475559c40162": "PM",
@@ -211,5 +215,12 @@
   "8864d8f92b7de6aa": "Relatório de \"{worker}\"",
   "0c1b912139183fc5": "Arquivado · {title}",
   "5a72e98e40a3f5f7": "Respostas · {title}",
-  "e5dc18fdd5daef98": "O gerente de projeto foi avisado."
+  "e5dc18fdd5daef98": "O gerente de projeto foi avisado.",
+  "9cedd1912bb1ce88": "Não foi possível instalar a atualização",
+  "8c24e88e226fce57": "A instalação falhou.",
+  "bf0a43379323e4ed": "PM3code {version} está pronto",
+  "cba27c93209589c4": "Uma atualização do PM3code está pronta",
+  "d5376f9e69109a25": "Reinicie para atualizar.",
+  "91486e2aef3c35a6": "Reiniciar",
+  "b0d022fe9d78def7": "Mais tarde"
 }
