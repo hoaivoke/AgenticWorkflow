@@ -43,7 +43,7 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 **An Inbox above the chat box.** The PM's questions (Q1, Q2, ...), its Live pages and its blocked work sit above the chat box, with counts at the top. Pick an answer in one click (the PM's pick has a star), snooze a row, or archive finished to-dos all at once. The Snoozed drawer keeps what you put off, and the Recent drawer below it keeps what the PM finished and what you already answered.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/inbox.png" width="80%" alt="The Inbox above the chat box: counts, two Live pages, two questions with one-click answers, Archive all, and the Snoozed and Recent drawers" />
+  <img src="./docs/pm/screenshots/inbox.png" width="80%" alt="The Inbox above the chat box: counts, then one line per row (two Live pages, two questions with one-click answers and a Details button), Archive all, and the Snoozed and Recent drawers" />
 </p>
 
 **Live pages.** When a question needs more than a button, the PM publishes a page that opens in a pop-up window over the chat. Your choices go straight back to the PM.
@@ -76,7 +76,7 @@ Once you run more than a couple of agent threads, you become the dispatcher. You
 **Make this a PM.** Any thread can become a Project Manager: right-click it in the sidebar, or use the thread menu or the command palette. It keeps its history, agent and model, and has the PM's tools from its next turn. **Turn back into a normal thread** undoes it.
 
 <p align="center">
-  <img src="./docs/pm/screenshots/make-pm.png" width="40%" alt="The sidebar's right-click menu on a thread, with Make this a PM highlighted" />
+  <img src="./docs/pm/screenshots/make-pm.png" width="60%" alt="The sidebar's right-click menu on a thread, every item with its icon, with Make this a PM highlighted" />
 </p>
 
 **Import from T3 Code.** Each time PM3code starts, it adds T3 Code's new projects and copies the settings you haven't changed in PM3code. It reads a copy, so it never writes to `~/.t3`. In Settings, Project managers, you can turn this off, import T3 Code's threads beside yours, or replace yours with them after a backup.
