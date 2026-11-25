@@ -30,6 +30,7 @@ import * as ProjectEnrichment from "../../project/ProjectEnrichmentService.ts";
 import * as ProjectService from "../../project/ProjectService.ts";
 import { migrationManifest, runMigrations } from "../../persistence/Migrations.ts";
 import * as SqlitePersistence from "../../persistence/Sqlite.ts";
+import * as ProviderRegistry from "../../provider/ProviderRegistry.ts"; // pipelines:
 import * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
 import * as WorkspacePaths from "../../workspace/WorkspacePaths.ts";
 import { layerFakes, makeWorld } from "../Pm.testkit.ts";
@@ -89,6 +90,10 @@ const layerPmServer = PmLayer.layer.pipe(
   Layer.provideMerge(Layer.merge(RuntimeLayer.layerEventSink, ProjectionStore.layer)),
   Layer.provideMerge(Layer.merge(GitVcsDriver.layer, WorkspacePaths.layer)),
   Layer.provideMerge(layerFakes(makeWorld())),
+  // pipelines: the router reads providers; this test has none.
+  Layer.provideMerge(
+    Layer.mock(ProviderRegistry.ProviderRegistry)({ getProviders: Effect.succeed([]) }),
+  ),
   Layer.provideMerge(SqlitePersistence.layerMemory),
   Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "pm-t3-import-" })),
   Layer.provideMerge(layerBase),

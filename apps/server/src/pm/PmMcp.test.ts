@@ -9,6 +9,7 @@ import { advertisedJsonSchema } from "../mcp/advertisedJsonSchema.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as PipelineService from "../pipelines/PipelineService.ts"; // pipelines:
 import {
   ASK_DETAIL,
   layerPm,
@@ -44,6 +45,7 @@ const harness = (world: PmWorld) =>
   McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
     Layer.provideMerge(layerPmRemoteHere),
     Layer.provideMerge(layerPm(world)),
+    Layer.provideMerge(PipelineService.layerTest({})), // pipelines:
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 
