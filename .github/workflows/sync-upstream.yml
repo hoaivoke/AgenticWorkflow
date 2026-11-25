@@ -1,5 +1,7 @@
-# Keeps this fork current: merges PM3code (which follows T3 Code nightlies) and, when it merges
-# cleanly, T3 Code main itself, into the `sync/upstream` branch and opens or updates one PR.
+# Keeps this fork on top of PM3code, which follows T3 Code nightlies by rebasing (its history is
+# rewritten on each sync, so merging it would duplicate commits). This fork's own commits are
+# replayed onto PM3code's newest `pm` into `sync/upstream`, checked, and reported in one issue.
+# Running the workflow with "promote" then moves the default branch there (old tip kept).
 name: Sync upstream
 
 on:
@@ -7,14 +9,13 @@ on:
     - cron: "23 7 * * *"
   workflow_dispatch:
     inputs:
-      t3code:
-        description: "Also try T3 Code main directly"
+      promote:
+        description: "Replace the default branch with sync/upstream when it is ready (old tip kept as a branch)"
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
-  pull-requests: write
   issues: write
 
 concurrency:
@@ -24,90 +25,121 @@ concurrency:
 jobs:
   sync:
     if: github.repository_owner == 'hoaivoke'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
-      # gh defaults a fork's PRs and issues to the parent repo; keep everything in this one.
+      # gh defaults a fork's issues and PRs to the parent repo; keep everything in this one.
       GH_REPO: ${{ github.repository }}
       BASE: ${{ github.event.repository.default_branch }}
+      # The PM3code commit the default branch sits on. This fork's commits are the ones after it.
+      MARK: upstream/pm3code
       BRANCH: sync/upstream
-      TRY_T3: ${{ github.event_name == 'schedule' || inputs.t3code }}
+      ISSUE_TITLE: "Upstream sync"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
 
-      - name: Fetch upstreams
+      - name: Setup Vite+
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          install: "false"
+
+      - name: Rebase this fork's commits onto PM3code
+        id: rebase
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add pm3code https://github.com/maddada/pm3code.git
-          git remote add t3code https://github.com/pingdotgg/t3code.git
           git fetch --no-tags pm3code pm
-          git fetch --no-tags t3code main
-          git switch -c "$BRANCH"
-
-      - name: Merge
-        id: merge
-        run: |
+          upstream=$(git rev-parse pm3code/pm)
+          mark=$(git rev-parse "origin/$MARK")
+          echo "upstream=$upstream" >> "$GITHUB_OUTPUT"
           report=report.md
-          : > "$report"
-          merge() {
-            local ref="$1" name="$2"
-            local behind
-            behind=$(git rev-list --count "HEAD..$ref")
-            if [ "$behind" = "0" ]; then
-              echo "- **$name**: already up to date." >> "$report"
-              return 0
+          if [ "$upstream" = "$mark" ]; then
+            echo "state=current" >> "$GITHUB_OUTPUT"
+            echo "PM3code has nothing new since $(git rev-parse --short "$mark")." > "$report"
+            exit 0
+          fi
+          ours=$(git rev-list --count "$mark..origin/$BASE")
+          echo "PM3code moved from \`$(git rev-parse --short "$mark")\` to \`$(git rev-parse --short "$upstream")\` ($(git log -1 --format=%s "$upstream")). Replaying this fork's $ours commits on top." > "$report"
+          git switch -c "$BRANCH" "origin/$BASE"
+          if git rebase --onto "$upstream" "$mark"; then
+            echo "state=rebased" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The lockfile is regenerated rather than merged by hand.
+          rebasing() { [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; }
+          while rebasing; do
+            conflicts=$(git diff --name-only --diff-filter=U)
+            if [ "$conflicts" = "pnpm-lock.yaml" ] \
+              && git checkout --ours pnpm-lock.yaml \
+              && vp install --lockfile-only \
+              && git add pnpm-lock.yaml; then
+              if GIT_EDITOR=true git rebase --continue; then break; fi
+              continue
             fi
-            if git merge --no-edit --no-ff "$ref" -m "chore: merge $name ($(git rev-parse --short "$ref"))"; then
-              echo "- **$name**: merged $behind new commits." >> "$report"
-              return 0
+            {
+              echo
+              echo "**Conflict** replaying \`$(git log -1 --format='%h %s' REBASE_HEAD)\`:"
+              echo "$conflicts" | sed 's/^/- `/; s/$/`/'
+              echo
+              echo "Resolve locally with the steps in docs/operations/upstream-sync.md."
+            } >> "$report"
+            git rebase --abort
+            echo "state=conflict" >> "$GITHUB_OUTPUT"
+            exit 0
+          done
+          echo "state=rebased" >> "$GITHUB_OUTPUT"
+
+      - name: Install
+        if: steps.rebase.outputs.state == 'rebased'
+        run: vp install
+
+      - name: Check this fork's changes on the new base
+        id: check
+        if: steps.rebase.outputs.state == 'rebased'
+        run: |
+          if vp run check:changed pm3code/pm; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "Checks on this fork's changes (\`vp run check:changed\`): **passed**." >> report.md
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "Checks on this fork's changes (\`vp run check:changed\`): **failed**, see the workflow run." >> report.md
+          fi
+
+      - name: Publish sync/upstream
+        if: steps.rebase.outputs.state == 'rebased'
+        run: git push --force origin "$BRANCH"
+
+      - name: Promote
+        id: promote
+        if: inputs.promote && steps.rebase.outputs.state == 'rebased' && steps.check.outputs.ok == 'true'
+        run: |
+          backup="$BASE-before-sync-$(date -u +%Y%m%d-%H%M)"
+          git push origin "origin/$BASE:refs/heads/$backup"
+          git push --force-with-lease="$BASE:$(git rev-parse "origin/$BASE")" origin "$BRANCH:$BASE"
+          git push --force origin "${{ steps.rebase.outputs.upstream }}:refs/heads/$MARK"
+          echo "Promoted: \`$BASE\` now has this fork's commits on PM3code \`$(git rev-parse --short "${{ steps.rebase.outputs.upstream }}")\`. The old tip is the branch \`$backup\`." >> report.md
+
+      - name: Report
+        if: steps.rebase.outputs.state != 'current'
+        run: |
+          {
+            cat report.md
+            echo
+            if [ "${{ steps.promote.outcome }}" != "success" ] && [ "${{ steps.rebase.outputs.state }}" = "rebased" ]; then
+              echo "To take it: Actions, Sync upstream, Run workflow, tick **promote**. Or test the \`$BRANCH\` branch first."
             fi
-            local files
-            files=$(git diff --name-only --diff-filter=U | sed 's/^/  - `/; s/$/`/')
-            git merge --abort
-            echo "- **$name**: $behind new commits, **not merged** (conflicts):" >> "$report"
-            echo "$files" >> "$report"
-            return 1
-          }
-          pm_ok=true
-          merge pm3code/pm "PM3code" || pm_ok=false
-          if [ "$TRY_T3" = "true" ]; then
-            merge t3code/main "T3 Code main" || true
-          fi
-          echo "pm_ok=$pm_ok" >> "$GITHUB_OUTPUT"
-          if [ "$(git rev-list --count "origin/$BASE..HEAD")" = "0" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-          cat "$report"
-
-      - name: Open or update the pull request
-        if: steps.merge.outputs.changed == 'true'
-        run: |
-          git push --force origin "$BRANCH"
-          body=$(printf '%s\n\n%s\n\n%s\n' \
-            "Automated upstream sync. Review the diff, let CI run, then merge." \
-            "$(cat report.md)" \
-            "Pull requests opened by this workflow do not start other workflows. To run CI, close and reopen this PR, or push any commit to \`$BRANCH\`. See docs/operations/upstream-sync.md.")
-          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+            echo
+            echo "[Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > body.md
+          number=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number')
           if [ -n "$number" ]; then
-            gh pr edit "$number" --body "$body"
-          else
-            gh pr create --base "$BASE" --head "$BRANCH" --title "chore: sync upstream" --body "$body"
-          fi
-
-      - name: Flag PM3code conflicts
-        if: steps.merge.outputs.pm_ok == 'false'
-        run: |
-          title="Upstream sync: PM3code does not merge cleanly"
-          body=$(printf '%s\n\n%s\n' "$(cat report.md)" "Resolve by hand or with an agent; see docs/operations/upstream-sync.md.")
-          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --body "$body"
-          else
-            gh issue create --title "$title" --body "$body"
+            gh issue comment "$number" --body-file body.md
+            if [ "${{ steps.promote.outcome }}" = "success" ]; then gh issue close "$number"; fi
+          elif [ "${{ steps.promote.outcome }}" != "success" ]; then
+            gh issue create --title "$ISSUE_TITLE" --body-file body.md
           fi

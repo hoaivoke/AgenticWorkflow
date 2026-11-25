@@ -1,58 +1,61 @@
 # Upstream sync
 
 This repo stacks three layers: T3 Code (`pingdotgg/t3code`), PM3code (`maddada/pm3code`, which adds
-Project Manager threads and follows T3 Code nightlies), and this fork's own work (pipelines and
-roles). All three share git history, so updates arrive as ordinary merges.
+Project Manager threads), and this fork's own commits (pipelines and roles). PM3code follows T3 Code
+nightlies by **rebasing** onto them, so its `pm` branch history is rewritten on each sync. This fork
+follows the same model: its own commits sit on top of PM3code and are replayed onto each new
+PM3code, never merged.
+
+The branch `upstream/pm3code` marks the PM3code commit the default branch sits on. Everything after
+it on `pm` is this fork's.
 
 ## Automatic
 
 `.github/workflows/sync-upstream.yml` runs daily and on demand (Actions, Sync upstream, Run
-workflow). It merges, in order:
+workflow). When PM3code has moved, it:
 
-1. **PM3code `pm`.** The main route for T3 Code updates: PM3code has already resolved the
-   conflicts between T3 Code and its own changes.
-2. **T3 Code `main`**, only when it merges cleanly on top. On 25 Nov 2026 a direct merge hit 13
-   conflicts, all in files PM3code changes, so expect this step to be skipped until PM3code
-   catches up.
+1. replays this fork's commits onto PM3code's newest `pm` as the branch `sync/upstream`,
+   regenerating `pnpm-lock.yaml` when that is the only conflict;
+2. runs `vp run check:changed` for this fork's changes on the new base;
+3. comments on the open "Upstream sync" issue (or opens one) with what moved and whether the checks
+   passed, or with the files that conflicted and the commit that hit them.
 
-Whatever merged goes to the `sync/upstream` branch and one pull request, whose description says
-what merged and which files blocked anything that did not. If PM3code itself does not merge, the
-workflow opens an issue instead.
+It never changes `pm` on a schedule. To take an update, run the workflow with **promote** ticked:
+it keeps the old tip as `pm-before-sync-<date>`, moves `pm` to `sync/upstream`, and moves the
+`upstream/pm3code` marker. Test the `sync/upstream` branch first if the change is large.
 
-One-time setup:
-
-- Actions are off by default on forks: enable them in the repo's Actions tab.
-- Settings, Actions, General, Workflow permissions: turn on **Allow GitHub Actions to create and
-  approve pull requests**.
-- Pull requests opened by the workflow do not trigger CI. Close and reopen the PR, or push a commit
-  to `sync/upstream`, to run it.
+One-time setup: Actions are off by default on forks; enable them in the repo's Actions tab.
 
 ## By hand
 
-```sh
-git remote add pm3code https://github.com/maddada/pm3code.git
-git remote add t3code https://github.com/pingdotgg/t3code.git
-git fetch pm3code pm && git fetch t3code main
+For a conflict the workflow reported:
 
-git switch -c sync/manual pm
-git merge pm3code/pm        # usually clean
-git merge t3code/main       # take T3 Code ahead of PM3code; may conflict
+```sh
+git fetch origin && git remote add pm3code https://github.com/maddada/pm3code.git
+git fetch pm3code pm
+git switch -c sync/manual origin/pm
+git rebase --onto pm3code/pm origin/upstream/pm3code
+# fix the listed files, git add them, git rebase --continue
+vp i && vp run check:changed pm3code/pm
+git push origin origin/pm:refs/heads/pm-before-sync-manual
+git push --force-with-lease=pm:origin/pm origin sync/manual:pm
+git push --force origin pm3code/pm:upstream/pm3code
 ```
 
-On conflicts:
+- `pnpm-lock.yaml`: take PM3code's (`git checkout --ours pnpm-lock.yaml` during a rebase), then
+  `vp install --lockfile-only`.
+- Lines marked `// pipelines:` are this fork's. Keep upstream's change and put the marked lines
+  back.
 
-- `pnpm-lock.yaml`: take either side, then run `vp i` and commit the regenerated lockfile.
-- Files under `apps/server/src/pm/`, `packages/pm/` and anything marked `// t3code-pm:` are
-  PM3code's. Keep upstream's change and re-apply PM3code's marked lines. Waiting for PM3code to
-  merge that T3 Code release is the lower-effort option.
-- Lines marked `// pipelines:` are this fork's. Keep them, adapted to upstream's new code.
+T3 Code changes arrive once PM3code takes them, usually within a day or two. To get one sooner,
+run PM3code's own `scripts/sync-upstream.sh` with a remote pointing at `pingdotgg/t3code`. It rebases
+onto T3 Code `main` and lists the conflicts PM3code's changes cause. The next PM3code sync replaces
+that work, so do it only for a change you need now.
 
-Then run `vp run check:changed pm` and open a PR.
-
-## Keeping merges cheap
+## Keeping syncs cheap
 
 - Put new work in new files and folders (`packages/pipelines`, `apps/server/src/pipelines`).
-- Keep edits to upstream files to a few lines, marked `// pipelines:`, so a conflict shows at once
-  whose line it is.
+- Keep edits to PM3code or T3 Code files to a few lines, marked `// pipelines:`.
 - Never change upstream tables, migrations or wire schemas; add side tables and new fields the way
   `PM_DESIGN.md` describes.
+- Keep this fork's history short: a few commits replay faster and conflict less than many.
