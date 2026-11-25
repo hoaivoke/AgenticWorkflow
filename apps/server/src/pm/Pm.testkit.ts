@@ -1,4 +1,5 @@
 import {
+  EnvironmentId,
   EventId,
   MessageId,
   NodeId,
@@ -18,11 +19,18 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { idleThreadProjection, liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
 import * as ThreadLaunch from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
+import * as PeerForwarding from "../peer/PeerForwarding.ts";
+import * as ProjectService from "../project/ProjectService.ts";
+import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import * as HostResources from "../resourceTelemetry/HostResources.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as PmLayer from "./PmLayer.ts";
+import * as PmRemote from "./PmRemote.ts";
 import * as PmReportWatcher from "./PmReportWatcher.ts";
 
 export const PROJECT = ProjectId.make("project:mcp-test");
@@ -68,6 +76,7 @@ export const layerFakes = (world: PmWorld) =>
   Layer.mergeAll(
     Layer.mock(ThreadManagement.ThreadManagementService)({
       getThreadShell: (threadId) => Effect.sync(() => world.shells.get(threadId) ?? null),
+      listActiveShellIndex: () => Effect.succeed([]),
       listActiveSubagentThreadIds: () =>
         Effect.sync(() =>
           [...world.shells.values()]
@@ -126,6 +135,22 @@ export const layerFakes = (world: PmWorld) =>
 /** PmService, its store and the fakes over the database in context, as one fresh server start. */
 export const layerPm = (world: PmWorld) =>
   PmLayer.layerCore.pipe(Layer.provideMerge(layerFakes(world)));
+
+/** PmRemote without linked computers, for tools that only may name one; needs `layerPm`. */
+export const layerPmRemoteHere = PmRemote.layer.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.mock(PeerForwarding.PeerForwarding)({}),
+      Layer.mock(ServerEnvironment.ServerEnvironment)({
+        getEnvironmentId: Effect.succeed(EnvironmentId.make("environment:pm")),
+      }),
+      Layer.mock(HostResources.HostResources)({}),
+      Layer.mock(ProviderRegistry.ProviderRegistry)({}),
+      Layer.mock(ProjectService.ProjectService)({}),
+      Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({}),
+    ),
+  ),
+);
 
 export const layerPmWithWatcher = (world: PmWorld) =>
   PmReportWatcher.layer.pipe(Layer.provideMerge(layerPm(world)));

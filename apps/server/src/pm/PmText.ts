@@ -52,7 +52,10 @@ export function workerBrief(input: {
   readonly pmTitle: string;
   readonly mission: string;
   readonly instructions: string;
+  /** The linked computer it runs on, when not the project manager's. */
+  readonly computer?: string | undefined;
 }): string {
+  const remote = input.computer !== undefined;
   const lines = [
     input.brief.trim(),
     "",
@@ -62,19 +65,26 @@ export function workerBrief(input: {
   if (input.mission.trim().length > 0) lines.push(`Its mission: ${input.mission.trim()}`);
   if (input.instructions.trim().length > 0)
     lines.push(`Its standing instructions: ${input.instructions.trim()}`);
+  if (remote)
+    lines.push(
+      "",
+      `You run on "${input.computer}", one of the user's other computers. The project manager runs on another computer and shares no files with you: anything it needs goes through git (push your branch when the brief allows it) or your report.`,
+    );
   lines.push(
     "",
     "How to report:",
     "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. PM3code passes it to the project manager.",
     "- Never message the project manager's thread yourself (t3_thread_send or the like).",
-    '- Right after every push, send a short note with `pm_worker_note` ("<commit> <one line on what landed>"), then keep going and still end your turn with the full report.',
+    remote
+      ? "- List every push in your final report (commit and one line on what landed): pm_worker_note does not reach the project manager from here."
+      : '- Right after every push, send a short note with `pm_worker_note` ("<commit> <one line on what landed>"), then keep going and still end your turn with the full report.',
     '- When you need a decision you cannot make, ask it plainly in your final message and stop. Give each question a title that names its subject (never "it" or "this" alone) and a line on what it is about and why: the user reads it in the project manager\'s dock, not in your report.',
     "- When the user must paste, post or run something, put the whole text and its link in the question's description, not only in the report.",
     "- Never ask the user to run or paste a command you can run yourself (setup, connect, sign-in, opening a setting): run it yourself and ask only for the step that needs their hands (Touch ID or fingerprint, clicking Approve, signing in in the browser window that opened). Never approve permission, Keychain, consent, pairing or sign-in prompts for the user, and never type passwords or 2FA.",
     "- Do not merge, push, delete branches or run destructive commands unless this brief asks for it.",
     "- Stop every background job you no longer need before your final report.",
     "- Start your report's sections with markers: ✅ Done, 🧪 Untested, ⚠️ Read this, 🛑 Blocked, ❓ Needs you.",
-    "- If you drove an app or a browser, save a screenshot of every state of the UI as it changes (before, each step, after) and link them in your report. Never tiny: at least 1650x962, so size the window or viewport first. Take none when you did no GUI work.",
+    `- If you drove an app or a browser, save a screenshot of every state of the UI as it changes (before, each step, after) and link them in your report. Never tiny: at least 1650x962, so size the window or viewport first. Take none when you did no GUI work.${remote ? ` Say that the files are on "${input.computer}".` : ""}`,
   );
   return lines.join("\n");
 }

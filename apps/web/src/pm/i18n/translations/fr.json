@@ -1,4 +1,5 @@
 {
+  "c331940627806964": "Exécutants sur d'autres ordinateurs",
   "be73dbe91e0aa28d": "Impossible d’enregistrer le paramètre",
   "102634e85b4b4f00": "Chefs de projet",
   "b7ec071429929aff": "Ajoute des fils chef de projet : ils planifient le travail d’un projet, lancent des fils d’exécution et les suivent. Le désactiver masque toutes les vues, tous les outils et toutes les surveillances PM ; les fils PM s’affichent comme des fils normaux, et rien n’est supprimé.",
@@ -13,6 +14,34 @@
   "f1a6baf0e001d05d": "Enregistrer les ajouts",
   "4c97b527828c55fd": "Guide du PM",
   "166661f94b300f5b": "Terminé",
+  "721a8cb5e8badd58": [
+    "Activé. Un PM peut lancer des exécutants sur les ordinateurs associés dans",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Environnements"
+    },
+    ", selon vos règles, la charge et l'usage restant de chaque ordinateur."
+  ],
+  "82429be60f475dcd": [
+    "Désactivé. Activez Environnements associés dans",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Labs"
+    },
+    " ",
+    "ici et sur l'autre ordinateur, puis associez-les dans",
+    " ",
+    {
+      "t": "Link",
+      "i": 2,
+      "c": "Environnements"
+    },
+    "."
+  ],
   "f6b2ceae51af3eeb": "Impossible de remplacer les fils",
   "621f02232c4b3c1a": "Impossible d'importer les fils",
   "8badd718ea6f6cb3": "Dernier lancement : T3 Code introuvable, rien n'a été lu.",
@@ -81,6 +110,9 @@
   "cff84ea88171b008": "Attend votre réponse",
   "7b022008c76d6606": "Inactif",
   "066644fe3ef88185": "Exécutants",
+  "c8fd7e3542c425da": "Sur {computer}",
+  "8544845f695d8389": "Perdu",
+  "06a9ae26c2f497ef": "Injoignable",
   "6f06cdb0083ab27b": "Impossible d’enregistrer la note de mémoire",
   "2f890e1e55af5ae5": "Mémoire",
   "fdcee4e787fcd70f": "Ajouter une note de mémoire",
@@ -200,6 +232,7 @@
   "099c3fe512452b13": "{items, plural, one {# tâche ouverte} other {# tâches ouvertes}} · {asks, plural, one {# question} other {# questions}} · {workers, plural, one {# exécutant} other {# exécutants}} ({running} actifs)",
   "32ac331a7b1e7efd": "Approbation",
   "a484e4248b460c95": "Saisie",
+  "5aa90feceb4bd10b": "En attente",
   "bba6ddabaa9898e1": "Modifier la mission…",
   "7a8d6cfff5967ba7": "Épingler le PM",
   "c8a41d3cb64b0a6c": "Désépingler le PM",

@@ -12,6 +12,7 @@ import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import {
   ASK_DETAIL,
   layerPm,
+  layerPmRemoteHere,
   makeWorld,
   messagesTo,
   PROJECT,
@@ -22,7 +23,7 @@ import * as PmMcpHandlers from "./PmMcpHandlers.ts";
 import { PmToolkit } from "./PmMcpTools.ts";
 import { PmService } from "./PmService.ts";
 import { PmStore } from "./PmStore.ts";
-import { hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
+import { hiddenUnlessPeerLink, hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
 
 const scopeFor = (threadId: string) => ({
   environmentId: EnvironmentId.make("environment:pm"),
@@ -41,6 +42,7 @@ type ToolName = keyof typeof PmToolkit.tools;
 
 const harness = (world: PmWorld) =>
   McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
+    Layer.provideMerge(layerPmRemoteHere),
     Layer.provideMerge(layerPm(world)),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
@@ -118,6 +120,22 @@ describe("pm_* tool visibility", () => {
         code: "invalid_request",
         message: "Thread thread-plain is not a project manager.",
       });
+
+      // pm_host_status: only another computer's peer link, never a thread or a plain client.
+      const hostStatusVisibleTo = (scope: McpInvocationContext.McpInvocationScope) =>
+        Effect.sync(hiddenUnlessPeerLink).pipe(
+          Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+        );
+      const client = (linked: boolean): McpInvocationContext.McpInvocationScope => ({
+        ...scopeFor(pm),
+        thread: undefined,
+        client: { sessionId: "session", label: "Mac mini", access: "auto", linked },
+      });
+      assert.isTrue(yield* hostStatusVisibleTo(client(true)));
+      assert.isFalse(yield* hostStatusVisibleTo(client(false)));
+      assert.isFalse(yield* hostStatusVisibleTo(scopeFor(pm)));
+      yield* service.setSettings({ enabled: false });
+      assert.isFalse(yield* hostStatusVisibleTo(client(true)));
     }).pipe(Effect.provide(harness(world)));
   });
 });

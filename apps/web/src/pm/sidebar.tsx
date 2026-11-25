@@ -1,4 +1,9 @@
-import type { EnvironmentId, PmSummary, ProjectId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  PmRemoteWorkerSummary,
+  PmSummary,
+  ProjectId,
+} from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/models";
@@ -10,6 +15,7 @@ import {
   ChevronRightIcon,
   ListChecksIcon,
   MessageCircleQuestionIcon,
+  MonitorIcon,
   UsersRoundIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -18,6 +24,7 @@ import { Button } from "../components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 import { cn } from "../lib/utils";
 import { useThreadShells } from "../state/entities";
+import { useLinkedThreadOpener } from "../state/linkedThreadView";
 import { buildThreadRouteParams, isThreadRoutePathname } from "../threadRoutes";
 import { formatRelativeTime } from "../timestampFormat";
 import { createPmAndOpen } from "./actions";
@@ -216,7 +223,11 @@ export const pmWorkerRows = (pm: SidebarThread) => (
 /** A PM's workers, nested under its row as one-line rows that fold with it. */
 function PmWorkerRows(props: { readonly pm: SidebarThread }) {
   const summary = summaryOf(usePmIndex(), props.pm);
-  if (summary === null || summary.workerThreadIds.length === 0) return null;
+  if (
+    summary === null ||
+    (summary.workerThreadIds.length === 0 && (summary.remoteWorkers?.length ?? 0) === 0)
+  )
+    return null;
   return <PmWorkerList pm={props.pm} />;
 }
 
@@ -229,7 +240,7 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
   const key = pmKey(props.pm.environmentId, props.pm.id);
   const [folded, setFolded] = useState(() => foldedPms.has(key));
   const summary = index.pms.get(key);
-  if (summary === undefined || summary.workerThreadIds.length === 0) return null;
+  if (summary === undefined) return null;
   const workers = summary.workerThreadIds
     .map((threadId) =>
       shells.find(
@@ -239,7 +250,9 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
     .filter(
       (shell): shell is EnvironmentThreadShell => shell !== undefined && shell.archivedAt === null,
     );
-  if (workers.length === 0) return null;
+  // t3code-pm: workers on the user's other computers have no shell here; the summary carries them.
+  const remote = summary.remoteWorkers ?? [];
+  if (workers.length === 0 && remote.length === 0) return null;
   const notMoving = new Set<string>(summary.notMovingWorkerThreadIds ?? []);
   const toggle = () => {
     if (folded) foldedPms.delete(key);
@@ -272,13 +285,18 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
           <ChevronDownIcon aria-hidden className="size-3" />
         )}
         <UsersRoundIcon aria-hidden className="size-3 text-primary/80" />
-        {gt("{count, plural, one {# worker} other {# workers}}", { count: workers.length })}
+        {gt("{count, plural, one {# worker} other {# workers}}", {
+          count: workers.length + remote.length,
+        })}
         {folded ? (
           <PmDotStack
-            dots={pmDotStack(
+            dots={pmDotStack([
               // As in Ghostex, a worker not moving after its nudge is the red dot.
-              workers.map((worker) => (notMoving.has(worker.id) ? "blocker" : pmWorkerDot(worker))),
-            )}
+              ...workers.map((worker) =>
+                notMoving.has(worker.id) ? "blocker" : pmWorkerDot(worker),
+              ),
+              ...remote.map(remoteWorkerDot),
+            ])}
           />
         ) : null}
       </button>
@@ -310,7 +328,87 @@ function PmWorkerList(props: { readonly pm: SidebarThread }) {
               </button>
             );
           })}
+      {folded
+        ? null
+        : remote.map((worker) => (
+            <PmRemoteWorkerRow key={worker.threadId} pm={props.pm} worker={worker} />
+          ))}
     </div>
+  );
+}
+
+const remoteWorkerDot = (worker: PmRemoteWorkerSummary): PmWorkerDot =>
+  worker.computer.lost !== null
+    ? "blocker"
+    : worker.computer.unreachableSince !== null
+      ? "idle"
+      : worker.state === "running"
+        ? "working"
+        : worker.state === "waiting"
+          ? "question"
+          : "idle";
+
+/** A worker on another computer: always named with its computer, red while it can't be reached. */
+function PmRemoteWorkerRow(props: {
+  readonly pm: SidebarThread;
+  readonly worker: PmRemoteWorkerSummary;
+}) {
+  const gt = useGT();
+  const { worker } = props;
+  const opener = useLinkedThreadOpener(
+    scopeThreadRef(props.pm.environmentId, props.pm.id),
+    {
+      environmentId: worker.computer.environmentId,
+      threadId: worker.threadId,
+      label: worker.computer.label,
+    },
+    worker.title,
+  );
+  const off = worker.computer.lost !== null || worker.computer.unreachableSince !== null;
+  const status =
+    worker.computer.lost !== null
+      ? {
+          label: gt("Lost", { $context: "worker status: its computer's link is gone" }),
+          className: "text-destructive-foreground",
+        }
+      : worker.computer.unreachableSince !== null
+        ? {
+            label: gt("Unreachable", { $context: "worker status: its computer does not answer" }),
+            className: "text-destructive-foreground",
+          }
+        : worker.state === "running"
+          ? {
+              label: gt("Working", { $context: "thread status" }),
+              className: "text-info-foreground",
+            }
+          : worker.state === "waiting"
+            ? {
+                label: gt("Waiting", { $context: "worker status: waits for an answer" }),
+                className: "text-warning-foreground",
+              }
+            : null;
+  return (
+    <button
+      type="button"
+      data-sidebar-row={pmKey(worker.computer.environmentId, worker.threadId)}
+      data-sidebar-parent={pmKey(props.pm.environmentId, props.pm.id)}
+      className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground/90 hover:bg-accent"
+      onClick={() => opener?.open("main")}
+    >
+      <span className="min-w-0 flex-1 truncate">{worker.title}</span>
+      <span
+        className={cn(
+          "inline-flex min-w-0 max-w-[45%] shrink items-center gap-1 text-2xs",
+          off ? "text-destructive-foreground" : "text-muted-foreground",
+        )}
+      >
+        <MonitorIcon aria-hidden className="size-3 shrink-0" />
+        <span className="truncate">{worker.computer.label}</span>
+      </span>
+      {status === null ? null : (
+        <span className={cn("shrink-0 text-2xs", status.className)}>{status.label}</span>
+      )}
+    </button>
   );
 }
 

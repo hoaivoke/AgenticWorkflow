@@ -1,4 +1,5 @@
 {
+  "c331940627806964": "Workers em outros computadores",
   "be73dbe91e0aa28d": "Não foi possível salvar a configuração",
   "102634e85b4b4f00": "Gerentes de projeto",
   "b7ec071429929aff": "Adiciona threads de gerente de projeto: elas planejam o trabalho em um projeto, iniciam threads de workers e acompanham cada uma. Ao desativar, todas as visualizações, ferramentas e monitores de PM ficam ocultos; as threads de PM aparecem como threads normais, e nada é excluído.",
@@ -13,6 +14,34 @@
   "f1a6baf0e001d05d": "Salvar complementos",
   "4c97b527828c55fd": "Manual do PM",
   "166661f94b300f5b": "Concluído",
+  "721a8cb5e8badd58": [
+    "Ativado. Um PM pode iniciar workers nos computadores que você vinculou em",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Ambientes"
+    },
+    ", segundo suas regras e a carga e o uso restante de cada computador."
+  ],
+  "82429be60f475dcd": [
+    "Desativado. Ative Ambientes vinculados em",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Labs"
+    },
+    " ",
+    "aqui e no outro computador, depois vincule-os em",
+    " ",
+    {
+      "t": "Link",
+      "i": 2,
+      "c": "Ambientes"
+    },
+    "."
+  ],
   "f6b2ceae51af3eeb": "Não foi possível substituir os threads",
   "621f02232c4b3c1a": "Não foi possível importar os threads",
   "8badd718ea6f6cb3": "Última inicialização: o T3 Code não foi encontrado, nada foi lido.",
@@ -81,6 +110,9 @@
   "cff84ea88171b008": "Aguardando sua resposta",
   "7b022008c76d6606": "Ocioso",
   "066644fe3ef88185": "Workers",
+  "c8fd7e3542c425da": "Em {computer}",
+  "8544845f695d8389": "Perdido",
+  "06a9ae26c2f497ef": "Inacessível",
   "6f06cdb0083ab27b": "Não foi possível salvar a nota de memória",
   "2f890e1e55af5ae5": "Memória",
   "fdcee4e787fcd70f": "Adicionar uma nota de memória",
@@ -200,6 +232,7 @@
   "099c3fe512452b13": "{items, plural, one {# item de trabalho aberto} other {# itens de trabalho abertos}} · {asks, plural, one {# pergunta} other {# perguntas}} · {workers, plural, one {# worker} other {# workers}} ({running} em execução)",
   "32ac331a7b1e7efd": "Aprovação",
   "a484e4248b460c95": "Entrada",
+  "5aa90feceb4bd10b": "Aguardando",
   "bba6ddabaa9898e1": "Editar missão…",
   "7a8d6cfff5967ba7": "Fixar PM",
   "c8a41d3cb64b0a6c": "Desafixar PM",

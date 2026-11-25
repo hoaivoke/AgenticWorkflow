@@ -1,4 +1,5 @@
 {
+  "c331940627806964": "Trabajadores en otros ordenadores",
   "be73dbe91e0aa28d": "No se pudo guardar el ajuste",
   "102634e85b4b4f00": "Gestores de proyecto",
   "b7ec071429929aff": "Añade hilos de gestor de proyecto: planifican el trabajo de un proyecto, inician hilos de trabajadores y les hacen seguimiento. Al desactivarlo se ocultan todas las vistas, herramientas y vigilantes de PM; los hilos de PM se muestran como hilos normales y no se elimina nada.",
@@ -13,6 +14,34 @@
   "f1a6baf0e001d05d": "Guardar ajustes",
   "4c97b527828c55fd": "Manual del PM",
   "166661f94b300f5b": "Listo",
+  "721a8cb5e8badd58": [
+    "Activado. Un PM puede iniciar trabajadores en los ordenadores que vinculaste en",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Entornos"
+    },
+    ", según tus reglas y la carga y el uso restante de cada ordenador."
+  ],
+  "82429be60f475dcd": [
+    "Desactivado. Activa Entornos vinculados en",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Experimentos"
+    },
+    " ",
+    "aquí y en el otro ordenador, y vincúlalos en",
+    " ",
+    {
+      "t": "Link",
+      "i": 2,
+      "c": "Entornos"
+    },
+    "."
+  ],
   "f6b2ceae51af3eeb": "No se pudieron reemplazar los hilos",
   "621f02232c4b3c1a": "No se pudieron importar los hilos",
   "8badd718ea6f6cb3": "Último inicio: no se encontró T3 Code, no se leyó nada.",
@@ -81,6 +110,9 @@
   "cff84ea88171b008": "Esperando tu respuesta",
   "7b022008c76d6606": "Inactivo",
   "066644fe3ef88185": "Trabajadores",
+  "c8fd7e3542c425da": "En {computer}",
+  "8544845f695d8389": "Perdido",
+  "06a9ae26c2f497ef": "Inaccesible",
   "6f06cdb0083ab27b": "No se pudo guardar la nota de memoria",
   "2f890e1e55af5ae5": "Memoria",
   "fdcee4e787fcd70f": "Añadir una nota de memoria",
@@ -200,6 +232,7 @@
   "099c3fe512452b13": "{items, plural, one {# tarea abierta} other {# tareas abiertas}} · {asks, plural, one {# pregunta} other {# preguntas}} · {workers, plural, one {# trabajador} other {# trabajadores}} ({running} en ejecución)",
   "32ac331a7b1e7efd": "Aprobación",
   "a484e4248b460c95": "Entrada",
+  "5aa90feceb4bd10b": "Esperando",
   "bba6ddabaa9898e1": "Editar misión…",
   "7a8d6cfff5967ba7": "Fijar PM",
   "c8a41d3cb64b0a6c": "Desfijar PM",

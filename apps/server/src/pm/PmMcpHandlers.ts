@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { PmToolkit } from "./PmMcpTools.ts";
+import { PmRemote } from "./PmRemote.ts";
 import { PmService } from "./PmService.ts";
 
 const toFailure = (error: PmError) =>
@@ -25,6 +26,20 @@ const asPm = Effect.fn("PmMcp.asPm")(function* <A>(
   const caller = yield* McpInvocationContext.requireThreadScope(scope, "This tool");
   const service = yield* PmService;
   return yield* run(service, caller.thread.threadId).pipe(Effect.mapError(toFailure));
+});
+
+/** As `asPm`, with the caller's scope for calls over the user's links (t3code-pm). */
+const asPmRemote = Effect.fn("PmMcp.asPmRemote")(function* <A>(
+  run: (
+    remote: PmRemote["Service"],
+    scope: McpInvocationContext.McpInvocationScope,
+    pm: string,
+  ) => Effect.Effect<A, PmError>,
+) {
+  const scope = yield* McpInvocationContext.McpInvocationContext;
+  const caller = yield* McpInvocationContext.requireThreadScope(scope, "This tool");
+  const remote = yield* PmRemote;
+  return yield* run(remote, scope, caller.thread.threadId).pipe(Effect.mapError(toFailure));
 });
 
 export const layer = McpToolAccess.toLayer(PmToolkit, {
@@ -60,11 +75,16 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
   pm_playbook_override: McpToolAccess.writesWithCapability((input) =>
     asPm((service, pm) => service.playbookOverride(pm, input)),
   ),
+  pm_computers: McpToolAccess.reads(() =>
+    asPmRemote((remote, scope, pm) => remote.computers(scope, pm)),
+  ),
   pm_worker_start: McpToolAccess.startsThreads(
     (input) => input,
     (input, { runtimeMode, interactionMode, linkOrigin }) =>
-      asPm((service, pm) =>
-        service.startWorker(pm, {
+      asPmRemote((remote, scope, pm) =>
+        remote.startWorker(scope, pm, {
+          computerName: input.computer,
+          cloneTo: input.clone_to,
           title: input.title,
           brief: input.brief,
           item: input.item,
@@ -77,8 +97,10 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
       ),
     "stamped",
   ),
-  pm_worker_link: McpToolAccess.writesWithCapability(({ thread, item }) =>
-    asPm((service, pm) => service.linkWorker(pm, { thread, item })),
+  pm_worker_link: McpToolAccess.writesWithCapability(({ thread, item, computer }) =>
+    asPmRemote((remote, scope, pm) =>
+      remote.linkWorker(scope, pm, { thread, item, computerName: computer }),
+    ),
   ),
   pm_worker_unlink: McpToolAccess.writesWithCapability(({ thread }) =>
     asPm((service, pm) => service.unlinkWorker(pm, thread)),
@@ -125,5 +147,12 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
   ),
   pm_page_retire: McpToolAccess.writesWithCapability(({ page }) =>
     asPm((service, pm) => service.pageRetire(pm, page)),
+  ),
+  // Numbers and agent names only, and only to a linked computer (the tool is hidden from threads).
+  pm_host_status: McpToolAccess.reads(() =>
+    Effect.gen(function* () {
+      const remote = yield* PmRemote;
+      return yield* remote.hostStatus;
+    }),
   ),
 });

@@ -1,0 +1,35 @@
+{"type": "transcript_start", "provider": "acpRegistry", "protocol": "acp.ndjson-jsonrpc", "version": "1", "scenario": "dev_replay_pm_remote", "metadata": {"generatedBy": "hand-written for the dev replay agent (t3code-pm): a PM starting workers on a linked computer"}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_guide", "arguments": {}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Ready. What should I manage?"}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_set_name", "arguments": {"name": "Pairing fixes"}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_set_mission", "arguments": {"mission": "Fix the pairing screen and check it on Android."}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_computers", "arguments": {}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_item_add", "arguments": {"title": "Fix the pairing screen"}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_worker_start", "arguments": {"computer": "Mac mini", "title": "Fix pairing screen", "brief": "Fix the pairing screen layout on small windows. Report what you changed in your final message.", "item": "W1", "modelSelection": {"instanceId": "devReplay", "model": "multi-turn"}}}}, "afterMs": 600}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "This Mac is busy, so I started **Fix pairing screen** on Mac mini. Its report comes back here."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_status", "arguments": {}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_item_add", "arguments": {"title": "Check pairing on Android"}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_worker_start", "arguments": {"computer": "Mac mini", "title": "Check Android pairing", "brief": "Check the pairing screen on the Android emulator and ask me before changing anything.", "item": "W2", "modelSelection": {"instanceId": "devReplay", "model": "question"}}}}, "afterMs": 600}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "✅ **Done:**\n- Fix pairing screen finished on Mac mini.\n\n🛫 **Kicked off:**\n- Check Android pairing, also on Mac mini."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "❓ **Needs you:**\n- Check Android pairing asks a question on Mac mini: open it there to answer."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "request", "method": "t3/mcp_call", "params": {"name": "pm_status", "arguments": {}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Mac mini answers again; its report caught up. I'll heal the worker if it needs it."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Noted."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Noted."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}
+{"type": "expect_outbound", "frame": {"kind": "request", "method": "session/prompt", "params": "<any>"}}
+{"type": "emit_inbound", "frame": {"kind": "notification", "method": "session/update", "params": {"sessionId": "dev-replay-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Noted."}}}}, "afterMs": 300}
+{"type": "emit_inbound", "frame": {"kind": "response", "method": "session/prompt", "result": {"stopReason": "end_turn"}}}

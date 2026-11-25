@@ -11,10 +11,12 @@ import * as Stream from "effect/Stream";
 import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
+  EnvironmentId,
   MessageId,
   ModelSelection,
   type OrchestrationV2Actor,
   type OrchestrationV2CreationSource,
+  type OrchestrationV2LinkedSender,
   type OrchestrationV2LinkOrigin,
   type OrchestrationV2Notification,
   type OrchestrationV2ThreadLaunchWorkspaceStrategy,
@@ -127,6 +129,40 @@ function workerStateOf(
   return "idle";
 }
 
+/** A worker on another computer, from what its follower last read there. */
+function remoteWorkerStateOf(worker: PmWorkerRow): PmWorkerState {
+  if (worker.resolvedAt !== null) return "resolved";
+  const remote = worker.watch.remote;
+  // Not read there yet: it was just started.
+  if (remote?.status === undefined) return "running";
+  const live = remote.status === "waiting" || RUNNING_STATUSES.has(remote.status);
+  // A run that ended there (its computer restarted) can still list its old request.
+  if (live && ((remote.pendingRequests ?? 0) > 0 || remote.status === "waiting")) return "waiting";
+  if (live) return "running";
+  return "idle";
+}
+
+/** The computer a worker runs on, for clients; null on this one. */
+const computerOf = (worker: PmWorkerRow) =>
+  worker.environmentId === null
+    ? null
+    : {
+        environmentId: EnvironmentId.make(worker.environmentId),
+        label: worker.environmentLabel ?? worker.environmentId,
+        unreachableSince: worker.watch.remote?.unreachableSince ?? null,
+        lost: worker.watch.remote?.lostReason ?? null,
+      };
+
+/** `pm_status`'s words for where a worker runs; nothing for this computer. */
+const computerNote = (worker: PmWorkerRow) => {
+  const computer = computerOf(worker);
+  if (computer === null) return "";
+  if (computer.lost !== null) return ` on "${computer.label}", lost: ${computer.lost}`;
+  if (computer.unreachableSince !== null)
+    return ` on "${computer.label}", not answering since ${computer.unreachableSince}: its reports wait until it answers`;
+  return ` on "${computer.label}"`;
+};
+
 const OWED_OR_NUDGED = new Set<PmReportKind>(["stopped", "restarted", "idle"]);
 
 /** Not moving, as Ghostex means it: still quiet a round after the nudge, or stopped again after it. */
@@ -171,6 +207,19 @@ export interface StartWorkerInput {
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
   readonly linkOrigin?: OrchestrationV2LinkOrigin | undefined;
+  /** Start it on another computer the user linked; omitted for this computer. */
+  readonly computer?: RemoteWorkerLaunch | undefined;
+}
+
+/** How PmRemote starts a worker on a linked computer; the key names the launch so a retry starts it once. */
+export interface RemoteWorkerLaunch {
+  readonly environmentId: string;
+  readonly label: string;
+  readonly launch: (input: {
+    readonly key: string;
+    readonly title: string;
+    readonly text: string;
+  }) => Effect.Effect<{ readonly threadId: string }, PmError>;
 }
 
 export interface ItemUpdateInput {
@@ -264,6 +313,7 @@ const make = Effect.gen(function* () {
     readonly creationSource?: OrchestrationV2CreationSource;
     readonly notification?: OrchestrationV2Notification;
     readonly senderThreadId?: string;
+    readonly linkedSender?: OrchestrationV2LinkedSender;
   }) {
     const messageId = MessageId.make(`message:pm:${input.key}`);
     yield* threads
@@ -281,6 +331,7 @@ const make = Effect.gen(function* () {
         ...(input.senderThreadId === undefined
           ? {}
           : { senderThreadId: ThreadId.make(input.senderThreadId) }),
+        ...(input.linkedSender === undefined ? {} : { linkedSender: input.linkedSender }),
       })
       .pipe(
         Effect.tapError((cause) =>
@@ -864,11 +915,22 @@ const make = Effect.gen(function* () {
     ]);
     const nowMs = yield* Clock.currentTimeMillis;
     const workerStates = yield* Effect.forEach(workers, (worker) =>
-      (worker.resolvedAt !== null ? Effect.succeed(null) : shellOf(worker.workerThreadId)).pipe(
+      (worker.resolvedAt !== null || worker.environmentId !== null
+        ? Effect.succeed(null)
+        : shellOf(worker.workerThreadId)
+      ).pipe(
         Effect.orElseSucceed(() => null),
         Effect.map((shell) => {
-          const state = workerStateOf(worker, shell, nowMs);
-          return { worker, shell, state, notMoving: isNotMoving(worker, shell, state) };
+          // t3code-pm: a worker on another computer has no shell here; its follower's last read stands in.
+          const remote = worker.environmentId !== null;
+          const state = remote ? remoteWorkerStateOf(worker) : workerStateOf(worker, shell, nowMs);
+          return {
+            worker,
+            shell,
+            state,
+            notMoving: remote ? false : isNotMoving(worker, shell, state),
+            title: shell?.title ?? worker.watch.remote?.title ?? worker.workerThreadId,
+          };
         }),
       ),
     );
@@ -936,9 +998,7 @@ const make = Effect.gen(function* () {
         fix: 'Heal it: read the worker with t3_thread_read (see "While workers run").',
         entries: derived.filter((entry) => entry.quietWorkers.length > 0),
         detail: (entry: (typeof derived)[number]) =>
-          entry.quietWorkers
-            .map((worker) => `"${worker.shell?.title ?? worker.worker.workerThreadId}"`)
-            .join(", "),
+          entry.quietWorkers.map((worker) => `"${worker.title}"`).join(", "),
       },
     ].filter((kind) => kind.entries.length > 0);
     if (kinds.length === 0) {
@@ -988,7 +1048,7 @@ const make = Effect.gen(function* () {
       .filter(({ shownStatus }) => shownStatus !== "dropped")
       .map(({ item, shownStatus, steps, waits, quietWorkers }) => {
         const lines = [
-          `${formatItemTag(item.itemNo)} ${item.title}: ${STATUS_LABELS[shownStatus]}${quietWorkers.length > 0 ? ` (quiet: ${quietWorkers.map((entry) => `"${entry.shell?.title ?? entry.worker.workerThreadId}"`).join(", ")} not moving after the nudge)` : ""}`,
+          `${formatItemTag(item.itemNo)} ${item.title}: ${STATUS_LABELS[shownStatus]}${quietWorkers.length > 0 ? ` (quiet: ${quietWorkers.map((entry) => `"${entry.title}"`).join(", ")} not moving after the nudge)` : ""}`,
         ];
         if (item.nowLine) lines.push(`  now: ${item.nowLine}`);
         if (item.doneLine) lines.push(`  done: ${item.doneLine}`);
@@ -1053,8 +1113,8 @@ const make = Effect.gen(function* () {
             : workerStates
                 .filter((entry) => entry.state !== "resolved")
                 .map(
-                  ({ worker, shell: workerShell, state, notMoving }) =>
-                    `- "${workerShell?.title ?? worker.workerThreadId}" (thread ${worker.workerThreadId})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : notMoving && state === "running" ? "running, quiet after the nudge" : notMoving ? "stopped again after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}${worker.lastNote !== null && (worker.lastReportAt === null || (worker.lastNoteAt ?? "") > worker.lastReportAt) ? `; pushed at ${worker.lastNoteAt}: ${firstLine(worker.lastNote, 70)}` : ""}`,
+                  ({ worker, title, state, notMoving }) =>
+                    `- "${title}" (thread ${worker.workerThreadId}${computerNote(worker)})${worker.itemNo === null ? "" : ` on ${formatItemTag(worker.itemNo)}`}: ${state === "limited" ? "paused at a usage limit, carries on after the reset" : notMoving && state === "running" ? "running, quiet after the nudge" : notMoving ? "stopped again after the nudge" : state}${worker.lastReportKind ? `; last report ${worker.lastReportKind} at ${worker.lastReportAt}: ${worker.lastReportLine ?? ""}` : ""}${worker.lastNote !== null && (worker.lastReportAt === null || (worker.lastNoteAt ?? "") > worker.lastReportAt) ? `; pushed at ${worker.lastNoteAt}: ${firstLine(worker.lastNote, 70)}` : ""}`,
                 )),
         ];
         return lines.join("\n");
@@ -1220,6 +1280,34 @@ const make = Effect.gen(function* () {
         const id = yield* newId;
         const workerThreadId = ThreadId.make(`pm-worker-${id}`);
         const at = yield* nowIso;
+        // t3code-pm: on a linked computer the thread id comes from there, so the row follows the
+        // launch; its follower reads state, not events, so a turn that already ended still reports.
+        if (input.computer !== undefined) {
+          const computer = input.computer;
+          const title = input.title.trim();
+          const launched = yield* computer.launch({
+            key: id,
+            title,
+            text: workerBrief({
+              brief: input.brief,
+              pmTitle: pmShell.title,
+              mission: row.mission,
+              instructions: row.instructions,
+              computer: computer.label,
+            }),
+          });
+          yield* store.upsertWorker({
+            workerThreadId: launched.threadId,
+            pmThreadId: pm,
+            itemNo: item?.itemNo ?? null,
+            linkedAt: at,
+            environmentId: computer.environmentId,
+            environmentLabel: computer.label,
+            watch: { remote: { title } },
+          });
+          if (item !== null) yield* store.updateItem(pm, item.itemNo, {}, at);
+          return `Started worker "${title}" on "${computer.label}" (thread ${launched.threadId} there)${item === null ? "" : ` on ${formatItemTag(item.itemNo)}`}. Its reports arrive as messages; end your turn.`;
+        }
         // Linked before launch, so even a turn that ends at once is reported.
         yield* store.upsertWorker({
           workerThreadId,
@@ -1292,6 +1380,39 @@ const make = Effect.gen(function* () {
         yield* syncWorkerTools;
         yield* refreshTools(ThreadId.make(input.thread));
         return `Linked "${shell.title}" (thread ${input.thread}) as your worker. Its reports now come to you.`;
+      }),
+    );
+
+  /** Adopts a thread on a linked computer that PmRemote found there. */
+  const linkRemoteWorker = (
+    pm: string,
+    input: {
+      readonly thread: string;
+      readonly title: string;
+      readonly item?: string | number | undefined;
+      readonly environmentId: string;
+      readonly label: string;
+      readonly skipRunId?: string | undefined;
+    },
+  ) =>
+    tool(pm, () =>
+      Effect.gen(function* () {
+        const item = yield* parseItemRef(pm, input.item);
+        yield* store.upsertWorker({
+          workerThreadId: input.thread,
+          pmThreadId: pm,
+          itemNo: item?.itemNo ?? null,
+          linkedAt: yield* nowIso,
+          environmentId: input.environmentId,
+          environmentLabel: input.label,
+          watch: {
+            remote: {
+              title: input.title,
+              ...(input.skipRunId === undefined ? {} : { skipRunId: input.skipRunId }),
+            },
+          },
+        });
+        return `Linked "${input.title}" (thread ${input.thread} on "${input.label}") as your worker. Its reports now come to you.`;
       }),
     );
 
@@ -1661,6 +1782,12 @@ const make = Effect.gen(function* () {
         lastReportKind: worker.lastReportKind,
         lastReportAt: worker.lastReportAt,
         lastReportLine: worker.lastReportLine,
+        ...(worker.environmentId === null
+          ? {}
+          : {
+              title: worker.watch.remote?.title ?? null,
+              computer: computerOf(worker),
+            }),
       })),
       links: links.map((link) => ({
         number: link.linkNo,
@@ -1724,7 +1851,26 @@ const make = Effect.gen(function* () {
         workers: live.length,
         runningWorkers: running,
         rowState: blocked ? "blocked" : needsYou ? "needs_you" : running > 0 ? "running" : "idle",
-        workerThreadIds: live.map((entry) => ThreadId.make(entry.worker.workerThreadId)),
+        // Threads on this computer only: clients look these up among their own threads.
+        workerThreadIds: live
+          .filter((entry) => entry.worker.environmentId === null)
+          .map((entry) => ThreadId.make(entry.worker.workerThreadId)),
+        remoteWorkers: live.flatMap((entry) => {
+          const computer = computerOf(entry.worker);
+          return computer === null
+            ? []
+            : [
+                {
+                  threadId: ThreadId.make(entry.worker.workerThreadId),
+                  title: entry.title,
+                  state:
+                    entry.state === "running" || entry.state === "waiting"
+                      ? entry.state
+                      : ("idle" as const),
+                  computer,
+                },
+              ];
+        }),
         notMovingWorkerThreadIds: live
           .filter((entry) => entry.notMoving)
           .map((entry) => ThreadId.make(entry.worker.workerThreadId)),
@@ -1805,12 +1951,22 @@ const make = Effect.gen(function* () {
   /** Delivers a claimed report; the command id comes from the report, so a retry is a no-op. */
   const redeliver = Effect.fn("PmService.redeliver")(function* (report: PmReportRow) {
     const at = yield* nowIso;
+    const sender = yield* store.getWorker(report.workerThreadId);
     yield* dispatchMessage({
       threadId: report.pmThreadId,
       key: report.reportId,
       text: report.text,
       createdBy: "agent",
-      senderThreadId: report.workerThreadId,
+      // t3code-pm: a worker on another computer is named with its computer; senderThreadId means here.
+      ...(sender?.environmentId == null
+        ? { senderThreadId: report.workerThreadId }
+        : {
+            linkedSender: {
+              environmentId: EnvironmentId.make(sender.environmentId),
+              threadId: ThreadId.make(report.workerThreadId),
+              title: sender.watch.remote?.title ?? report.workerThreadId,
+            },
+          }),
       notification: {
         source: { kind: "system" },
         outcome: "updated",
@@ -1900,6 +2056,7 @@ const make = Effect.gen(function* () {
     undoDismissAsk,
     startWorker,
     linkWorker,
+    linkRemoteWorker,
     unlinkWorker,
     resolveWorker,
     workerNote,

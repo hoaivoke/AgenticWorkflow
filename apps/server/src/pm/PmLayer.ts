@@ -5,6 +5,7 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as RuntimeLayer from "../orchestration-v2/runtimeLayer.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as ServerActivation from "../serverActivation.ts";
+import * as PmRemote from "./PmRemote.ts";
 import * as PmReportWatcher from "./PmReportWatcher.ts";
 import * as PmService from "./PmService.ts";
 import * as PmStore from "./PmStore.ts";
@@ -30,3 +31,11 @@ export const layerWatcher = Layer.effectDiscard(
     yield* ServerActivation.forkParkedFiber(t3.syncProjectsAtLaunch);
   }),
 ).pipe(Layer.provide(PmReportWatcher.layer), Layer.provide(layer), Layer.provide(Scheduler.layer));
+
+/** Workers on the user's linked computers. One value: /mcp and the followers share one instance. */
+export const layerRemote = PmRemote.layer.pipe(Layer.provide(layer));
+
+/** Follows workers on other computers, including after a restart. Needs the peer links. */
+export const layerRemoteFollowers = Layer.effectDiscard(
+  PmRemote.PmRemote.pipe(Effect.flatMap((remote) => remote.start())),
+);

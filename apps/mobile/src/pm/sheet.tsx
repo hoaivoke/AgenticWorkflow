@@ -22,6 +22,7 @@ import { useThreadShells } from "../state/entities";
 import { useOpenLinkedThread } from "../features/threads/useOpenLinkedThread";
 import { runPm } from "./actions";
 import { PmNotMovingChip } from "./notMovingChip";
+import { useOpenRemoteWorker } from "./row";
 import type { PmSheetTab } from "./pm.logic";
 import { pmCommands, usePmThreadDetail } from "./state";
 
@@ -159,6 +160,7 @@ function WorkersTab(props: { readonly target: Target; readonly detail: PmThreadD
   const gt = useGT();
   const shells = useThreadShells();
   const open = useOpenLinkedThread();
+  const openRemote = useOpenRemoteWorker();
   const titles = new Map(
     shells.map((shell) => [pmKey(shell.environmentId, shell.id), shell.title]),
   );
@@ -173,17 +175,34 @@ function WorkersTab(props: { readonly target: Target; readonly detail: PmThreadD
       key={worker.threadId}
       accessibilityRole="button"
       className="gap-1 rounded-xl border border-border bg-card px-3 py-2.5"
-      onPress={() => open({ environmentId: props.target.environmentId, threadId: worker.threadId })}
+      onPress={() => {
+        const computer = worker.computer ?? null;
+        if (computer === null)
+          open({ environmentId: props.target.environmentId, threadId: worker.threadId });
+        else
+          openRemote(props.target.environmentId, {
+            threadId: worker.threadId,
+            title: worker.title ?? null,
+            computer,
+          });
+      }}
     >
       <View className="flex-row items-center gap-2">
         <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
-          {titles.get(pmKey(props.target.environmentId, worker.threadId)) ?? worker.threadId}
+          {titles.get(pmKey(props.target.environmentId, worker.threadId)) ??
+            worker.title ??
+            worker.threadId}
         </Text>
         {worker.notMoving ? <PmNotMovingChip /> : null}
       </View>
       <Text className="text-xs text-foreground-muted" numberOfLines={2}>
         {[
           worker.itemNo === null ? null : `W${worker.itemNo}`,
+          worker.computer
+            ? worker.computer.unreachableSince !== null
+              ? gt("Unreachable on {computer}", { computer: worker.computer.label })
+              : gt("On {computer}", { computer: worker.computer.label })
+            : null,
           worker.limitResetAt
             ? gt("Resumes after {time}", {
                 time: new Date(worker.limitResetAt).toLocaleTimeString([], {

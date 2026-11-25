@@ -11,8 +11,9 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
+import { PmHostStatus, PmRemote } from "./PmRemote.ts";
 import { PmService } from "./PmService.ts";
-import { hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
+import { hiddenUnlessPeerLink, hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
 
 const shared = {
   failure: OrchestratorMcpFailure,
@@ -25,6 +26,7 @@ const shared = {
     McpInvocationContext.McpInvocationContext,
     ThreadManagementService.ThreadManagementService,
     PmService,
+    PmRemote,
   ],
 };
 
@@ -92,10 +94,24 @@ const PmPlaybookOverrideTool = pmTool(
     number: Schema.optional(Schema.Number),
   },
 );
+const ComputerRef = TrimmedNonEmptyString.annotate({
+  description: 'A computer from pm_computers, by name or id. Omit (or "here") for this computer.',
+});
+const PmComputersTool = pmToolWithoutParameters(
+  "pm_computers",
+  "This computer and every computer the user linked: whether each answers, its access, its agents with their usage, its load, and whether it has this repository. Call before starting work on another computer.",
+);
 const PmWorkerStartTool = pmTool(
   "pm_worker_start",
-  "Start a worker thread in your project with a brief that stands alone. PM3code adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours.",
+  "Start a worker thread in your project with a brief that stands alone. PM3code adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours. `computer` starts it on another computer the user linked.",
   {
+    computer: Schema.optional(ComputerRef),
+    clone_to: Schema.optional(
+      TrimmedNonEmptyString.annotate({
+        description:
+          "Only after the user agreed: clone this repository to this absolute folder on that computer first, when it has no copy.",
+      }),
+    ),
     title: TrimmedNonEmptyString.annotate({ description: "Its task, 3 to 6 words." }),
     brief: TrimmedNonEmptyString.check(Schema.isMaxLength(120000)),
     item: Schema.optional(ItemRef),
@@ -107,8 +123,12 @@ const PmWorkerStartTool = pmTool(
 ).annotate(Tool.Destructive, true);
 const PmWorkerLinkTool = pmTool(
   "pm_worker_link",
-  "Adopt an existing thread in your project as your worker, after the user agreed. Its reports then come to you.",
-  { thread: TrimmedNonEmptyString, item: Schema.optional(ItemRef) },
+  "Adopt an existing thread in your project as your worker, after the user agreed. Its reports then come to you. `computer` for a thread on another computer the user linked.",
+  {
+    thread: TrimmedNonEmptyString,
+    item: Schema.optional(ItemRef),
+    computer: Schema.optional(ComputerRef),
+  },
 );
 const PmWorkerUnlinkTool = pmTool(
   "pm_worker_unlink",
@@ -179,6 +199,21 @@ const PmWorkerNoteTool = Tool.make("pm_worker_note", {
     'Right after every push, tell your project manager in one line what landed ("<commit> <what landed>"), then keep working and still end your turn with your full report.',
   parameters: Schema.Struct({ note: Schema.String }),
 }).annotate(McpSchema.EnabledWhen, hiddenUnlessPmWorker);
+
+// t3code-pm: asked by another computer's PM over its link, never by a thread here.
+const PmHostStatusTool = Tool.make("pm_host_status", {
+  description:
+    "This computer's agents (ready, usage windows) and load (CPU, free memory, running threads), for a project manager on a linked computer choosing where to start work.",
+  success: PmHostStatus,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: [McpInvocationContext.McpInvocationContext, PmRemote],
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true)
+  .annotate(McpSchema.EnabledWhen, hiddenUnlessPeerLink);
+
 const PmLinkAddTool = pmTool(
   "pm_link_add",
   "Link an issue, PR or page (full URL) to a work item or worker.",
@@ -215,6 +250,7 @@ export const PmToolkit = Toolkit.make(
   PmRememberTool,
   PmForgetTool,
   PmPlaybookOverrideTool,
+  PmComputersTool,
   PmWorkerStartTool,
   PmWorkerLinkTool,
   PmWorkerUnlinkTool,
@@ -230,4 +266,5 @@ export const PmToolkit = Toolkit.make(
   PmLinkAddTool,
   PmPageShowTool,
   PmPageRetireTool,
+  PmHostStatusTool,
 );

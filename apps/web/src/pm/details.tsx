@@ -36,6 +36,7 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { cn } from "../lib/utils";
 import { useThreadShells } from "../state/entities";
+import { useLinkedThreadOpener } from "../state/linkedThreadView";
 import { buildThreadRouteParams } from "../threadRoutes";
 import { formatShortTimestamp } from "../timestampFormat";
 import { runPmCommand } from "./actions";
@@ -443,8 +444,6 @@ function PmWorkersSection(props: {
   readonly detail: PmThreadDetail;
 }) {
   const gt = useGT();
-  const navigate = useNavigate();
-  const shells = useThreadShells();
   const resumeLabel = useResumeLabel();
   const workers = props.detail.workers.filter((worker) => worker.state !== "resolved");
   if (workers.length === 0) return null;
@@ -463,49 +462,86 @@ function PmWorkersSection(props: {
       actions={<span className="text-muted-foreground text-xs">{workers.length}</span>}
     >
       <div className="flex flex-col px-1">
-        {workers.map((worker) => {
-          const shell = shells.find(
-            (candidate) =>
-              candidate.environmentId === props.threadRef.environmentId &&
-              candidate.id === worker.threadId,
-          );
-          const ref = scopeThreadRef(props.threadRef.environmentId, worker.threadId);
-          return (
-            <button
-              key={worker.threadId}
-              type="button"
-              className="group/pm-worker flex w-full min-w-0 items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-accent"
-              onClick={() =>
-                void navigate({
-                  to: "/$environmentId/$threadId",
-                  params: buildThreadRouteParams(ref),
-                })
-              }
-            >
-              <span className="min-w-0 flex-1">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate text-sm">{shell?.title ?? worker.threadId}</span>
-                  {worker.notMoving ? <PmNotMovingChip /> : null}
-                </span>
-                <span className="block truncate text-muted-foreground text-xs">
-                  {[
-                    worker.itemNo === null ? null : `W${worker.itemNo}`,
-                    stateLabel(worker),
-                    worker.lastReportLine,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </span>
-              <ArrowUpRightIcon
-                aria-hidden
-                className="mt-0.5 size-3 shrink-0 opacity-0 group-hover/pm-worker:opacity-100"
-              />
-            </button>
-          );
-        })}
+        {workers.map((worker) => (
+          <PmWorkerDetailRow
+            key={worker.threadId}
+            threadRef={props.threadRef}
+            worker={worker}
+            stateLabel={stateLabel(worker)}
+          />
+        ))}
       </div>
     </ThreadDetailsSection>
+  );
+}
+
+/** One worker; a worker on another computer opens there and names its computer (t3code-pm). */
+function PmWorkerDetailRow(props: {
+  readonly threadRef: ThreadRef;
+  readonly worker: PmThreadDetail["workers"][number];
+  readonly stateLabel: string;
+}) {
+  const gt = useGT();
+  const navigate = useNavigate();
+  const shells = useThreadShells();
+  const { worker } = props;
+  const computer = worker.computer ?? null;
+  const shell =
+    computer === null
+      ? shells.find(
+          (candidate) =>
+            candidate.environmentId === props.threadRef.environmentId &&
+            candidate.id === worker.threadId,
+        )
+      : undefined;
+  const title = shell?.title ?? worker.title ?? worker.threadId;
+  const opener = useLinkedThreadOpener(
+    props.threadRef,
+    computer === null
+      ? undefined
+      : { environmentId: computer.environmentId, threadId: worker.threadId, label: computer.label },
+    title,
+  );
+  const off = computer !== null && (computer.unreachableSince !== null || computer.lost !== null);
+  return (
+    <button
+      type="button"
+      className="group/pm-worker flex w-full min-w-0 items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-accent"
+      onClick={() => {
+        if (opener !== null) return opener.open("main");
+        void navigate({
+          to: "/$environmentId/$threadId",
+          params: buildThreadRouteParams(
+            scopeThreadRef(props.threadRef.environmentId, worker.threadId),
+          ),
+        });
+      }}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm">{title}</span>
+          {worker.notMoving ? <PmNotMovingChip /> : null}
+        </span>
+        <span className="block truncate text-muted-foreground text-xs">
+          {[
+            worker.itemNo === null ? null : `W${worker.itemNo}`,
+            computer === null ? null : gt("On {computer}", { computer: computer.label }),
+            off
+              ? computer?.lost !== null
+                ? gt("Lost", { $context: "worker status: its computer's link is gone" })
+                : gt("Unreachable", { $context: "worker status: its computer does not answer" })
+              : props.stateLabel,
+            worker.lastReportLine,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </span>
+      <ArrowUpRightIcon
+        aria-hidden
+        className="mt-0.5 size-3 shrink-0 opacity-0 group-hover/pm-worker:opacity-100"
+      />
+    </button>
   );
 }
 

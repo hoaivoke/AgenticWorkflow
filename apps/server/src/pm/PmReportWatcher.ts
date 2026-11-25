@@ -64,7 +64,8 @@ const make = Effect.gen(function* () {
   const watched = Effect.fn("PmReportWatcher.watched")(function* (workerThreadId: string) {
     if (!(yield* pm.isEnabled)) return null;
     const worker = yield* store.getWorker(workerThreadId).pipe(Effect.orElseSucceed(() => null));
-    if (worker === null || worker.resolvedAt !== null) return null;
+    // t3code-pm: a worker on another computer has no thread here; PmRemote follows it.
+    if (worker === null || worker.resolvedAt !== null || worker.environmentId !== null) return null;
     const pmShell = yield* shellOf(worker.pmThreadId);
     if (pmShell === null || pmShell.archivedAt !== null) return null;
     return worker;

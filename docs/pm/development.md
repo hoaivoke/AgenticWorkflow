@@ -39,7 +39,11 @@ vp run dist:desktop:linux       # Linux AppImage
 
 A plain clone shares `~/.t3/dev` in dev mode; isolate it with
 `vp run migrate-dev-db --base-dir <clone>/.t3` and `vp run dev --home-dir <clone>/.t3`.
-The free `Replay (dev)` provider has a `pm` scenario that drives the real `pm_*` tools.
+The free `Replay (dev)` provider has a `pm` scenario that drives the real `pm_*` tools, and a
+`pm-remote` scenario that starts workers on a linked computer named "Mac mini". To try it on one
+Mac, run a second server with its own `--home-dir`, `--port` and `T3CODE_ENVIRONMENT_LABEL="Mac mini"`,
+turn on `linkedEnvironmentsEnabled` in both homes' `userdata/settings.json`, and link them with
+`t3 environment link`.
 
 The desktop app is **PM3code** (`com.t3codepm.desktop`, URL scheme `t3code-pm`, command
 `t3-pm`). It keeps its data in `~/.t3-pm` and its Electron profile in

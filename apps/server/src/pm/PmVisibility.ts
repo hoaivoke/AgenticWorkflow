@@ -40,3 +40,11 @@ export const hiddenUnlessPmWorker = (): boolean => {
   const threadId = callerThreadId();
   return threadId !== undefined && state.enabled && state.workers.has(threadId);
 };
+
+/** `pm_host_status`: only another computer's peer link asks it, and only while PMs are on here. */
+export const hiddenUnlessPeerLink = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope =
+    fiber && Context.getOrUndefined(fiber.context, McpInvocationContext.McpInvocationContext);
+  return state.enabled && scope?.thread === undefined && scope?.client?.linked === true;
+};

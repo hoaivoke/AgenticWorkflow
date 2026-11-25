@@ -34,6 +34,25 @@ export interface PmWorkerWatch {
   readonly idleNudgedFor?: string;
   /** The report it stopped with again after the carry-on nudge: "Not moving", never nudged again. */
   readonly stuckReportAt?: string;
+  /** A worker on another computer: what its follower last read there. */
+  readonly remote?: PmRemoteWatch;
+}
+
+/** The last look at a worker on another computer, so restarts and clients see it without asking there. */
+export interface PmRemoteWatch {
+  readonly title?: string;
+  /** Its thread's status there: idle, or a run status. */
+  readonly status?: string;
+  readonly runId?: string | null;
+  readonly pendingRequests?: number;
+  /** Its newest timeline item there, for the quiet check. */
+  readonly activityAt?: string;
+  /** Set while its computer does not answer; cleared once it answers again. */
+  readonly unreachableSince?: string;
+  /** Its thread is gone there: no longer followed. A refused link shows as unreachable instead. */
+  readonly lostReason?: string;
+  /** A run that had already ended when an existing thread was adopted: never reported. */
+  readonly skipRunId?: string;
 }
 
 export interface PmWorkerRow {
@@ -47,6 +66,9 @@ export interface PmWorkerRow {
   readonly lastReportLine: string | null;
   readonly lastNote: string | null;
   readonly lastNoteAt: string | null;
+  /** The linked computer it runs on; null on this one. */
+  readonly environmentId: string | null;
+  readonly environmentLabel: string | null;
   readonly watch: PmWorkerWatch;
 }
 
@@ -186,6 +208,8 @@ const toWorker = (row: Row): PmWorkerRow => ({
   lastReportLine: str(row.last_report_line),
   lastNote: str(row.last_note),
   lastNoteAt: str(row.last_note_at),
+  environmentId: str(row.environment_id),
+  environmentLabel: str(row.environment_label),
   watch: parseJson<PmWorkerWatch>(row.watch_json, {}),
 });
 
@@ -499,17 +523,22 @@ const make = Effect.gen(function* () {
       pmThreadId: string;
       itemNo: number | null;
       linkedAt: string;
+      environmentId?: string | null;
+      environmentLabel?: string | null;
+      watch?: PmWorkerWatch;
     }) =>
       exec(
         "upsertWorker",
-        sql`INSERT INTO pm_workers (worker_thread_id, pm_thread_id, item_no, linked_at)
-            VALUES (${input.workerThreadId}, ${input.pmThreadId}, ${input.itemNo}, ${input.linkedAt})
+        sql`INSERT INTO pm_workers (worker_thread_id, pm_thread_id, item_no, linked_at, environment_id, environment_label, watch_json)
+            VALUES (${input.workerThreadId}, ${input.pmThreadId}, ${input.itemNo}, ${input.linkedAt}, ${input.environmentId ?? null}, ${input.environmentLabel ?? null}, ${JSON.stringify(input.watch ?? {})})
             ON CONFLICT (worker_thread_id) DO UPDATE SET
               pm_thread_id = excluded.pm_thread_id,
               item_no = COALESCE(excluded.item_no, pm_workers.item_no),
               linked_at = excluded.linked_at,
+              environment_id = excluded.environment_id,
+              environment_label = excluded.environment_label,
               resolved_at = NULL,
-              watch_json = '{}'`,
+              watch_json = excluded.watch_json`,
       ),
     getWorker: (workerThreadId: string) =>
       first(

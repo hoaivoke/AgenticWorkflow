@@ -1,6 +1,7 @@
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { PM_PLAYBOOK } from "@t3tools/pm";
-import { useGT } from "gt-react";
+import { Link } from "@tanstack/react-router";
+import { T, useGT } from "gt-react";
 import { BookOpenIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -28,11 +29,45 @@ import { runPmCommand } from "./actions";
 import { pmCommands, pmSettingsQuery } from "./state";
 import { T3ImportSection } from "./T3ImportSection";
 
+/** Whether PMs can start workers on the user's other computers: upstream's Linked environments. */
+function PmOtherComputersRow(props: { readonly linked: boolean }) {
+  const gt = useGT();
+  return (
+    <SettingsRow
+      title={gt("Workers on other computers")}
+      description={
+        props.linked ? (
+          <T>
+            On. A PM can start workers on computers you linked in{" "}
+            <Link to="/settings/connections" className="underline underline-offset-2">
+              Environments
+            </Link>
+            , by your rules and by each computer's load and usage left.
+          </T>
+        ) : (
+          <T>
+            Off. Turn on Linked environments in{" "}
+            <Link to="/settings/labs" className="underline underline-offset-2">
+              Labs
+            </Link>{" "}
+            here and on the other computer, then link them in{" "}
+            <Link to="/settings/connections" className="underline underline-offset-2">
+              Environments
+            </Link>
+            .
+          </T>
+        )
+      }
+    />
+  );
+}
+
 /** Settings, Project managers: the switch and the playbook overrides every PM follows. */
 export function PmSettingsPanel() {
   const gt = useGT();
   const searchableSetting = useSearchableSetting();
-  const environmentId = usePrimaryEnvironment()?.environmentId ?? null;
+  const primary = usePrimaryEnvironment();
+  const environmentId = primary?.environmentId ?? null;
   const canWrite = useEnvironmentScope(environmentId, AuthSettingsWriteScope);
   const query = useEnvironmentQuery(
     environmentId === null ? null : pmSettingsQuery({ environmentId, input: {} }),
@@ -53,6 +88,7 @@ export function PmSettingsPanel() {
     if (saved !== null) query.refresh();
   };
   const overridesText = overrides ?? settings?.playbookOverrides.join("\n") ?? "";
+  const linkedOn = primary?.serverConfig?.settings.linkedEnvironmentsEnabled === true;
   return (
     <SettingsPageContainer>
       <SettingsSection id="project-managers" title={gt("Project managers")}>
@@ -70,6 +106,7 @@ export function PmSettingsPanel() {
             />
           }
         />
+        <PmOtherComputersRow linked={linkedOn} />
       </SettingsSection>
       <SettingsSection id="pm-playbook" title={gt("Playbook")}>
         <SettingsRow

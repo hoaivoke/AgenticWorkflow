@@ -1,4 +1,5 @@
 {
+  "c331940627806964": "Worker auf anderen Computern",
   "be73dbe91e0aa28d": "Die Einstellung konnte nicht gespeichert werden",
   "102634e85b4b4f00": "Projektmanager",
   "b7ec071429929aff": "Fügt Projektmanager-Threads hinzu: Sie planen die Arbeit in einem Projekt, starten Worker-Threads und verfolgen sie. Wenn du es ausschaltest, werden alle PM-Ansichten, -Tools und -Watcher ausgeblendet; PM-Threads erscheinen als normale Threads, und nichts wird gelöscht.",
@@ -13,6 +14,34 @@
   "f1a6baf0e001d05d": "Ergänzungen speichern",
   "4c97b527828c55fd": "PM-Playbook",
   "166661f94b300f5b": "Fertig",
+  "721a8cb5e8badd58": [
+    "An. Ein PM kann Worker auf Computern starten, die du unter",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Umgebungen"
+    },
+    " verknüpft hast, nach deinen Regeln und nach Auslastung und verbleibender Nutzung jedes Computers."
+  ],
+  "82429be60f475dcd": [
+    "Aus. Schalte Verknüpfte Umgebungen unter",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Labs"
+    },
+    " ",
+    "hier und auf dem anderen Computer ein und verknüpfe sie dann unter",
+    " ",
+    {
+      "t": "Link",
+      "i": 2,
+      "c": "Umgebungen"
+    },
+    "."
+  ],
   "f6b2ceae51af3eeb": "Die Threads konnten nicht ersetzt werden",
   "621f02232c4b3c1a": "Die Threads konnten nicht importiert werden",
   "8badd718ea6f6cb3": "Letzter Start: T3 Code wurde nicht gefunden, nichts wurde gelesen.",
@@ -81,6 +110,9 @@
   "cff84ea88171b008": "Wartet auf deine Antwort",
   "7b022008c76d6606": "Inaktiv",
   "066644fe3ef88185": "Worker",
+  "c8fd7e3542c425da": "Auf {computer}",
+  "8544845f695d8389": "Verloren",
+  "06a9ae26c2f497ef": "Nicht erreichbar",
   "6f06cdb0083ab27b": "Die Notiz konnte nicht gespeichert werden",
   "2f890e1e55af5ae5": "Gedächtnis",
   "fdcee4e787fcd70f": "Notiz hinzufügen",
@@ -200,6 +232,7 @@
   "099c3fe512452b13": "{items, plural, one {# offene Aufgabe} other {# offene Aufgaben}} · {asks, plural, one {# Frage} other {# Fragen}} · {workers, plural, one {# Worker} other {# Worker}} ({running} laufen)",
   "32ac331a7b1e7efd": "Genehmigung",
   "a484e4248b460c95": "Eingabe",
+  "5aa90feceb4bd10b": "Wartet",
   "bba6ddabaa9898e1": "Auftrag bearbeiten…",
   "7a8d6cfff5967ba7": "PM anheften",
   "c8a41d3cb64b0a6c": "PM loslösen",

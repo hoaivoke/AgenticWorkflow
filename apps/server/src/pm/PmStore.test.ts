@@ -73,7 +73,7 @@ describe("PM migrations", () => {
       `;
       assert.deepStrictEqual(
         pmLedger.map((row) => row.migration_id),
-        [1, 2, 3, 4],
+        [1, 2, 3, 4, 5],
       );
     }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
   );
@@ -92,13 +92,15 @@ describe("PM migrations", () => {
         ["pm_items", "archived_at"],
         ["pm_workers", "last_note"],
         ["pm_workers", "last_note_at"],
+        ["pm_workers", "environment_id"],
+        ["pm_workers", "environment_label"],
       ])
         yield* sql.unsafe(`ALTER TABLE ${table} DROP COLUMN ${column}`).unprepared;
       yield* sql`DELETE FROM pm_migrations WHERE migration_id > 1`;
       const from021 = yield* runPmMigrations();
       assert.deepStrictEqual(
         from021.map(([id, name]) => `${id}_${name}`),
-        ["2_PmInbox", "3_PmImportAndRetired", "4_PmWorkerNotes"],
+        ["2_PmInbox", "3_PmImportAndRetired", "4_PmWorkerNotes", "5_PmWorkerComputers"],
       );
       const [archived] = yield* sql<{ readonly count: number }>`
         SELECT COUNT(*) AS count FROM pragma_table_info('pm_items') WHERE name = 'archived_at'`;
@@ -109,11 +111,13 @@ describe("PM migrations", () => {
       yield* sql`DROP TABLE pm_retired_threads`;
       yield* sql`ALTER TABLE pm_workers DROP COLUMN last_note`;
       yield* sql`ALTER TABLE pm_workers DROP COLUMN last_note_at`;
+      yield* sql`ALTER TABLE pm_workers DROP COLUMN environment_id`;
+      yield* sql`ALTER TABLE pm_workers DROP COLUMN environment_label`;
       yield* sql`DELETE FROM pm_migrations WHERE migration_id > 2`;
       const fromInbox = yield* runPmMigrations();
       assert.deepStrictEqual(
         fromInbox.map(([id]) => id),
-        [3, 4],
+        [3, 4, 5],
       );
       assert.includeMembers(yield* tableNames, ["pm_retired_threads", "pm_t3_imported_threads"]);
     }).pipe(Effect.provide(SqlitePersistence.layerMemory)),

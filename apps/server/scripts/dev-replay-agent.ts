@@ -71,6 +71,11 @@ export const SCENARIOS = [
     file: "./dev-replay/command_output_transcript.ndjson",
   },
   { id: "pm", name: "Project manager", file: "./dev-replay/pm_transcript.ndjson" }, // t3code-pm:
+  {
+    id: "pm-remote",
+    name: "Project manager, other computer",
+    file: "./dev-replay/pm_remote_transcript.ndjson",
+  }, // t3code-pm:
 ] as const;
 
 // Session setup and vendor state stay out: they would replace the replay agent's own models.

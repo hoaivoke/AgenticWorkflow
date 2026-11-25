@@ -9,7 +9,13 @@ import {
   AuthSettingsWriteScope,
   EnvironmentAuthorizationError,
 } from "./auth.ts";
-import { MessageId, ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  EnvironmentId,
+  MessageId,
+  ProjectId,
+  ThreadId,
+  TrimmedNonEmptyString,
+} from "./baseSchemas.ts";
 import { ModelSelection } from "./modelSelection.ts";
 
 export const PmStoredItemStatus = Schema.Literals(["moving", "later", "finished", "dropped"]);
@@ -38,6 +44,25 @@ export type PmReportKind = typeof PmReportKind.Type;
 export const PmRowState = Schema.Literals(["blocked", "needs_you", "running", "idle"]);
 export const PmPageState = Schema.Literals(["open", "answered", "seen", "replaced", "retired"]);
 
+/** A worker on another computer the user linked, by the PM's link to it. */
+export const PmWorkerComputer = Schema.Struct({
+  environmentId: EnvironmentId,
+  label: Schema.String,
+  /** Set while that computer does not answer; its reports wait until it does. */
+  unreachableSince: Schema.NullOr(Schema.String),
+  /** Why the PM no longer follows it: its thread is gone there. */
+  lost: Schema.NullOr(Schema.String),
+});
+export type PmWorkerComputer = typeof PmWorkerComputer.Type;
+
+export const PmRemoteWorkerSummary = Schema.Struct({
+  threadId: ThreadId,
+  title: Schema.String,
+  state: Schema.Literals(["running", "waiting", "idle"]),
+  computer: PmWorkerComputer,
+});
+export type PmRemoteWorkerSummary = typeof PmRemoteWorkerSummary.Type;
+
 /** One PM in the sidebar. Small on purpose: every client gets every PM. */
 export const PmSummary = Schema.Struct({
   threadId: ThreadId,
@@ -51,6 +76,8 @@ export const PmSummary = Schema.Struct({
   workerThreadIds: Schema.Array(ThreadId),
   /** Workers still not moving a full round after T3 Code nudged them. */
   notMovingWorkerThreadIds: Schema.optional(Schema.Array(ThreadId)),
+  /** Workers on other computers: no shell here, so they carry their own title and state. */
+  remoteWorkers: Schema.optional(Schema.Array(PmRemoteWorkerSummary)),
 });
 export type PmSummary = typeof PmSummary.Type;
 
@@ -131,6 +158,9 @@ export const PmWorker = Schema.Struct({
   limitResetAt: Schema.optional(Schema.NullOr(Schema.String)),
   /** Still not moving a full round after T3 Code nudged it. */
   notMoving: Schema.optional(Schema.Boolean),
+  /** On another computer: its thread is not here, so its title comes from there. */
+  title: Schema.optional(Schema.NullOr(Schema.String)),
+  computer: Schema.optional(Schema.NullOr(PmWorkerComputer)),
 });
 export type PmWorker = typeof PmWorker.Type;
 

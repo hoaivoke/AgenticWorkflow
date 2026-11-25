@@ -1442,7 +1442,7 @@ export const layerToolSearch = Layer.mergeAll(
 
 // t3code-pm: PM tools sit outside layerTools, so its context budget stays upstream's.
 const layerPmToolkit = toolkitRegistration(PmToolkit, PmMcpHandlers.layer).pipe(
-  Layer.provide(PmLayer.layer),
+  Layer.provide(Layer.merge(PmLayer.layer, PmLayer.layerRemote)),
 );
 
 export const layer = layerMcpTransport(

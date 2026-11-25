@@ -1,4 +1,5 @@
 {
+  "c331940627806964": "Arbetare på andra datorer",
   "be73dbe91e0aa28d": "Det gick inte att spara inställningen",
   "102634e85b4b4f00": "Projektledare",
   "b7ec071429929aff": "Lägger till projektledartrådar: de planerar arbetet i ett projekt, startar arbetartrådar och följer upp dem. Om du stänger av det döljs alla PM-vyer, verktyg och bevakare; PM-trådar visas som vanliga trådar och inget tas bort.",
@@ -13,6 +14,34 @@
   "f1a6baf0e001d05d": "Spara tillägg",
   "4c97b527828c55fd": "PM-handbok",
   "166661f94b300f5b": "Klar",
+  "721a8cb5e8badd58": [
+    "På. En PM kan starta arbetare på datorer du länkat under",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Miljöer"
+    },
+    ", efter dina regler och varje dators belastning och återstående användning."
+  ],
+  "82429be60f475dcd": [
+    "Av. Slå på Länkade miljöer under",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Labs"
+    },
+    " ",
+    "här och på den andra datorn och länka dem sedan under",
+    " ",
+    {
+      "t": "Link",
+      "i": 2,
+      "c": "Miljöer"
+    },
+    "."
+  ],
   "f6b2ceae51af3eeb": "Det gick inte att ersätta trådarna",
   "621f02232c4b3c1a": "Det gick inte att importera trådarna",
   "8badd718ea6f6cb3": "Senaste start: T3 Code hittades inte, inget lästes.",
@@ -81,6 +110,9 @@
   "cff84ea88171b008": "Väntar på ditt svar",
   "7b022008c76d6606": "Inaktiv",
   "066644fe3ef88185": "Arbetare",
+  "c8fd7e3542c425da": "På {computer}",
+  "8544845f695d8389": "Förlorad",
+  "06a9ae26c2f497ef": "Inte nåbar",
   "6f06cdb0083ab27b": "Det gick inte att spara minnesanteckningen",
   "2f890e1e55af5ae5": "Minne",
   "fdcee4e787fcd70f": "Lägg till en minnesanteckning",
@@ -200,6 +232,7 @@
   "099c3fe512452b13": "{items, plural, one {# öppen arbetsuppgift} other {# öppna arbetsuppgifter}} · {asks, plural, one {# fråga} other {# frågor}} · {workers, plural, one {# arbetare} other {# arbetare}} ({running} körs)",
   "32ac331a7b1e7efd": "Godkännande",
   "a484e4248b460c95": "Inmatning",
+  "5aa90feceb4bd10b": "Väntar",
   "bba6ddabaa9898e1": "Redigera uppdrag…",
   "7a8d6cfff5967ba7": "Fäst PM",
   "c8a41d3cb64b0a6c": "Lossa PM",

@@ -1,6 +1,12 @@
 import type { MenuAction } from "@react-native-menu/menu";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type {
+  EnvironmentId,
+  PmRemoteWorkerSummary,
+  PmWorkerComputer,
+  ThreadId,
+} from "@t3tools/contracts";
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/models";
 import { pmKey } from "@t3tools/pm/client";
 import { useGT } from "gt-react-native";
@@ -9,7 +15,9 @@ import { Pressable, View } from "react-native";
 import { AppText as Text } from "../components/ui/AppText";
 import { SymbolView } from "../components/ui/AppSymbol";
 import { cn } from "../lib/cn";
+import { useOpenLinkedThreadRead } from "../features/threads/useOpenLinkedThread";
 import { useThreadShells } from "../state/entities";
+import { useEnvironments } from "../state/environments";
 import { convertToPm, createPm, revertPm } from "./actions";
 import { PmNotMovingChip } from "./notMovingChip";
 import { pmWorkerPreview } from "./pm.logic";
@@ -43,8 +51,21 @@ export function PmRowCounts(props: {
   const workerKeys = new Set(
     summary.workerThreadIds.map((id) => pmKey(props.thread.environmentId, id)),
   );
-  const workers = shells.filter((shell) => workerKeys.has(pmKey(shell.environmentId, shell.id)));
-  const preview = pmWorkerPreview(workers, (worker) => threadRuntimeIsActive(worker.runtime));
+  type Entry =
+    | { readonly kind: "here"; readonly shell: EnvironmentThreadShell }
+    | { readonly kind: "remote"; readonly worker: PmRemoteWorkerSummary };
+  const workers: ReadonlyArray<Entry> = [
+    ...shells
+      .filter((shell) => workerKeys.has(pmKey(shell.environmentId, shell.id)))
+      .map((shell) => ({ kind: "here" as const, shell })),
+    // t3code-pm: workers on the user's other computers, carried by the summary.
+    ...(summary.remoteWorkers ?? []).map((worker) => ({ kind: "remote" as const, worker })),
+  ];
+  const preview = pmWorkerPreview(workers, (entry) =>
+    entry.kind === "here"
+      ? threadRuntimeIsActive(entry.shell.runtime)
+      : entry.worker.state === "running",
+  );
   const notMoving = new Set<string>(summary.notMovingWorkerThreadIds ?? []);
   const status =
     summary.rowState === "blocked"
@@ -76,30 +97,124 @@ export function PmRowCounts(props: {
           {status.text}
         </Text>
       </View>
-      {preview.shown.map((worker) => (
-        <Pressable
-          key={worker.id}
-          accessibilityRole="button"
-          accessibilityLabel={gt("Open worker {title}", { title: worker.title })}
-          className="flex-row items-center gap-2 py-1"
-          onPress={() => props.onSelectThread(worker)}
-        >
-          <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
-            {worker.title}
-          </Text>
-          {notMoving.has(worker.id) ? (
-            <PmNotMovingChip />
-          ) : threadRuntimeIsActive(worker.runtime) ? (
-            <Text className="text-xs text-primary-text">{gt("Working")}</Text>
-          ) : null}
-        </Pressable>
-      ))}
+      {preview.shown.map((entry) =>
+        entry.kind === "remote" ? (
+          <PmRemoteWorkerRow
+            key={entry.worker.threadId}
+            viaEnvironmentId={props.thread.environmentId}
+            worker={entry.worker}
+          />
+        ) : (
+          <Pressable
+            key={entry.shell.id}
+            accessibilityRole="button"
+            accessibilityLabel={gt("Open worker {title}", { title: entry.shell.title })}
+            className="flex-row items-center gap-2 py-1"
+            onPress={() => props.onSelectThread(entry.shell)}
+          >
+            <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+              {entry.shell.title}
+            </Text>
+            {notMoving.has(entry.shell.id) ? (
+              <PmNotMovingChip />
+            ) : threadRuntimeIsActive(entry.shell.runtime) ? (
+              <Text className="text-xs text-primary-text">{gt("Working")}</Text>
+            ) : null}
+          </Pressable>
+        ),
+      )}
       {preview.more > 0 ? (
         <Text className="text-xs text-foreground-muted">
           {gt("{count} more", { count: preview.more })}
         </Text>
       ) : null}
     </View>
+  );
+}
+
+/** Opens a worker on another computer: in place when this app is connected there, else read-only. */
+export function useOpenRemoteWorker() {
+  const navigation = useNavigation();
+  const openLinkedRead = useOpenLinkedThreadRead();
+  const { presentationById } = useEnvironments();
+  return (
+    viaEnvironmentId: EnvironmentId,
+    worker: {
+      readonly threadId: ThreadId;
+      readonly title: string | null;
+      readonly computer: PmWorkerComputer;
+    },
+  ) => {
+    const { computer } = worker;
+    const target = { environmentId: computer.environmentId, threadId: worker.threadId };
+    if (presentationById.get(computer.environmentId)?.connection.phase === "connected")
+      navigation.dispatch(StackActions.push("Thread", target));
+    else openLinkedRead(target, { viaEnvironmentId, label: computer.label }, worker.title);
+  };
+}
+
+/** A worker on another computer: always named with its computer, red while it can't be reached. */
+function PmRemoteWorkerRow(props: {
+  readonly viaEnvironmentId: EnvironmentId;
+  readonly worker: PmRemoteWorkerSummary;
+}) {
+  const gt = useGT();
+  const openRemote = useOpenRemoteWorker();
+  const { worker } = props;
+  const { computer } = worker;
+  const off = computer.lost !== null || computer.unreachableSince !== null;
+  const open = () => openRemote(props.viaEnvironmentId, worker);
+  const status =
+    computer.lost !== null
+      ? gt("Lost", { $context: "worker status: its computer's link is gone" })
+      : computer.unreachableSince !== null
+        ? gt("Unreachable", { $context: "worker status: its computer does not answer" })
+        : worker.state === "running"
+          ? gt("Working")
+          : worker.state === "waiting"
+            ? gt("Waiting", { $context: "worker status: waits for an answer" })
+            : null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={gt("Open worker {title} on {computer}", {
+        title: worker.title,
+        computer: computer.label,
+      })}
+      className="flex-row items-center gap-2 py-1"
+      onPress={open}
+    >
+      <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+        {worker.title}
+      </Text>
+      <View className="max-w-[45%] flex-row items-center gap-1">
+        <SymbolView
+          name="desktopcomputer"
+          size={11}
+          tintColorClassName={off ? "accent-danger-foreground" : "accent-foreground-muted"}
+        />
+        <Text
+          className={cn("text-xs", off ? "text-danger-foreground" : "text-foreground-muted")}
+          numberOfLines={1}
+        >
+          {computer.label}
+        </Text>
+      </View>
+      {status === null ? null : (
+        <Text
+          className={cn(
+            "text-xs",
+            off
+              ? "text-danger-foreground"
+              : worker.state === "running"
+                ? "text-primary-text"
+                : "text-warning-foreground",
+          )}
+        >
+          {status}
+        </Text>
+      )}
+    </Pressable>
   );
 }
 

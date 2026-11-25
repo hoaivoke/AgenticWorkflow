@@ -61,6 +61,7 @@ Everything else is T3 Code: the same fast app, the same agents, the same subscri
 **It spreads the work**
 
 - The PM picks the agent for each piece of work, based on the rules you set, such as which agent has usage left.
+- The PM can start work on [your other computers](#workers-on-your-other-computers). It keeps work on this computer unless your rules say otherwise, or this one is busy or out of usage for that agent and another computer has the repo. To save usage it tries the same agent on another computer first, then another agent your rules allow. Running workers never move.
 - The PM stays idle after it hands work to its workers and relays their status, Live pages and questions back to you. So you can always send it more asks, however unrelated.
 
 ## Why a coordinator?
@@ -203,6 +204,18 @@ Connect the Android app over Tailscale or your local network.
 Your projects appear, and PMs show in the thread list with their workers. The list button in a PM's header opens its work items, workers, mission and memory.
 
 T3 Connect sign-in does not work in the fork's APK: T3's sign-in only accepts T3's own apps. Use Tailscale or your local network instead.
+
+## Workers on your other computers
+
+A PM can start workers on other computers you own, such as a Mac mini or a Linux box, and follow them like its own.
+
+1. **Install PM3code** on the other computer and sign in to the agents you want it to run.
+2. **Turn on Linked environments** on both computers: Settings, Labs.
+3. **Link them** over Tailscale or your local network: on the computer the PM runs on, open Settings, Environments, choose **Link**, and pick the other computer or enter its address with a pairing code from its Settings, Sharing & access. The access you pick is the most a PM may do there: a read-only link starts nothing, and worktrees and cloning a repo need full access.
+
+Settings, Project managers shows whether this is on. The PM looks at each computer's load and agent usage (numbers only, sent only to computers you linked) and works in the project with the same repo there. When that computer doesn't have the repo, the PM asks you before it clones it.
+
+Workers there show in the sidebar under their PM with the computer's name, and **Unreachable** in red while that computer doesn't answer; their reports catch up once it's back. Click one to read it here. Approvals, and questions the PM can't settle itself, are answered on that computer: choose **Connect to interact** in that thread, or open PM3code there.
 
 ## Unofficial
 

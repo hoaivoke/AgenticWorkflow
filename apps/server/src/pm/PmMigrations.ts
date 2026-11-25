@@ -203,11 +203,19 @@ const addWorkerNoteColumns = Effect.gen(function* () {
   yield* sql`ALTER TABLE pm_workers ADD COLUMN last_note_at TEXT`;
 });
 
+// A worker on another computer the user linked: null on both means this computer.
+const addWorkerComputerColumns = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`ALTER TABLE pm_workers ADD COLUMN environment_id TEXT`;
+  yield* sql`ALTER TABLE pm_workers ADD COLUMN environment_label TEXT`;
+});
+
 const pmMigrationEntries = [
   [1, "PmTables", createTables],
   [2, "PmInbox", addInboxColumns],
   [3, "PmImportAndRetired", createImportAndRetiredTables],
   [4, "PmWorkerNotes", addWorkerNoteColumns],
+  [5, "PmWorkerComputers", addWorkerComputerColumns],
 ] as const;
 
 const run = Migrator.make({});

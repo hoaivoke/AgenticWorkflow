@@ -1,4 +1,5 @@
 {
+  "c331940627806964": "Workers on other computers",
   "be73dbe91e0aa28d": "Could not save the setting",
   "102634e85b4b4f00": "Project managers",
   "b7ec071429929aff": "Adds Project Manager threads: they plan work in a project, start worker threads and follow them. Turning it off hides every PM view, tool and watcher; PM threads show as normal threads, and nothing is deleted.",
@@ -13,6 +14,34 @@
   "f1a6baf0e001d05d": "Save overrides",
   "4c97b527828c55fd": "PM playbook",
   "166661f94b300f5b": "Done",
+  "721a8cb5e8badd58": [
+    "On. A PM can start workers on computers you linked in",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Environments"
+    },
+    ", by your rules and by each computer's load and usage left."
+  ],
+  "82429be60f475dcd": [
+    "Off. Turn on Linked environments in",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Labs"
+    },
+    " ",
+    "here and on the other computer, then link them in",
+    " ",
+    {
+      "t": "Link",
+      "i": 2,
+      "c": "Environments"
+    },
+    "."
+  ],
   "f6b2ceae51af3eeb": "Could not replace the threads",
   "621f02232c4b3c1a": "Could not import the threads",
   "8badd718ea6f6cb3": "Last launch: T3 Code was not found, nothing was read.",
@@ -81,6 +110,9 @@
   "cff84ea88171b008": "Waiting for your answer",
   "7b022008c76d6606": "Idle",
   "066644fe3ef88185": "Workers",
+  "c8fd7e3542c425da": "On {computer}",
+  "8544845f695d8389": "Lost",
+  "06a9ae26c2f497ef": "Unreachable",
   "6f06cdb0083ab27b": "Could not save the memory note",
   "2f890e1e55af5ae5": "Memory",
   "fdcee4e787fcd70f": "Add a memory note",
@@ -200,6 +232,7 @@
   "099c3fe512452b13": "{items, plural, one {# open work item} other {# open work items}} · {asks, plural, one {# ask} other {# asks}} · {workers, plural, one {# worker} other {# workers}} ({running} running)",
   "32ac331a7b1e7efd": "Approval",
   "a484e4248b460c95": "Input",
+  "5aa90feceb4bd10b": "Waiting",
   "bba6ddabaa9898e1": "Edit mission…",
   "7a8d6cfff5967ba7": "Pin PM",
   "c8a41d3cb64b0a6c": "Unpin PM",
