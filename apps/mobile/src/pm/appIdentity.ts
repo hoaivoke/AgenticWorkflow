@@ -5,5 +5,5 @@ export const PM_APP_IDENTITY = {
   iosBundleIdentifier: "com.t3codepm.app",
   androidPackage: "com.t3codepm.app",
   /** Raise for every APK release; Android refuses to update over an equal or higher one. */
-  androidVersionCode: 7,
+  androidVersionCode: 8,
 } as const;
