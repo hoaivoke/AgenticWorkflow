@@ -135,6 +135,22 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
   pm_page_retire: McpToolAccess.writesWithCapability(({ page }) =>
     asPm((service, pm) => service.pageRetire(pm, page)),
   ),
+  pm_worker_schedule: McpToolAccess.startsThreads(
+    // pipelines:
+    () => ({}),
+    ({ schedule, enabled, ...startArguments }) =>
+      asPm((service, pm) =>
+        PmRouting.scheduleWorker({
+          pm,
+          title: startArguments.title,
+          startArguments,
+          schedule,
+          enabled,
+        }).pipe(Effect.flatMap((text) => service.toolResult(pm, () => Effect.succeed(text)))),
+      ),
+    // A scheduled run starts long after its caller, with nothing to carry the link.
+    { refused: "schedule workers in this environment" },
+  ),
   pm_pipelines: McpToolAccess.reads(({ name }) =>
     // pipelines:
     asPm((service, pm) =>

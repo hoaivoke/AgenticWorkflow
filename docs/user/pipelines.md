@@ -14,11 +14,24 @@ Nothing changes until a PM uses it: `pm_worker_start` without a `role` behaves e
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `pm_worker_start({ ..., role, escalate?, avoid_provider_of? })` | Picks the worker's model from the role, adds the role's instructions above the brief, and says in its result which model ran and why. |
 | `pm_roles`                                                      | Every role, its tier, and the model it would get right now, plus any accounts at their limit.                                         |
+| `pm_worker_schedule({ ..., schedule })`                         | Same fields as `pm_worker_start`, plus when to run. Each run, the PM starts the worker.                                               |
 | `pm_pipelines({ name? })`                                       | The pipelines, one line each; or one pipeline as a numbered checklist with its rules.                                                 |
 
-The PM playbook (version 5) tells the PM to give every worker a role, pick a pipeline for anything
+The PM playbook (version 6) tells the PM to give every worker a role, pick a pipeline for anything
 bigger than a quick fix, make one work item per stage, and move on from checks and reviews only by
 the verdict the worker wrote (PASS/FAIL, APPROVE/CHANGES REQUESTED), not by its summary.
+
+## Scheduled workers
+
+Ask a PM to run a worker later or on a repeat, such as "run a security audit every night at 3" or
+"retry this build when my Claude limit resets". The PM calls `pm_worker_schedule` with the worker's
+brief and role plus a schedule: once at a time, every so many minutes (at least one), daily or on
+chosen weekdays at a time, or when a webhook URL is called.
+
+Each run posts a message in the PM's thread, and the PM starts the worker then. The worker reports
+back like any other, and its role picks the model at that moment, so a run skips accounts that are
+at their limit. Schedules show in **Settings → Scheduled tasks** as "Worker: <title>", where you
+can pause or delete them; the PM can do the same.
 
 ## How a model is picked
 

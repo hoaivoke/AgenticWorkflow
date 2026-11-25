@@ -1443,6 +1443,8 @@ export const layerToolSearch = Layer.mergeAll(
 // t3code-pm: PM tools sit outside layerTools, so its context budget stays upstream's.
 const layerPmToolkit = toolkitRegistration(PmToolkit, PmMcpHandlers.layer).pipe(
   Layer.provide(PmLayer.layer),
+  // pipelines: pm_worker_schedule reuses schedule_task's checks; the same layer object is shared.
+  Layer.provide(OrchestratorMcpService.layer),
 );
 
 export const layer = layerMcpTransport(

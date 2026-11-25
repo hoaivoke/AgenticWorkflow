@@ -4,6 +4,7 @@ import {
   OrchestratorMcpFailure,
   ProviderInteractionMode,
   RuntimeMode,
+  ScheduledTaskUpsertSchedule,
   TrimmedNonEmptyString,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -11,6 +12,7 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
+import * as OrchestratorMcpService from "../mcp/OrchestratorMcpService.ts"; // pipelines:
 import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
 import { PmService } from "./PmService.ts";
 import { PmStore } from "./PmStore.ts"; // pipelines:
@@ -29,6 +31,7 @@ const shared = {
     PmService,
     PmStore, // pipelines:
     PipelineService, // pipelines:
+    OrchestratorMcpService.OrchestratorMcpService, // pipelines:
   ],
 };
 
@@ -125,6 +128,25 @@ const PmWorkerStartTool = pmTool(
     workspaceStrategy: Schema.optional(OrchestrationV2ThreadLaunchWorkspaceStrategy),
     runtimeMode: Schema.optional(RuntimeMode),
     interactionMode: Schema.optional(ProviderInteractionMode),
+  },
+).annotate(Tool.Destructive, true);
+const ScheduleWorkerSchedule = Schema.Union([
+  ScheduledTaskUpsertSchedule,
+  // OpenCode sends nested union objects as JSON text.
+  Schema.fromJsonString(ScheduledTaskUpsertSchedule),
+]).annotate({
+  description:
+    "When: {type:'interval',everyMs} (at least 60000), {type:'fixed_time',timeOfDay,weekdays?}, {type:'once',runAt} or {type:'webhook'}.",
+});
+const PmWorkerScheduleTool = pmTool(
+  // pipelines:
+  "pm_worker_schedule",
+  "Start a worker later or on a repeat, such as a nightly audit or a retry when a usage limit resets. Takes pm_worker_start's fields plus `schedule`. Each run posts a Scheduled worker message here and you start the worker then, so a role picks the model at that time.",
+  {
+    ...PmWorkerStartTool.parametersSchema.fields,
+    brief: TrimmedNonEmptyString.check(Schema.isMaxLength(100000)),
+    schedule: ScheduleWorkerSchedule,
+    enabled: Schema.optional(Schema.Boolean.annotate({ description: "Default true." })),
   },
 ).annotate(Tool.Destructive, true);
 const PmPipelinesTool = pmTool(
@@ -255,6 +277,7 @@ export const PmToolkit = Toolkit.make(
   PmLinkAddTool,
   PmPageShowTool,
   PmPageRetireTool,
+  PmWorkerScheduleTool, // pipelines:
   PmPipelinesTool, // pipelines:
   PmRolesTool, // pipelines:
 );

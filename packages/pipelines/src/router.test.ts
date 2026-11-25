@@ -1,7 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import { loadPipelineConfig } from "./load.ts";
-import { renderPipeline, renderPipelineList, renderRoleBrief, renderRoles } from "./render.ts";
+import {
+  renderPipeline,
+  renderPipelineList,
+  renderRoleBrief,
+  renderRoles,
+  renderScheduledWorkerPrompt,
+} from "./render.ts";
 import { matchModel, pickEffort, resolveRole, versionOf, type ProviderSnapshot } from "./router.ts";
 
 const reasoning = (id: string) => ({ id, choices: ["low", "medium", "high", "xhigh"] });
@@ -230,6 +236,18 @@ describe("render", () => {
     expect(text).toContain("- architect: frontier tier, read-only.");
     expect(text).toContain("Now: claudeAgent/claude-opus-5-5 (effort=high).");
     expect(text).toContain("- codex until 2026-11-25T03:00:00Z");
+  });
+
+  it("writes a scheduled worker message the PM can replay exactly", () => {
+    const args = {
+      title: "Nightly audit",
+      brief: 'Audit "auth/".\nReport findings.',
+      role: "security-reviewer",
+    };
+    const prompt = renderScheduledWorkerPrompt("Nightly audit", args);
+    expect(prompt.startsWith("Scheduled worker: Nightly audit\n")).toBe(true);
+    const json = prompt.match(/```json\n([\s\S]*?)\n```/)?.[1] ?? "";
+    expect(JSON.parse(json)).toEqual(args);
   });
 
   it("writes a role brief", () => {
