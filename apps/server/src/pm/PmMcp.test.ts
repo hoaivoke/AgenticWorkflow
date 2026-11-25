@@ -9,6 +9,7 @@ import { advertisedJsonSchema } from "../mcp/advertisedJsonSchema.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as PipelineService from "../pipelines/PipelineService.ts"; // pipelines:
 import { layerPm, makeWorld, messagesTo, PROJECT, shellFor, type PmWorld } from "./Pm.testkit.ts";
 import * as PmMcpHandlers from "./PmMcpHandlers.ts";
 import { PmToolkit } from "./PmMcpTools.ts";
@@ -34,6 +35,7 @@ type ToolName = keyof typeof PmToolkit.tools;
 const harness = (world: PmWorld) =>
   McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
     Layer.provideMerge(layerPm(world)),
+    Layer.provideMerge(PipelineService.layerTest({})), // pipelines:
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 

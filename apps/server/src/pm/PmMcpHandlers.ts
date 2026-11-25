@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
+import * as PmRouting from "../pipelines/PmRouting.ts"; // pipelines:
 import { PmToolkit } from "./PmMcpTools.ts";
 import { PmService } from "./PmService.ts";
 
@@ -18,8 +19,9 @@ const toFailure = (error: PmError) =>
   });
 
 /** Every `pm_*` tool acts for the calling thread, which must be a PM. */
-const asPm = Effect.fn("PmMcp.asPm")(function* <A>(
-  run: (service: PmService["Service"], pm: string) => Effect.Effect<A, PmError>,
+// pipelines: generic in R so role routing can read its own services.
+const asPm = Effect.fn("PmMcp.asPm")(function* <A, R = never>(
+  run: (service: PmService["Service"], pm: string) => Effect.Effect<A, PmError, R>,
 ) {
   const scope = yield* McpInvocationContext.McpInvocationContext;
   const caller = yield* McpInvocationContext.requireThreadScope(scope, "This tool");
@@ -62,15 +64,34 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
     (input) => input,
     (input, { runtimeMode, interactionMode, linkOrigin }) =>
       asPm((service, pm) =>
-        service.startWorker(pm, {
-          title: input.title,
-          brief: input.brief,
-          item: input.item,
-          modelSelection: input.modelSelection,
-          workspaceStrategy: input.workspaceStrategy,
-          runtimeMode,
-          interactionMode,
-          linkOrigin,
+        Effect.gen(function* () {
+          // pipelines: a role picks the model and adds its instructions to the brief.
+          const routed =
+            input.role === undefined
+              ? undefined
+              : yield* PmRouting.routeWorker({
+                  pm,
+                  role: input.role,
+                  escalate: input.escalate,
+                  avoidProviderOf: input.avoid_provider_of,
+                  modelSelection: input.modelSelection,
+                });
+          const result = yield* service.startWorker(pm, {
+            title: input.title,
+            brief:
+              routed === undefined
+                ? input.brief
+                : `${routed.preamble}\n\n## Your task\n${input.brief}`,
+            item: input.item,
+            modelSelection: routed?.modelSelection ?? input.modelSelection,
+            workspaceStrategy: input.workspaceStrategy,
+            runtimeMode,
+            interactionMode,
+            linkOrigin,
+          });
+          return routed === undefined
+            ? result
+            : { ...result, result: `${result.result} ${routed.summary}` };
         }),
       ),
     "stamped",
@@ -113,5 +134,21 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
   ),
   pm_page_retire: McpToolAccess.writesWithCapability(({ page }) =>
     asPm((service, pm) => service.pageRetire(pm, page)),
+  ),
+  pm_pipelines: McpToolAccess.reads(({ name }) =>
+    // pipelines:
+    asPm((service, pm) =>
+      PmRouting.pipelinesText(pm, name).pipe(
+        Effect.flatMap((text) => service.toolResult(pm, () => Effect.succeed(text))),
+      ),
+    ),
+  ),
+  pm_roles: McpToolAccess.reads(() =>
+    // pipelines:
+    asPm((service, pm) =>
+      PmRouting.rolesText(pm).pipe(
+        Effect.flatMap((text) => service.toolResult(pm, () => Effect.succeed(text))),
+      ),
+    ),
   ),
 });

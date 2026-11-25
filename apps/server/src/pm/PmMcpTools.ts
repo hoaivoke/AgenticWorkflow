@@ -11,7 +11,9 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
+import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
 import { PmService } from "./PmService.ts";
+import { PmStore } from "./PmStore.ts"; // pipelines:
 import { hiddenUnlessPm } from "./PmVisibility.ts";
 
 const shared = {
@@ -25,6 +27,8 @@ const shared = {
     McpInvocationContext.McpInvocationContext,
     ThreadManagementService.ThreadManagementService,
     PmService,
+    PmStore, // pipelines:
+    PipelineService, // pipelines:
   ],
 };
 
@@ -100,11 +104,40 @@ const PmWorkerStartTool = pmTool(
     brief: TrimmedNonEmptyString.check(Schema.isMaxLength(120000)),
     item: Schema.optional(ItemRef),
     modelSelection: Schema.optional(ModelSelection),
+    // pipelines: a role picks the model from the user's tiers, accounts and usage limits.
+    role: Schema.optional(
+      TrimmedNonEmptyString.annotate({
+        description:
+          "Role from pm_roles, such as builder, reviewer or architect. Picks the model and adds the role's instructions. Prefer it to modelSelection.",
+      }),
+    ),
+    escalate: Schema.optional(
+      Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 2 })).annotate({
+        description: "Tiers above the role's own, after failed attempts on the same card.",
+      }),
+    ),
+    avoid_provider_of: Schema.optional(
+      Schema.Array(TrimmedNonEmptyString).annotate({
+        description:
+          "Thread ids whose vendor this worker should not share, such as the builder a reviewer checks.",
+      }),
+    ),
     workspaceStrategy: Schema.optional(OrchestrationV2ThreadLaunchWorkspaceStrategy),
     runtimeMode: Schema.optional(RuntimeMode),
     interactionMode: Schema.optional(ProviderInteractionMode),
   },
 ).annotate(Tool.Destructive, true);
+const PmPipelinesTool = pmTool(
+  // pipelines:
+  "pm_pipelines",
+  "The pipelines for this project (built-in plus the project's .pipelines folder). Without a name, one line each; with a name, its stages as a checklist with the rules for running it.",
+  { name: Schema.optional(TrimmedNonEmptyString) },
+);
+const PmRolesTool = pmToolWithoutParameters(
+  // pipelines:
+  "pm_roles",
+  "Every worker role, its tier, and the model it would run on right now given the user's accounts and usage limits.",
+);
 const PmWorkerLinkTool = pmTool(
   "pm_worker_link",
   "Adopt an existing thread in your project as your worker, after the user agreed. Its reports then come to you.",
@@ -222,4 +255,6 @@ export const PmToolkit = Toolkit.make(
   PmLinkAddTool,
   PmPageShowTool,
   PmPageRetireTool,
+  PmPipelinesTool, // pipelines:
+  PmRolesTool, // pipelines:
 );
