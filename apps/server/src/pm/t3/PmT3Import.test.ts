@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
   CheckpointScopeId,
+  CommandId,
   EventId,
   MessageId,
   type OrchestrationV2AppThread,
@@ -17,13 +18,16 @@ import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as ServerConfig from "../../config.ts";
 import { checkpointRefForScopeOrdinal } from "../../orchestration-v2/CheckpointService.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as RuntimeLayer from "../../orchestration-v2/runtimeLayer.ts";
+import * as ManagedProjectFolders from "../../project/ManagedProjectFolders.ts";
 import * as ProjectEnrichment from "../../project/ProjectEnrichmentService.ts";
+import * as ProjectService from "../../project/ProjectService.ts";
 import { migrationManifest, runMigrations } from "../../persistence/Migrations.ts";
 import * as SqlitePersistence from "../../persistence/Sqlite.ts";
 import * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
@@ -46,7 +50,34 @@ const NO_ENRICHMENT = {
 
 const layerBase = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer);
 
+/** PM3code's No project at its home's scratch folder, as ManagedProjectFolders creates it. */
+const layerNoProject = Layer.effect(
+  ManagedProjectFolders.ManagedProjectFolders,
+  Effect.gen(function* () {
+    const config = yield* ServerConfig.ServerConfig;
+    const projects = yield* ProjectService.ProjectService;
+    const fs = yield* FileSystem.FileSystem;
+    const root = ManagedProjectFolders.scratchFolderRoot(config.baseDir, yield* Path.Path);
+    return {
+      scratchRoot: Effect.succeedSome(root),
+      ensureScratchProject: fs.makeDirectory(root, { recursive: true }).pipe(
+        Effect.andThen(
+          projects.bootstrap({
+            commandId: CommandId.make("scratch-project:test"),
+            projectId: ProjectId.make("pm-no-project"),
+            title: "No project",
+            workspaceRoot: root,
+          }),
+        ),
+        Effect.map(({ project }) => ({ projectId: project.id })),
+        Effect.orDie,
+      ),
+    } as unknown as ManagedProjectFolders.ManagedProjectFolders["Service"];
+  }),
+);
+
 const layerPmServer = PmLayer.layer.pipe(
+  Layer.provideMerge(layerNoProject),
   Layer.provideMerge(RuntimeLayer.layerProjectService),
   Layer.provideMerge(
     Layer.mock(ProjectEnrichment.ProjectEnrichmentService)({
@@ -68,6 +99,7 @@ const threadOf = (
   projectId: string,
   title: string,
   at: DateTime.Utc,
+  worktreePath: string | null = null,
 ): OrchestrationV2AppThread => ({
   id: ThreadId.make(id),
   projectId: ProjectId.make(projectId),
@@ -77,7 +109,7 @@ const threadOf = (
   runtimeMode: "full-access",
   interactionMode: "default",
   branch: null,
-  worktreePath: null,
+  worktreePath,
   activeProviderThreadId: null,
   lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: ThreadId.make(id) },
   forkedFrom: null,
@@ -93,11 +125,17 @@ const threadOf = (
 });
 
 /** A thread with one message, written the way the server writes projections. */
-const putThread = (input: { id: string; projectId: string; title: string; text: string }) =>
+const putThread = (input: {
+  id: string;
+  projectId: string;
+  title: string;
+  text: string;
+  worktreePath?: string;
+}) =>
   Effect.gen(function* () {
     const store = yield* ProjectionStore.ProjectionStoreV2;
     const now = yield* DateTime.now;
-    const thread = threadOf(input.id, input.projectId, input.title, now);
+    const thread = threadOf(input.id, input.projectId, input.title, now, input.worktreePath);
     yield* store.apply({
       id: EventId.make(`event:thread:${input.id}`),
       type: "thread.created",
@@ -198,6 +236,45 @@ const makeT3Home = Effect.gen(function* () {
   return { home, repo, dbPath, t3Refs: t3Refs.sort(), listRefs, run };
 });
 
+const T3_NO_PROJECT = "t3-no-project";
+const T3_SCRATCH_THREAD = "6d1f3c4e-0000-4000-8000-0000scratch1";
+
+/** T3 Code's own No project in that home, with one thread working in its own folder. */
+const addT3NoProject = (t3: { home: string; dbPath: string }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* (yield* FileSystem.FileSystem).makeDirectory(`${t3.home}/scratch`, { recursive: true });
+    const now = DateTime.formatIso(yield* DateTime.now);
+    yield* sql`INSERT INTO projection_projects ${sql.insert({
+      project_id: T3_NO_PROJECT,
+      title: "No project",
+      workspace_root: `${t3.home}/scratch`,
+      scripts_json: "[]",
+      created_at: now,
+      updated_at: now,
+    })}`;
+    yield* putThread({
+      id: T3_SCRATCH_THREAD,
+      projectId: T3_NO_PROJECT,
+      title: "Scratch thread",
+      text: "hi",
+      worktreePath: `${t3.home}/scratch/2026-11-25-hi-1`,
+    });
+  }).pipe(
+    Effect.provide(
+      Layer.fresh(ProjectionStore.layer).pipe(
+        Layer.provideMerge(NodeSqliteClient.layer({ filename: t3.dbPath })),
+      ),
+    ),
+  );
+
+const pmProjects = Effect.flatMap(
+  SqlClient.SqlClient,
+  (sql) => sql<{ project_id: string; title: string; workspace_root: string }>`
+    SELECT project_id, title, workspace_root FROM projection_projects WHERE deleted_at IS NULL
+    ORDER BY project_id`,
+);
+
 const withT3Home = (home: string) =>
   Effect.provideService(HostProcess.Environment, { ...process.env, [T3_HOME_ENV]: home });
 
@@ -280,6 +357,53 @@ describe("launch read", () => {
       assert.strictEqual(again.length, 1);
     }).pipe(Effect.scoped, Effect.provide(layerPmServer)),
   );
+
+  it.live("moves an earlier import's copy of T3 Code's No project into PM3code's own", () =>
+    Effect.gen(function* () {
+      const t3 = yield* makeT3Home;
+      const projects = yield* ProjectService.ProjectService;
+      yield* (yield* FileSystem.FileSystem).makeDirectory(`${t3.home}/scratch`);
+      // What earlier builds left: an ordinary project at T3 Code's scratch folder.
+      yield* projects.create({
+        commandId: CommandId.make("command:old-import"),
+        projectId: ProjectId.make("stray-no-project"),
+        title: "No project",
+        workspaceRoot: `${t3.home}/scratch`,
+      });
+      yield* putThread({
+        id: "pm-scratch-thread",
+        projectId: "stray-no-project",
+        title: "Old scratch",
+        text: "hi",
+        worktreePath: `${t3.home}/scratch/2026-11-20-hi-1`,
+      });
+      const service = yield* PmT3Import;
+      yield* addT3NoProject(t3);
+      yield* service.syncProjectsAtLaunch.pipe(withT3Home(t3.home));
+      const sql = yield* SqlClient.SqlClient;
+      const expected = [
+        { project_id: "pm-no-project", title: "No project" },
+        { project_id: T3_PROJECT, title: "From T3" },
+      ];
+      const projectsNow = (yield* pmProjects).map(({ project_id, title }) => ({
+        project_id,
+        title,
+      }));
+      assert.deepStrictEqual(projectsNow, expected);
+      const moved = yield* sql<{ project_id: string; worktree_path: string | null }>`
+        SELECT project_id, json_extract(payload_json, '$.worktreePath') AS worktree_path
+        FROM orchestration_v2_projection_threads WHERE thread_id = 'pm-scratch-thread'`;
+      assert.deepStrictEqual(moved, [
+        { project_id: "pm-no-project", worktree_path: `${t3.home}/scratch/2026-11-20-hi-1` },
+      ]);
+
+      yield* service.syncProjectsAtLaunch.pipe(withT3Home(t3.home));
+      assert.deepStrictEqual(
+        (yield* pmProjects).map(({ project_id, title }) => ({ project_id, title })),
+        expected,
+      );
+    }).pipe(Effect.scoped, Effect.provide(layerPmServer)),
+  );
 });
 
 describe("import from T3 Code", () => {
@@ -315,6 +439,33 @@ describe("import from T3 Code", () => {
       assert.strictEqual(second.imported, 0);
       assert.strictEqual(second.skippedAlreadyImported, 1);
       assert.strictEqual((yield* pmThreads).length, 1);
+    }).pipe(Effect.scoped, Effect.provide(layerPmServer)),
+  );
+
+  it.live("takes T3 Code's No project threads into PM3code's own No project", () =>
+    Effect.gen(function* () {
+      const t3 = yield* makeT3Home;
+      yield* addT3NoProject(t3);
+      const service = yield* PmT3Import;
+      const result = yield* service.importThreads("import").pipe(withT3Home(t3.home));
+      assert.strictEqual(result.imported, 2);
+      assert.strictEqual(result.skippedNoProject, 0);
+      const pmBaseDir = (yield* ServerConfig.ServerConfig).baseDir;
+      assert.deepStrictEqual(yield* pmProjects, [
+        {
+          project_id: "pm-no-project",
+          title: "No project",
+          workspace_root: `${pmBaseDir}/scratch`,
+        },
+        { project_id: T3_PROJECT, title: "From T3", workspace_root: t3.repo },
+      ]);
+      const sql = yield* SqlClient.SqlClient;
+      const scratch = yield* sql<{ project_id: string; worktree_path: string | null }>`
+        SELECT project_id, json_extract(payload_json, '$.worktreePath') AS worktree_path
+        FROM orchestration_v2_projection_threads WHERE title = 'Scratch thread'`;
+      assert.deepStrictEqual(scratch, [
+        { project_id: "pm-no-project", worktree_path: `${t3.home}/scratch/2026-11-25-hi-1` },
+      ]);
     }).pipe(Effect.scoped, Effect.provide(layerPmServer)),
   );
 

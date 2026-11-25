@@ -1,10 +1,12 @@
 import {
   CheckpointScopeId,
+  CommandId,
   EventId,
   PmError,
   type PmT3ImportMode,
   type PmT3ImportResult,
   type PmT3Status,
+  ProjectId,
   ThreadId,
 } from "@t3tools/contracts";
 import { randomUuidV4 } from "@t3tools/provider-core/server/randomUuid";
@@ -16,6 +18,7 @@ import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -23,6 +26,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as ServerConfig from "../../config.ts";
 import { checkpointRefForScopeOrdinal } from "../../orchestration-v2/CheckpointService.ts";
+import * as ManagedProjectFolders from "../../project/ManagedProjectFolders.ts";
 import * as ProjectService from "../../project/ProjectService.ts";
 import * as EventSink from "../../orchestration-v2/EventSink.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
@@ -31,7 +35,13 @@ import { EVENT_LOG_PRUNED_THROUGH } from "../../persistence/OrchestrationEventSt
 import * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
 import { PmService } from "../PmService.ts";
 import { pmVisibility } from "../PmVisibility.ts";
-import { readSyncState, setSyncEnabled, syncProjects, syncProjectsAtLaunch } from "./PmT3Sync.ts";
+import {
+  readSyncState,
+  setSyncEnabled,
+  syncProjects,
+  syncProjectsAtLaunch,
+  t3ScratchRoots,
+} from "./PmT3Sync.ts";
 import { readTables, resolveT3Source, snapshotDatabase, type T3Source } from "./T3Source.ts";
 
 // t3code-pm: copies T3 Code's threads into PM3code, one way. Imported threads get new ids, and
@@ -161,6 +171,8 @@ const make = Effect.gen(function* () {
   const eventSink = yield* EventSink.EventSinkV2;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const pm = yield* PmService;
+  const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
+  const projectService = yield* ProjectService.ProjectService;
   const lock = yield* Semaphore.make(1);
   const context = yield* Effect.context<
     | FileSystem.FileSystem
@@ -181,6 +193,15 @@ const make = Effect.gen(function* () {
 
   const toPmErrorEarly = (operation: string) => (error: unknown) =>
     isPmError(error) ? Effect.fail(error) : sqlError(operation)(error);
+
+  const pmNoProject = managedFolders.ensureScratchProject.pipe(
+    Effect.map(({ projectId }) => Option.some<string>(projectId)),
+    Effect.catchCause((cause) =>
+      Effect.logWarning("PM3code has no No project for T3 Code's", { cause }).pipe(
+        Effect.as(Option.none<string>()),
+      ),
+    ),
+  );
 
   const source = resolveT3Source(config.baseDir).pipe(
     Effect.filterOrFail(
@@ -441,6 +462,8 @@ const make = Effect.gen(function* () {
     const projects = yield* syncProjects({
       config,
       dbPath: found.dbPath,
+      t3Home: found.home,
+      pmNoProject,
       respectSeen: false,
     }).pipe(Effect.provide(context));
     const already = new Set(
@@ -622,6 +645,68 @@ const make = Effect.gen(function* () {
     } satisfies PmT3ImportResult;
   });
 
+  /**
+   * Earlier imports copied T3 Code's No project as an ordinary project at T3's scratch folder.
+   * Moves its threads into PM3code's No project, keeping each one's folder, then removes it.
+   */
+  const repairImportedNoProject = Effect.gen(function* () {
+    const found = yield* resolveT3Source(config.baseDir);
+    if (found === null) return;
+    const t3Scratch = yield* t3ScratchRoots(found.home);
+    const stray = (yield* sql<{ project_id: string; workspace_root: string }>`
+      SELECT project_id, workspace_root FROM projection_projects WHERE deleted_at IS NULL`).filter(
+      (row) => t3Scratch.has(path.resolve(row.workspace_root)),
+    );
+    if (stray.length === 0) return;
+    const target = yield* pmNoProject;
+    if (Option.isNone(target)) return;
+    for (const project of stray) {
+      if (project.project_id === target.value) continue;
+      const threadIds = (yield* sql<{ thread_id: string }>`
+        SELECT thread_id FROM orchestration_v2_projection_threads
+        WHERE project_id = ${project.project_id} AND deleted_at IS NULL`).map(
+        (row) => row.thread_id,
+      );
+      const [active] = yield* sql<{ count: number }>`
+        SELECT COUNT(*) AS count FROM orchestration_v2_projection_runs
+        WHERE thread_id IN ${sql.in(threadIds.length > 0 ? threadIds : [""])}
+          AND status IN ${sql.in(ACTIVE_RUN_STATUSES)}`;
+      // A running thread rewrites its own metadata; the next launch moves them once it is idle.
+      if (Number(active?.count ?? 0) > 0) continue;
+      for (const threadId of threadIds) {
+        const thread = yield* projections.getThread(ThreadId.make(threadId));
+        const occurredAt = yield* DateTime.now;
+        yield* eventSink.write({
+          events: [
+            {
+              id: EventId.make(`event:pm-t3-no-project:${threadId}:${yield* randomUuidV4}`),
+              type: "thread.metadata-updated",
+              threadId: thread.id,
+              providerInstanceId: thread.providerInstanceId,
+              occurredAt,
+              payload: {
+                ...thread,
+                projectId: ProjectId.make(target.value),
+                worktreePath: thread.worktreePath ?? project.workspace_root,
+                updatedAt: occurredAt,
+              },
+            },
+          ],
+        });
+      }
+      yield* sql`UPDATE pm_threads SET project_id = ${target.value}
+        WHERE project_id = ${project.project_id}`;
+      yield* projectService.delete({
+        commandId: CommandId.make(`command:pm-t3-no-project:${yield* randomUuidV4}`),
+        projectId: ProjectId.make(project.project_id),
+      });
+    }
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning("Could not move T3 Code's No project into PM3code's", { cause }),
+    ),
+  );
+
   const toPmError = (operation: string) => (error: unknown) =>
     isPmError(error) ? Effect.fail(error) : sqlError(operation)(error);
 
@@ -640,10 +725,12 @@ const make = Effect.gen(function* () {
       lock.withPermits(1)(
         runImport(mode).pipe(Effect.catch(toPmError("copying threads")), Effect.provide(context)),
       ),
-    syncProjectsAtLaunch: syncProjectsAtLaunch({
-      baseDir: config.baseDir,
-      stateDir: config.stateDir,
-    }).pipe(Effect.provide(context)),
+    syncProjectsAtLaunch: repairImportedNoProject.pipe(
+      Effect.andThen(
+        syncProjectsAtLaunch({ baseDir: config.baseDir, stateDir: config.stateDir }, pmNoProject),
+      ),
+      Effect.provide(context),
+    ),
   };
 });
 

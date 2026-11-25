@@ -19,6 +19,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import type * as ServerConfig from "../../config.ts";
+import { scratchFolderRoot } from "../../project/ManagedProjectFolders.ts";
 import * as ProjectService from "../../project/ProjectService.ts";
 import { mergeFollowedSettings, type SettingsBaseline } from "./settingsMerge.ts";
 import { readJsonFile, readTables, resolveT3Source } from "./T3Source.ts";
@@ -178,6 +179,17 @@ const decodeModelSelection = Schema.decodeUnknownEffect(Schema.fromJsonString(Mo
 
 const text = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : null);
 
+/** T3 Code's No project folder, as written and as resolved through a symlink. */
+export const t3ScratchRoots = Effect.fn("PmT3Sync.t3ScratchRoots")(function* (t3Home: string) {
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
+  const root = scratchFolderRoot(t3Home, path);
+  return new Set([root, yield* fs.realPath(root).pipe(Effect.orElseSucceed(() => root))]);
+});
+
+/** PM3code's own No project, created on first use; none when this home cannot have one. */
+export type PmNoProject = Effect.Effect<Option.Option<string>>;
+
 /**
  * Adds T3 Code's projects whose folder PM3code has no project for, keeping T3 Code's id when it is
  * free so its threads and per-project settings line up. Returns T3 project id → PM3code id.
@@ -185,10 +197,13 @@ const text = (value: unknown) => (typeof value === "string" && value.length > 0 
 export const syncProjects = Effect.fn("PmT3Sync.projects")(function* (input: {
   readonly config: ConfigPaths;
   readonly dbPath: string;
+  readonly t3Home: string;
+  readonly pmNoProject: PmNoProject;
   /** The launch read skips folders it offered before; an import adds every project it needs. */
   readonly respectSeen: boolean;
 }) {
   const path = yield* Path.Path;
+  const t3Scratch = yield* t3ScratchRoots(input.t3Home);
   const sql = yield* SqlClient.SqlClient;
   const projects = yield* ProjectService.ProjectService;
   const scratch = path.join(input.config.stateDir, `pm-t3-projects-${yield* randomUuidV4}.sqlite`);
@@ -211,6 +226,12 @@ export const syncProjects = Effect.fn("PmT3Sync.projects")(function* (input: {
   for (const row of t3Projects) {
     const t3Id = String(row.project_id);
     const root = path.resolve(String(row.workspace_root));
+    // T3 Code's No project is PM3code's own No project, never an ordinary project at T3's folder.
+    if (t3Scratch.has(root)) {
+      const noProject = yield* input.pmNoProject;
+      if (Option.isSome(noProject)) idMap.set(t3Id, noProject.value);
+      continue;
+    }
     const existing = pmByRoot.get(root);
     if (existing !== undefined) {
       idMap.set(t3Id, existing);
@@ -269,14 +290,20 @@ export const syncProjects = Effect.fn("PmT3Sync.projects")(function* (input: {
 
 /** The launch half that needs the running server: new projects. Never fails the server. */
 export const syncProjectsAtLaunch = Effect.fn("PmT3Sync.projectsAtLaunch")(
-  function* (config: ConfigPaths) {
+  function* (config: ConfigPaths, pmNoProject: PmNoProject) {
     const state = yield* readSyncState(config.stateDir);
     if (!state.enabled) return;
     const source = yield* resolveT3Source(config.baseDir);
     if (source === null) return;
     const fs = yield* FileSystem.FileSystem;
     if (!(yield* fs.exists(source.dbPath))) return;
-    const { added } = yield* syncProjects({ config, dbPath: source.dbPath, respectSeen: true });
+    const { added } = yield* syncProjects({
+      config,
+      dbPath: source.dbPath,
+      t3Home: source.home,
+      pmNoProject,
+      respectSeen: true,
+    });
     yield* updateSyncState(config.stateDir, (current) => ({
       ...current,
       lastLaunch:
