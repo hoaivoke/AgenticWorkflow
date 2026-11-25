@@ -47,6 +47,9 @@ export const BUILTIN_ROLES: ReadonlyArray<Role> = [
       "Plans the change, splits it into worker-sized task cards, and writes the threat model.",
     tier: "frontier",
     access: "read-only",
+    contextFiles: ["AGENTS.md", "README.md", "ARCHITECTURE.md"],
+    toolkits: ["read-only"],
+    outputContract: "plan.md, tasks/T<n>.md, and threat-model.md in the run folder.",
     instructions: [
       RUN_FOLDER_RULE,
       "Read spec.md and features.json. Write plan.md: approach, data model and API changes, files to touch, risks, and the order of work.",
@@ -60,6 +63,8 @@ export const BUILTIN_ROLES: ReadonlyArray<Role> = [
     description: "Challenges a plan with fresh eyes before any code is written.",
     tier: "frontier",
     access: "read-only",
+    toolkits: ["read-only"],
+    outputContract: "plan-review.md ending with APPROVE or CHANGES REQUESTED.",
     instructions: [
       RUN_FOLDER_RULE,
       "Review plan.md, tasks/ and threat-model.md against spec.md as a skeptical staff engineer. You did not write the plan.",
@@ -71,6 +76,9 @@ export const BUILTIN_ROLES: ReadonlyArray<Role> = [
     description: "Implements one task card, with tests, in its own worktree.",
     tier: "mid",
     access: "write",
+    contextFiles: ["AGENTS.md"],
+    toolkits: ["workspace", "git"],
+    outputContract: "Committed implementation + tests, and an entry appended to progress.md.",
     instructions: [
       RUN_FOLDER_RULE,
       "Implement exactly the task card in the brief. Read plan.md and threat-model.md first.",
@@ -85,11 +93,50 @@ export const BUILTIN_ROLES: ReadonlyArray<Role> = [
     tier: "mid",
     access: "write",
     multimodal: true,
+    skills: ["modern-web-guidance", "a11y-debugging"],
+    contextFiles: ["AGENTS.md", "docs/design-system.md", "docs/ui.md"],
+    toolkits: ["preview", "previewControls", "device"],
+    outputContract:
+      "Updated UI files, browser verification screenshots in run folder, and progress.md.",
     instructions: [
       RUN_FOLDER_RULE,
       "Implement the UI task card in the brief, matching any mockups or screenshots it names.",
+      "Check semantic HTML, keyboard navigation, focus states, responsive layout (desktop & phone widths), and contrast.",
       "Run the app and look at the result in a browser at desktop and phone widths before reporting. Save screenshots to the run folder and name them in your report.",
       "Commit when the card's checks pass, and append to progress.md.",
+    ].join("\n"),
+  },
+  {
+    name: "ux-reviewer",
+    description:
+      "Reviews rendered UI for usability, accessibility, layout issues, and dead controls.",
+    tier: "mid",
+    access: "read-only",
+    multimodal: true,
+    skills: ["a11y-debugging"],
+    contextFiles: ["docs/design-system.md", "docs/ui.md"],
+    toolkits: ["preview", "previewControls", "read-only"],
+    outputContract:
+      "ux-review.md with concrete visual/a11y/interaction findings ending with APPROVE or CHANGES REQUESTED.",
+    instructions: [
+      RUN_FOLDER_RULE,
+      "Inspect the rendered UI across desktop and narrow viewports. Test hover, focus, keyboard navigation, click actions, empty states, and error states.",
+      "Write ux-review.md with numbered findings (component/selector, expected vs observed behavior, fix). End with APPROVE or CHANGES REQUESTED.",
+    ].join("\n"),
+  },
+  {
+    name: "verifier",
+    description:
+      "Adversarially verifies another worker's diff, tests, and behavior without editing code.",
+    tier: "mid",
+    access: "read-only",
+    toolkits: ["read-only"],
+    outputContract:
+      "Concise PASS/FAIL verification report citing exact files, lines, and command outputs.",
+    instructions: [
+      RUN_FOLDER_RULE,
+      "Treat author claims as unverified until you inspect the diff and run checks yourself.",
+      "Never edit implementation files so two workers never collide in the same file. Post concrete failures back to the author or PM/Swarm board.",
     ].join("\n"),
   },
   {
@@ -98,6 +145,8 @@ export const BUILTIN_ROLES: ReadonlyArray<Role> = [
     tier: "small",
     maxTier: "small",
     access: "read-only",
+    toolkits: ["shell-gates"],
+    outputContract: "gates.json: [{ command, exitCode, summary }].",
     instructions: [
       RUN_FOLDER_RULE,
       "Run each command in the brief, in order, from the workspace the brief names. Do not fix anything and do not skip a command.",

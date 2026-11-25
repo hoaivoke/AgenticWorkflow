@@ -50,6 +50,12 @@ import {
   createTranscriptJsonSelector,
   TranscriptJsonLimitError,
 } from "./AgentSessionJson.ts";
+import {
+  parseAntigravityConversationDb,
+  readAntigravityDbCwd,
+  readAntigravitySummaries,
+  type AntigravityConversationSummary,
+} from "./AntigravityTranscriptReader.ts";
 
 const TRANSCRIPT_PREFIX_BYTES = 32 * 1024;
 
@@ -1202,6 +1208,17 @@ export const make = Effect.gen(function* () {
     transcript: TranscriptCandidate,
     budget: MetadataReadBudget,
   ) {
+    if (source === "antigravity") {
+      if (budget.operationsRemaining < 1) {
+        budget.truncated = true;
+        return null;
+      }
+      budget.operationsRemaining -= 1;
+      const summary = readAntigravitySummaries(transcript.homePath).get(
+        path.basename(transcript.filePath, ".db"),
+      );
+      return summary?.cwd ?? readAntigravityDbCwd(transcript.filePath);
+    }
     if (transcript.identity.size === 0) return null;
     if (
       budget.bytesRemaining === 0 ||
@@ -1709,6 +1726,68 @@ export const make = Effect.gen(function* () {
     return { transcripts, truncated, operationsUsed: operationBudget - operationsRemaining };
   });
 
+  const antigravityTranscriptIdentity = Effect.fn(
+    "AgentSessionScanner.antigravityTranscriptIdentity",
+  )(function* (filePath: string, stats: FileSystem.File.Info) {
+    const base = transcriptIdentity(filePath, stats);
+    const walStats = yield* statOption(`${filePath}-wal`);
+    if (Option.isNone(walStats) || walStats.value.type !== "File") {
+      return base;
+    }
+    const walMtimeMs = Option.match(walStats.value.mtime, {
+      onNone: () => 0,
+      onSome: (date) => date.getTime(),
+    });
+    return {
+      ...base,
+      size: base.size + Number(walStats.value.size),
+      mtimeMs: Math.max(base.mtimeMs ?? 0, walMtimeMs),
+    };
+  });
+
+  const discoverAntigravityTranscripts = Effect.fn(
+    "AgentSessionScanner.discoverAntigravityTranscripts",
+  )(function* (homePath: string, providerInstanceId: ProviderInstanceId, operationBudget: number) {
+    const conversationsDir = path.join(homePath, "conversations");
+    let operationsRemaining = operationBudget;
+    let truncated = false;
+    if (operationsRemaining <= 0) {
+      return { transcripts: [], truncated: true, operationsUsed: 0 };
+    }
+    operationsRemaining -= 1;
+    const entries = (yield* listDirectory(conversationsDir)).filter((entry) =>
+      entry.endsWith(".db"),
+    );
+    const summaries = readAntigravitySummaries(homePath);
+    const transcripts: Array<TranscriptCandidate> = [];
+    for (const entry of entries) {
+      if (operationsRemaining <= 0) {
+        truncated = true;
+        break;
+      }
+      operationsRemaining -= 1;
+      const filePath = path.join(conversationsDir, entry);
+      const stats = yield* statOption(filePath);
+      if (Option.isNone(stats) || stats.value.type !== "File" || Option.isNone(stats.value.mtime)) {
+        continue;
+      }
+      const identity = yield* antigravityTranscriptIdentity(filePath, stats.value);
+      const summary = summaries.get(path.basename(entry, ".db"));
+      const mtimeMs = Math.max(
+        identity.mtimeMs ?? stats.value.mtime.value.getTime(),
+        summary?.lastModifiedAtMs ?? 0,
+      );
+      transcripts.push({
+        filePath,
+        mtimeMs,
+        providerInstanceId,
+        homePath,
+        identity,
+      });
+    }
+    return { transcripts, truncated, operationsUsed: operationBudget - operationsRemaining };
+  });
+
   const groupTranscriptsByCwd = Effect.fn("AgentSessionScanner.groupTranscriptsByCwd")(function* (
     source: AgentSessionSource,
     transcripts: ReadonlyArray<TranscriptCandidate>,
@@ -1796,7 +1875,7 @@ export const make = Effect.gen(function* () {
     let truncated = false;
     let metadataTruncated = false;
 
-    for (const source of ["claudeAgent", "codex", "pi"] as const) {
+    for (const source of ["claudeAgent", "codex", "pi", "antigravity"] as const) {
       const instances: Array<{
         readonly instanceId: ProviderInstanceId;
         readonly config: ProviderInstanceConfig;
@@ -1833,23 +1912,40 @@ export const make = Effect.gen(function* () {
           return typeof configured === "string" ? configured : hostEnvironment[name];
         };
 
-        let homePath: string;
-        if (source === "pi") {
+        const homePaths: Array<string> = [];
+        if (source === "antigravity") {
           const environment = yield* mergeProviderInstanceEnvironment(
             instance.environment,
             hostEnvironment,
           ).pipe(Effect.provideService(HostProcess.HomeDirectory, homeDir));
-          homePath = resolvePiSessionsDir(
-            environment,
-            piHome(environment, homeDir, platform),
-            path,
+          const configuredCliHome = environment.ANTIGRAVITY_CLI_HOME?.trim();
+          const configuredGeminiHome = environment.GEMINI_CLI_HOME?.trim();
+          if (configuredCliHome) {
+            homePaths.push(path.resolve(expandHomePath(configuredCliHome, homeDir)));
+          } else if (configuredGeminiHome) {
+            homePaths.push(path.resolve(expandHomePath(configuredGeminiHome, homeDir)));
+          } else {
+            const effectiveHome = environment.HOME?.trim()
+              ? path.resolve(expandHomePath(environment.HOME.trim(), homeDir))
+              : homeDir;
+            homePaths.push(
+              path.join(effectiveHome, ".gemini", "antigravity-cli"),
+              path.join(effectiveHome, ".gemini", "antigravity"),
+            );
+          }
+        } else if (source === "pi") {
+          const environment = yield* mergeProviderInstanceEnvironment(
+            instance.environment,
+            hostEnvironment,
+          ).pipe(Effect.provideService(HostProcess.HomeDirectory, homeDir));
+          homePaths.push(
+            resolvePiSessionsDir(environment, piHome(environment, homeDir, platform), path),
           );
         } else if (source === "claudeAgent") {
           const config = decodeClaudeSettings(instance.config ?? {});
           if (Option.isNone(config)) continue;
-          homePath = resolveClaudeConfigDir(
-            config.value.homePath,
-            environmentHome("CLAUDE_CONFIG_DIR"),
+          homePaths.push(
+            resolveClaudeConfigDir(config.value.homePath, environmentHome("CLAUDE_CONFIG_DIR")),
           );
         } else {
           const config = decodeCodexSettings(instance.config ?? {});
@@ -1864,13 +1960,15 @@ export const make = Effect.gen(function* () {
           const layout = yield* resolveCodexHomeLayout(codexSettings).pipe(
             Effect.provideService(Path.Path, path),
           );
-          homePath = layout.sharedHomePath;
+          homePaths.push(layout.sharedHomePath);
         }
 
-        const homeKey = `${source}\0${yield* directoryIdentity(homePath)}`;
-        if (seenHomes.has(homeKey)) continue;
-        seenHomes.add(homeKey);
-        homes.push({ homePath, providerInstanceId: instanceId });
+        for (const homePath of homePaths) {
+          const homeKey = `${source}\0${yield* directoryIdentity(homePath)}`;
+          if (seenHomes.has(homeKey)) continue;
+          seenHomes.add(homeKey);
+          homes.push({ homePath, providerInstanceId: instanceId });
+        }
       }
 
       const transcriptCandidates: Array<TranscriptCandidate> = [];
@@ -1879,7 +1977,9 @@ export const make = Effect.gen(function* () {
           ? discoverClaudeTranscripts
           : source === "codex"
             ? discoverCodexTranscripts
-            : discoverPiTranscripts;
+            : source === "pi"
+              ? discoverPiTranscripts
+              : discoverAntigravityTranscripts;
       const shares = splitOperationBudget(MAX_DISCOVERY_OPERATIONS_PER_SOURCE, homes.length);
       const discovered: Array<{
         readonly transcripts: ReadonlyArray<TranscriptCandidate>;
@@ -2193,6 +2293,18 @@ export const make = Effect.gen(function* () {
       }
       return prefixes.flat();
     });
+    const antigravitySummariesByHome = new Map<
+      string,
+      ReadonlyMap<string, AntigravityConversationSummary>
+    >();
+    const readAntigravitySummaryMap = (homePath: string) => {
+      let cached = antigravitySummariesByHome.get(homePath);
+      if (cached === undefined) {
+        cached = readAntigravitySummaries(homePath);
+        antigravitySummariesByHome.set(homePath, cached);
+      }
+      return cached;
+    };
     return Stream.fromIteratorSucceed(eligibleTranscripts.values(), 1).pipe(
       Stream.mapEffect(({ candidate, transcript }) =>
         Effect.gen(function* () {
@@ -2206,7 +2318,10 @@ export const make = Effect.gen(function* () {
           if (Option.isNone(stats) || stats.value.type !== "File") {
             return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
           }
-          const identity = transcriptIdentity(transcript.filePath, stats.value);
+          const identity =
+            candidate.source === "antigravity"
+              ? yield* antigravityTranscriptIdentity(transcript.filePath, stats.value)
+              : transcriptIdentity(transcript.filePath, stats.value);
           const completedSource = completed?.find(
             (source) =>
               source.provider === candidate.source && sameTranscriptIdentity(source, identity),
@@ -2229,6 +2344,56 @@ export const make = Effect.gen(function* () {
           }
           transcriptsRemaining -= 1;
           bytesRemaining -= identity.size;
+
+          if (candidate.source === "antigravity") {
+            const sessionId = path.basename(transcript.filePath, ".db");
+            const summary = readAntigravitySummaryMap(candidate.homePath).get(sessionId);
+            const parsedDb = parseAntigravityConversationDb({
+              filePath: transcript.filePath,
+              providerInstanceId: candidate.providerInstanceId,
+              sessionId,
+              lastActiveAtMs: Math.max(transcript.mtimeMs, summary?.lastModifiedAtMs ?? 0),
+              summary,
+            });
+            if (parsedDb.cwd === null) {
+              return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
+            }
+            const expandedCwd = expandHomePath(
+              projectCwd(parsedDb.cwd, transcript.projectRoots).trim(),
+              homeDir,
+            );
+            if (
+              !path.isAbsolute(expandedCwd) ||
+              !(yield* belongsToRoot(path.resolve(expandedCwd)))
+            ) {
+              return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
+            }
+            if (parsedDb.thread === "empty") {
+              transcriptsRemaining += 1;
+              return Option.none<AgentSessionRecentThread>();
+            }
+            if (parsedDb.thread === null) {
+              return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
+            }
+            const worktree = yield* rootWorktree(path.resolve(expandedCwd));
+            const source: AgentSessionImportSource = {
+              ...identity,
+              provider: parsedDb.thread.source,
+              providerInstanceId: parsedDb.thread.providerInstanceId,
+              providerSessionId: parsedDb.thread.providerSessionId,
+            };
+            const sessionKey = `${parsedDb.thread.providerInstanceId}\0${parsedDb.thread.providerSessionId}`;
+            if (importedSessions.has(sessionKey)) {
+              return Option.some<AgentSessionRecentThread>({ _tag: "Duplicate", source });
+            }
+            importedSessions.add(sessionKey);
+            return Option.some<AgentSessionRecentThread>({
+              _tag: "Importable",
+              thread: parsedDb.thread,
+              source,
+              worktree,
+            });
+          }
           const snapshot = yield* readTranscript(transcript.filePath, identity, candidate.source);
           if (snapshot === null) {
             return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });

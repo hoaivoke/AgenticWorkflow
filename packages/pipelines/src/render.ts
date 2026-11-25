@@ -62,7 +62,8 @@ export function renderPipeline(
   });
   const rules = [
     `Run folder: ${RUNS_DIR}/<short-run-name>/ under the project root. Create it, give every worker its absolute path, and keep ${RUNS_DIR}/ out of git.`,
-    "Start each stage's workers with pm_worker_start and role set to the stage's role. Write the stage goal, the files to read and produce, and (for build) the task card into the brief.",
+    "Start each stage's workers with pm_worker_start and role set to the stage's role. Role harnesses (skills, context files, toolkits) load automatically; put only the stage goal, artifact paths, and task card in the brief.",
+    "For stages with deterministic `run:` commands (such as gatekeeper), prefer `pm_run_gates` so checks run directly at zero LLM cost before spawning an agent.",
     `A failed card goes back to its stage with the failure attached. After ${pipeline.escalateAfter ?? 2} failed attempts on one card, start the next attempt with escalate: 1 (one tier up)${pipeline.replanAfter === undefined ? "" : `; after ${pipeline.replanAfter}, send it back to planning`}.`,
     "Never let a worker review or QA its own work. Read gates.json, review.md and validated.json yourself; do not take a worker's word that checks passed.",
   ];
@@ -133,17 +134,36 @@ export function renderScheduledWorkerPrompt(
   ].join("\n");
 }
 
-/** The role section that goes at the top of a worker's brief. */
-export function renderRoleBrief(role: Role, tier: string): string {
+export interface ResolvedRoleHarness {
+  readonly skills?: ReadonlyArray<{ readonly name: string; readonly content: string }>;
+  readonly contextFiles?: ReadonlyArray<{ readonly path: string; readonly content: string }>;
+}
+
+/** The role section + resolved harness that goes at the top of a worker's brief. */
+export function renderRoleBrief(role: Role, tier: string, harness?: ResolvedRoleHarness): string {
   const access =
     role.access === "read-only"
       ? "You are read-only: never edit, create or delete project files, except the run-folder files your role writes."
       : "You may edit files in your workspace.";
-  return [
-    `## Your role: ${role.name} (${tier} tier)`,
-    role.description,
-    access,
-    "",
-    role.instructions,
-  ].join("\n");
+  const lines = [`## Your role: ${role.name} (${tier} tier)`, role.description, access];
+  if (role.toolkits && role.toolkits.length > 0) {
+    lines.push(`Recommended toolkits/scope: ${role.toolkits.join(", ")}.`);
+  }
+  if (role.outputContract) {
+    lines.push(`Output contract: ${role.outputContract}`);
+  }
+  lines.push("", role.instructions);
+  if (harness?.contextFiles && harness.contextFiles.length > 0) {
+    lines.push("", "## Role Context");
+    for (const file of harness.contextFiles) {
+      lines.push(`### ${file.path}`, file.content);
+    }
+  }
+  if (harness?.skills && harness.skills.length > 0) {
+    lines.push("", "## Role Skills");
+    for (const skill of harness.skills) {
+      lines.push(`### Skill: ${skill.name}`, skill.content);
+    }
+  }
+  return lines.join("\n");
 }

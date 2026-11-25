@@ -147,3 +147,17 @@ it("regroups the list when all models are disabled and enabled again", async () 
 
   expect(rowSlugs(screen.container)).toEqual(models.map((model) => model.slug));
 });
+
+it("triggers model refresh for Antigravity when Refresh models is clicked", async () => {
+  const onRefreshModels = vi.fn();
+  await using screen = await render(
+    section({
+      instanceId: ProviderInstanceId.make("antigravity"),
+      driverKind: ProviderDriverKind.make("antigravity"),
+      models,
+      onRefreshModels,
+    }),
+  );
+  await screen.getByRole("button", { name: "Refresh models" }).click();
+  expect(onRefreshModels).toHaveBeenCalledOnce();
+});

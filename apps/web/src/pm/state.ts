@@ -23,6 +23,7 @@ export const {
   indexAtom: pmIndexAtom,
 } = pmClient;
 const pmThreadDetail = pmClient.threadDetail;
+const pmSwarmBoardQuery = pmClient.swarmBoard;
 
 /** Upstream tests that mock `useAtomValue` hand back their own values; those read as no PMs. */
 export const usePmIndex = (): PmIndex => asPmIndex(useAtomValue(pmIndexAtom));
@@ -49,4 +50,18 @@ export function usePmThreadDetail(
       : pmThreadDetail({ environmentId, input: { pm: threadId as ThreadId } }),
   );
   return query.data ?? null;
+}
+
+/** Shared Swarm board for either the coordinator thread or one of its member threads. */
+export function useSwarmBoard(
+  environmentId: EnvironmentId | null,
+  threadId: ThreadId | string | null,
+  enabled = true,
+) {
+  const canRead = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
+  return useEnvironmentQuery(
+    environmentId === null || threadId === null || !enabled || !canRead
+      ? null
+      : pmSwarmBoardQuery({ environmentId, input: { threadId: threadId as ThreadId } }),
+  );
 }

@@ -63,6 +63,7 @@ import {
 } from "@t3tools/provider-core/server/handoffBudget";
 import {
   deliverContextHandoffs,
+  expandSwarmCommandText,
   isSlashCommandMessage,
   withInlineContext,
 } from "./ContextHandoffDelivery.ts";
@@ -1019,13 +1020,12 @@ export const layer: Layer.Layer<
       });
       let effectiveHandoffs = handoffs;
       let resumeFellBack = false;
-      const messageText = withMessageSenderNote(
-        providerMessage,
-        projectComposerContextForProvider({
-          text: providerMessage.text,
-          records: providerMessage.context?.records ?? [],
-        }),
-      );
+      const projectedPrompt = projectComposerContextForProvider({
+        text: providerMessage.text,
+        records: providerMessage.context?.records ?? [],
+      });
+      const expandedPrompt = expandSwarmCommandText(projectedPrompt) ?? projectedPrompt;
+      const messageText = withMessageSenderNote(providerMessage, expandedPrompt);
       const slashCommand = isSlashCommandMessage(providerMessage);
       const goalDriver =
         session.driver === "codex" ||

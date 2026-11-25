@@ -2047,6 +2047,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (applied) setComposerHighlightedItemId(null);
         return;
       }
+      if (item.command === "swarm") {
+        const applied = applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "/swarm ", {
+          expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
+        });
+        if (applied) setComposerHighlightedItemId(null);
+        return;
+      }
       return;
     }
     if (item.type === "provider-slash-command") {

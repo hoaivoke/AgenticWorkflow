@@ -262,6 +262,13 @@ export function useComposerMenuItems({
           label: "/model",
           description: gt("Switch response model for this thread"),
         },
+        {
+          id: "slash:swarm",
+          type: "slash-command",
+          command: "swarm",
+          label: "/swarm",
+          description: gt("Coordinate parallel worker agents on a shared Swarm board"),
+        },
         ...(sideChatAvailable
           ? ([
               {
