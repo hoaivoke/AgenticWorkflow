@@ -4,24 +4,22 @@ export interface SyncMessage {
   readonly text: string;
 }
 
+/** A thread message, and whether it came from the transcript (import or live sync). */
+export interface StoredMessage extends SyncMessage {
+  readonly fromTranscript: boolean;
+}
+
 /** Messages that must match to place the thread's history inside a re-read transcript. */
 const ANCHOR_LENGTH = 3;
 
 const same = (left: SyncMessage, right: SyncMessage) =>
   left.role === right.role && left.text === right.text;
 
-/**
- * The transcript messages that come after everything the thread already shows. The thread's
- * last few messages are found in the transcript, newest occurrence first, and what follows
- * them is new. Returns null when the thread's history cannot be found in the transcript (it
- * was rewritten, cleared or compacted), so nothing is added out of order.
- */
-export function messagesToAppend<M extends SyncMessage>(
-  stored: ReadonlyArray<SyncMessage>,
+function afterAnchor<M extends SyncMessage>(
+  anchor: ReadonlyArray<SyncMessage>,
   transcript: ReadonlyArray<M>,
 ): ReadonlyArray<M> | null {
-  if (stored.length === 0) return null;
-  const anchor = stored.slice(-ANCHOR_LENGTH);
+  if (anchor.length === 0) return null;
   for (let end = transcript.length - 1; end >= anchor.length - 1; end--) {
     const start = end - anchor.length + 1;
     if (anchor.every((message, offset) => same(message, transcript[start + offset]!))) {
@@ -29,6 +27,26 @@ export function messagesToAppend<M extends SyncMessage>(
     }
   }
   return null;
+}
+
+/**
+ * Transcript messages after the thread's last few, falling back to its transcript-sourced ones
+ * since app turns on other providers never reach the transcript. Skips what the app shows; null
+ * when the history can't be placed (rewritten, cleared or compacted).
+ */
+export function messagesToAppend<M extends SyncMessage>(
+  stored: ReadonlyArray<StoredMessage>,
+  transcript: ReadonlyArray<M>,
+): ReadonlyArray<M> | null {
+  const fresh =
+    afterAnchor(stored.slice(-ANCHOR_LENGTH), transcript) ??
+    afterAnchor(
+      stored.filter((message) => message.fromTranscript).slice(-ANCHOR_LENGTH),
+      transcript,
+    );
+  if (fresh === null) return null;
+  const fromApp = stored.filter((message) => !message.fromTranscript);
+  return fresh.filter((message) => !fromApp.some((shown) => same(shown, message)));
 }
 
 /** The next free index for imported message ids, which end in a six-digit index. */

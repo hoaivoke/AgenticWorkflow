@@ -3,6 +3,7 @@ import {
   EventId,
   type AgentSessionImportSource,
   type OrchestrationV2DomainEvent,
+  type OrchestrationV2RunStatus,
   type ProjectId,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -33,6 +34,13 @@ const FOLLOWED_SOURCES: ReadonlySet<string> = new Set(["claudeAgent"]);
 const MAX_FOLLOWED_BYTES = 256 * 1024 * 1024;
 /** New conversations are looked for every this many scheduler ticks (5 s each). */
 const DISCOVERY_EVERY_SWEEPS = 12;
+const SETTLED_RUN_STATUSES: ReadonlySet<OrchestrationV2RunStatus> = new Set([
+  "completed",
+  "interrupted",
+  "failed",
+  "cancelled",
+  "rolled_back",
+]);
 
 export interface SyncResult {
   readonly appended: number;
@@ -49,7 +57,7 @@ const make = Effect.gen(function* () {
 
   /** Last transcript size and mtime handled per thread; unchanged files cost one stat. */
   const handled = new Map<ThreadId, string>();
-  /** Threads continued in the app, deleted, or with transcripts too large to follow. */
+  /** Threads deleted, no longer imported, or with transcripts gone or too large to follow. */
   const stopped = new Set<ThreadId>();
   let sweeps = 0;
 
@@ -62,19 +70,27 @@ const make = Effect.gen(function* () {
     }>,
   ) {
     const records = yield* orchestrator.getThreadRecords(threadId, ["messages", "runs"]);
-    // Once a turn runs here, the app owns the session and writes to the same transcript.
-    if (
-      records.thread.historyOrigin !== "v1_import" ||
-      records.runs.length > 0 ||
-      records.thread.deletedAt !== null
-    ) {
+    if (records.thread.historyOrigin !== "v1_import" || records.thread.deletedAt !== null) {
       stopped.add(threadId);
-      return 0;
+      return null;
     }
+    // A turn the app is running may be writing this same transcript; read it once it settles.
+    if (records.runs.some((run) => !SETTLED_RUN_STATUSES.has(run.status))) return null;
+    const transcriptIdPrefix = `${threadId}:`;
     const stored = records.messages
       .filter((message) => message.role === "user" || message.role === "assistant")
-      .toSorted((left, right) => left.id.localeCompare(right.id))
-      .map((message) => ({ role: message.role as "user" | "assistant", text: message.text }));
+      .toSorted(
+        (left, right) =>
+          DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
+          left.id.localeCompare(right.id),
+      )
+      .map((message) => ({
+        role: message.role as "user" | "assistant",
+        text: message.text,
+        fromTranscript:
+          message.id.startsWith(transcriptIdPrefix) &&
+          /^\d{6,}$/.test(message.id.slice(transcriptIdPrefix.length)),
+      }));
     const fresh = messagesToAppend(stored, transcript);
     if (fresh === null || fresh.length === 0) return 0;
     const firstIndex = nextImportedMessageIndex(records.messages.map((message) => message.id));
@@ -131,8 +147,9 @@ const make = Effect.gen(function* () {
       parsed === null
         ? 0
         : yield* threadCommands.withLock(threadId, append(threadId, parsed.messages));
-    handled.set(threadId, key);
-    return appended;
+    // null: not read this time (a turn was running), so the same file is tried again.
+    if (appended !== null) handled.set(threadId, key);
+    return appended ?? 0;
   });
 
   /** One pass: follow every imported conversation, and now and then look for new ones. */

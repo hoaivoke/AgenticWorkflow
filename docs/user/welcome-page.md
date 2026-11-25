@@ -113,9 +113,8 @@ continue a large batch, open the Welcome page again and pick the project in
 without the remaining history.
 
 Imported Claude conversations stay in sync while you keep using Claude Code
-outside T3 Code: new messages appear in the thread within a few seconds. A thread
-stops following its Claude Code conversation once you send a message to it in
-T3 Code. In projects that already have imported conversations, new Claude Code
+outside T3 Code: new messages appear in the thread within a few seconds, including
+after you have also used the thread in T3 Code. In projects that already have imported conversations, new Claude Code
 conversations are picked up about once a minute. Codex and Pi conversations are
 imported once.
 
