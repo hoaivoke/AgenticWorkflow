@@ -47,7 +47,7 @@ const isProjectionStoreThreadNotFoundError = Schema.is(
   ProjectionStore.ProjectionStoreThreadNotFoundError,
 );
 
-const IMPORT_EVENT_PREFIX = "agent-session-import:v2";
+export const IMPORT_EVENT_PREFIX = "agent-session-import:v2"; // pipelines: used by live sync
 const CLAUDE_SESSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -109,7 +109,8 @@ type HistoryMessage = Omit<AgentSessionScanner.AgentSessionThreadMessage, "role"
   readonly role: AgentSessionScanner.AgentSessionThreadMessage["role"] | "reasoning";
 };
 
-function messageEvents(input: {
+// pipelines: exported so live session sync writes messages exactly as the import does.
+export function messageEvents(input: {
   readonly threadId: ThreadId;
   readonly index: number;
   readonly message: HistoryMessage;
