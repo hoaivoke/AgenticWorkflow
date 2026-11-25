@@ -112,6 +112,13 @@ continue a large batch, open the Welcome page again and pick the project in
 **Review all**. Completed conversations are not imported again. You can continue
 without the remaining history.
 
+Imported Claude conversations stay in sync while you keep using Claude Code
+outside T3 Code: new messages appear in the thread within a few seconds. A thread
+stops following its Claude Code conversation once you send a message to it in
+T3 Code. In projects that already have imported conversations, new Claude Code
+conversations are picked up about once a minute. Codex and Pi conversations are
+imported once.
+
 You can start without importing. While an import runs, T3 Code stays on the
 Welcome page. If you quit, open the Welcome page again from **Settings → About**; the
 projects you started stay checked.

@@ -1,5 +1,6 @@
 import * as WorktreeBranchSync from "./WorktreeBranchSync.ts";
 import * as GuestShareService from "../guest/GuestShareService.ts";
+import * as AgentSessionLiveSync from "../sessionSync/AgentSessionLiveSync.ts"; // pipelines:
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as Layer from "effect/Layer";
@@ -435,6 +436,18 @@ export const layerProduction = Layer.mergeAll(
   layerProviderContinuationWorkerProvided,
   layerAgentSessionScannerProvided,
   layerAgentSessionImporterProvided,
+  // pipelines: follow imported Claude Code conversations that continue outside the app.
+  AgentSessionLiveSync.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        layerAgentSessionImporterProvided,
+        layerOrchestratorProvided,
+        layerEventSink,
+        ProviderSessionRuntime.layer,
+        ThreadCommandExecutor.layer,
+      ),
+    ),
+  ),
   EffectOutbox.layerPruneWorker.pipe(Layer.provide(EffectOutbox.layer)),
 ).pipe(
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
