@@ -1,6 +1,15 @@
 // pipelines: role routing through the real pm_* tools, over the PM test kit's fakes.
 import { describe, expect, it } from "@effect/vitest";
-import { EnvironmentId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  OrchestratorMcpFailure,
+  ProjectId,
+  ProviderInstanceId,
+  RunId,
+  ScheduledTaskId,
+  ThreadId,
+  type OrchestratorMcpScheduleTaskInput,
+} from "@t3tools/contracts";
 import type { ProviderSnapshot } from "@t3tools/pipelines";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -8,6 +17,7 @@ import * as Stream from "effect/Stream";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
+import * as OrchestratorMcpService from "../mcp/OrchestratorMcpService.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { layerPm, makeWorld, PROJECT, type PmWorld } from "../pm/Pm.testkit.ts";
 import * as PmMcpHandlers from "../pm/PmMcpHandlers.ts";
@@ -51,10 +61,39 @@ const scopeFor = (threadId: string) => ({
   issuedAt: 0,
 });
 
+/** Records what pm_worker_schedule asks the scheduler for; T3's own tests cover the scheduler. */
+const scheduled: Array<{
+  readonly threadId: string;
+  readonly input: OrchestratorMcpScheduleTaskInput;
+}> = [];
+const layerScheduler = Layer.mock(OrchestratorMcpService.OrchestratorMcpService)({
+  scheduleTask: (scope, input) =>
+    input.title === "Worker: Refused"
+      ? Effect.fail(
+          new OrchestratorMcpFailure({ code: "capability_denied", message: "No run permission." }),
+        )
+      : Effect.sync(() => {
+          scheduled.push({ threadId: scope.thread?.threadId ?? "", input });
+          return {
+            scheduledTaskId: ScheduledTaskId.make("task-1"),
+            title: input.title ?? "",
+            prompt: input.prompt,
+            enabled: input.enabled ?? true,
+            projectId: ProjectId.make("project-1"),
+            boundThreadId: ThreadId.make(scope.thread?.threadId ?? "thread"),
+            freshSession: false,
+            schedule: { type: "once", runAt: "2026-11-26T09:00:00.000Z" } as never,
+            nextRunAt: "2026-11-26T09:00:00.000Z" as never,
+            lastRunStatus: "never" as never,
+          };
+        }),
+});
+
 const harness = (world: PmWorld, files: PipelineService.TestFiles = []) =>
   McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
     Layer.provideMerge(layerPm(world)),
     Layer.provideMerge(PipelineService.layerTest({ providers: PROVIDERS, files })),
+    Layer.provideMerge(layerScheduler),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 
@@ -225,5 +264,59 @@ describe("pm_pipelines and pm_roles", () => {
       expect(roles).toContain("- triage: small tier, up to mid, read-only.");
       expect(roles).toContain("Now: claudeAgent/claude-haiku-5-5");
     }).pipe(Effect.provide(harness(world, files)));
+  });
+});
+
+describe("pm_worker_schedule", () => {
+  it.effect("binds a schedule to the PM thread whose message replays pm_worker_start", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      scheduled.length = 0;
+      const pm = yield* createPm(world);
+      const launchesBefore = world.launches.length;
+      const result = yield* callAs(pm, "pm_worker_schedule", {
+        title: "Nightly audit",
+        brief: "Audit the auth routes.",
+        role: "security-reviewer",
+        schedule: { type: "fixed_time", timeOfDay: "03:00" },
+      });
+      expect(result.result).toContain('Scheduled worker "Nightly audit" as task task-1.');
+      expect(result.result).toContain("Next run: 2026-11-26T09:00:00.000Z.");
+      expect(scheduled).toHaveLength(1);
+      const { threadId, input } = scheduled[0]!;
+      expect(threadId).toBe(pm);
+      expect(input.bindToCurrentThread).toBe(true);
+      expect(input.title).toBe("Worker: Nightly audit");
+      expect(input.schedule).toEqual({ type: "fixed_time", timeOfDay: "03:00" });
+      const json = input.prompt.match(/```json\n([\s\S]*?)\n```/)?.[1] ?? "";
+      expect(JSON.parse(json)).toEqual({
+        title: "Nightly audit",
+        brief: "Audit the auth routes.",
+        role: "security-reviewer",
+      });
+      expect(world.launches).toHaveLength(launchesBefore);
+    }).pipe(Effect.provide(harness(world)));
+  });
+
+  it.effect("refuses unknown roles before scheduling, and reports scheduler refusals", () => {
+    const world = makeWorld();
+    return Effect.gen(function* () {
+      scheduled.length = 0;
+      const pm = yield* createPm(world);
+      const unknown = yield* callAs(pm, "pm_worker_schedule", {
+        title: "X",
+        brief: "X.",
+        role: "wizard",
+        schedule: { type: "interval", everyMs: 3600000 },
+      });
+      expect(unknown.message).toContain('There is no role "wizard"');
+      const refused = yield* callAs(pm, "pm_worker_schedule", {
+        title: "Refused",
+        brief: "X.",
+        schedule: { type: "interval", everyMs: 3600000 },
+      });
+      expect(refused.message).toBe("No run permission.");
+      expect(scheduled).toHaveLength(0);
+    }).pipe(Effect.provide(harness(world)));
   });
 });

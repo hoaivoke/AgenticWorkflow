@@ -6,12 +6,14 @@ import {
   ProviderInstanceId,
   ThreadId,
   type ModelSelection as ModelSelectionType,
+  type ScheduledTaskUpsertSchedule,
 } from "@t3tools/contracts";
 import {
   renderPipeline,
   renderPipelineList,
   renderRoleBrief,
   renderRoles,
+  renderScheduledWorkerPrompt,
   resolveRole,
   type ProviderSnapshot,
 } from "@t3tools/pipelines";
@@ -19,6 +21,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
+import * as OrchestratorMcpService from "../mcp/OrchestratorMcpService.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import { PmStore } from "../pm/PmStore.ts";
 import { PipelineService } from "./PipelineService.ts";
@@ -174,4 +178,68 @@ export const rolesText = Effect.fn("PmRouting.rolesText")(function* (pm: string)
   const providers = yield* pipelines.providers;
   const limited = yield* limitedAccounts(pm);
   return renderRoles(config, providers, limited, problems);
+});
+
+export interface ScheduleWorkerInput {
+  readonly pm: string;
+  readonly title: string;
+  /** What `pm_worker_start` gets on each run, minus the schedule. */
+  readonly startArguments: Readonly<Record<string, unknown>> & {
+    readonly role?: string | undefined;
+  };
+  readonly schedule: ScheduledTaskUpsertSchedule;
+  readonly enabled?: boolean | undefined;
+}
+
+const scheduleFailureCode = (code: string) =>
+  code === "invalid_request" || code === "target_required"
+    ? ("invalid_request" as const)
+    : code === "capability_denied" ||
+        code === "runtime_mode_escalation_denied" ||
+        code === "interaction_mode_escalation_denied"
+      ? ("conflict" as const)
+      : ("unavailable" as const);
+
+/**
+ * `pm_worker_schedule`: a T3 scheduled task bound to the PM's own thread. Each run asks the PM to
+ * start the worker, so it becomes a normal worker that reports back, and its role picks the model
+ * at run time. Pausing, listing and deleting stay T3's own tools and Settings page.
+ */
+export const scheduleWorker = Effect.fn("PmRouting.scheduleWorker")(function* (
+  input: ScheduleWorkerInput,
+) {
+  const role = input.startArguments.role;
+  if (role !== undefined) {
+    const pipelines = yield* PipelineService;
+    const shell = yield* projectOf(input.pm);
+    const { config } = yield* pipelines.configFor(shell.projectId);
+    if (!config.roles.has(role)) {
+      return yield* invalid(
+        `There is no role "${role}". Roles: ${[...config.roles.keys()].join(", ")}.`,
+      );
+    }
+  }
+  const scope = yield* McpInvocationContext.McpInvocationContext;
+  const orchestrator = yield* OrchestratorMcpService.OrchestratorMcpService;
+  const task = yield* orchestrator
+    .scheduleTask(scope, {
+      title: `Worker: ${input.title}`,
+      prompt: renderScheduledWorkerPrompt(input.title, input.startArguments),
+      schedule: input.schedule,
+      bindToCurrentThread: true,
+      ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+    })
+    .pipe(
+      Effect.mapError(
+        (failure) =>
+          new PmError({ code: scheduleFailureCode(failure.code), message: failure.message }),
+      ),
+    );
+  const when =
+    task.webhookUrl !== undefined
+      ? `It runs when ${task.webhookUrl} receives a request.`
+      : task.nextRunAt === null
+        ? "It has no next run time."
+        : `Next run: ${task.nextRunAt}.`;
+  return `Scheduled worker "${input.title}" as task ${task.scheduledTaskId}${task.enabled ? "" : " (paused)"}. ${when} Each run posts a "Scheduled worker" message here; start the worker it names. Pause with schedule_task { scheduledTaskId, enabled: false }, remove with delete_scheduled_task.`;
 });

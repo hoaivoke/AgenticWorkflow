@@ -109,6 +109,30 @@ export function renderRoles(
   ].join("\n");
 }
 
+export const SCHEDULED_WORKER_HEADING = "Scheduled worker:";
+
+/**
+ * What a worker schedule posts into its PM's thread on each run. The PM starts the worker
+ * itself, so the role picks a model from the accounts and limits of that moment.
+ */
+export function renderScheduledWorkerPrompt(
+  title: string,
+  startArguments: Readonly<Record<string, unknown>>,
+): string {
+  return [
+    `${SCHEDULED_WORKER_HEADING} ${title}`,
+    "",
+    "A schedule you created with pm_worker_schedule just ran. Call pm_worker_start with exactly these arguments, then end your turn:",
+    "",
+    "```json",
+    JSON.stringify(startArguments, null, 2),
+    "```",
+    "",
+    "If webhook data follows below, add what the worker needs from it to the brief.",
+    "If the work item is done or the user no longer wants this, do not start the worker: delete this schedule with delete_scheduled_task (list_scheduled_tasks shows its id) and tell the user in one line.",
+  ].join("\n");
+}
+
 /** The role section that goes at the top of a worker's brief. */
 export function renderRoleBrief(role: Role, tier: string): string {
   const access =
