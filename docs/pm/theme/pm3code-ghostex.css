@@ -160,6 +160,11 @@ body {
   --chat-composer-outline: transparent !important;
   --chat-composer-highlight: transparent !important;
 }
+/* The row under the composer (checkout, branch, access) paints the page colour: a black strip
+   here. It stays clear over the art; the blur alone keeps a scrolled timeline from reading through. */
+[data-slot="composer-context-strip"] {
+  background: transparent !important;
+}
 
 /* The Inbox over the composer: Ghostex's 12px dock radius, glass hairlines inside, and buttons
    that are glass too rather than grey slabs. Rows, drawers and footers stay clear over the glass. */
