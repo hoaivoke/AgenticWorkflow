@@ -21,7 +21,47 @@ PM3code (PMs Mod for T3code) is an unofficial fork of [T3 Code](https://github.c
 
 Everything else is T3 Code: the same fast app, the same agents, the same subscriptions you already pay for.
 
-> We're not trying to create a separate app. This is just a test to let people try [Ghostex](https://github.com/maddada/Ghostex)'s orchestration and inbox workflow inside T3 Code, in an app you can install side by side with regular T3 Code.
+> We're not trying to create a separate app. This is just a test to let people try [Ghostex](https://github.com/maddada/Ghostex)'s orchestration and inbox workflow inside T3 Code, in an app you can install side by side with regular T3 Code. Ghostex is a Rust-based alternative with the same coordinator workflow.
+
+## How it works
+
+1. **Create one PM per project.**
+2. **Ask for options or a triage.** For example: "I want to add feature X. Show me UX options in a Live page", or "Triage all my issues in a Live page".
+3. **The page lands in your Inbox**, the area above the chat box, with designs or choices on it.
+4. **Make your picks or comments** right on the page.
+5. **Click Send to agent** at the end of the page.
+6. **The PM starts workers** to do all the assigned work, on the agents you told it to use and by any rules you set. Those rules live in the PM's memory.
+
+> [!TIP]
+> Use Live pages to get information back and to make decisions. Reading the chat is a much worse experience.
+
+## Why it's better
+
+**Less thread juggling**
+
+- No more hunting for, snoozing or settling threads. The PM follows its workers and wraps them up for you.
+- Far fewer threads get created, because workers nest under their PM. An almost empty sidebar means peace of mind.
+- The PM manages all the work. You just prompt and make picks.
+
+**You stay in the loop only where it matters**
+
+- You see a "Needs you" in the sidebar and aren't flooded with updates.
+- Jump to that PM whenever you want and make your picks, or snooze what you want to continue later.
+- Once you're done testing, tell the PM to cut a release, then go play GTA.
+- Tell your PM to send you a Live page first whenever it's going to change the UI, so you pick how it should look. Without this, agents sometimes pick the dumbest UIs.
+- Yes, it needs you before it builds, but that beats testing later and finding something ugly. You spend the time either way: adjusting afterwards, or giving your picks up front. Picks up front mean much less going back.
+
+**It gets smarter over time**
+
+- Your PM keeps getting better, because it saves how you like to work in each project.
+- Copy chosen memories from one PM to a new one when you want to.
+- PM memory beats `AGENTS.md` for this, because it doesn't affect the worker threads.
+- A strong model can often write better prompts than you once it understands the product. You get that for free, because the PM rewords your asks before it starts or messages a worker.
+
+**It spreads the work**
+
+- The PM picks the agent for each piece of work, based on the rules you set, such as which agent has usage left.
+- The PM stays idle after it hands work to its workers and relays their status, Live pages and questions back to you. So you can always send it more asks, however unrelated.
 
 ## Why a coordinator?
 
