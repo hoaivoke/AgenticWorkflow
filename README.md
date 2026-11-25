@@ -1,8 +1,8 @@
-# PM3code sends zero telemetry
 
-No analytics, no crash reports, no usage pings and no tracking IDs, from the desktop app, the server, the web app or the Android app. No setting or environment variable turns any of it on. Besides the agents and providers you use, it only makes the few feature calls listed under [Runs beside T3 Code](#runs-beside-t3-code), such as fetching the model list from GitHub.
-
-PM3code 0.2.1 and 0.2.2 sent usage analytics to T3 Code's account by default. 0.2.3 stopped that.
+> [!NOTE]
+> <b>PM3code sends zero telemetry</b>
+>
+> No analytics, no crash reports, no usage pings and no tracking IDs, from the desktop app, the server, the web app or the Android app. No setting or environment variable turns any of it on. Besides the agents and providers you use, it only makes the few feature calls listed under [Runs beside T3 Code](#runs-beside-t3-code), such as fetching the model list from GitHub.
 
 <h1 align="center">PM3code - PMs Mod for T3code</h1>
 
