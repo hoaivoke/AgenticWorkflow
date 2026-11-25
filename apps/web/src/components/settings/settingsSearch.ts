@@ -18,6 +18,7 @@ import { commandLabel } from "./KeybindingsSettings.logic";
 import type { ResolvedSettingsScope } from "./settingsScope";
 import * as Pm from "../../pm/settingsSearch"; // t3code-pm:
 import { PM_COLLECTS_USAGE_DATA, PM_OFFERS_OTLP_EXPORT } from "../../pm/usageData"; // t3code-pm:
+import { PM_OFFERS_UPDATE_TRACK } from "../../pm/updateTrack"; // t3code-pm:
 
 export type SettingsPath =
   | "/settings/projects"
@@ -1652,7 +1653,8 @@ export function filterAvailableSettingsSearchItems(
     // t3code-pm:
     (item) =>
       (PM_COLLECTS_USAGE_DATA || item.id !== "privacy-policy") &&
-      (PM_OFFERS_OTLP_EXPORT || item.id !== "telemetry-export"),
+      (PM_OFFERS_OTLP_EXPORT || item.id !== "telemetry-export") &&
+      (PM_OFFERS_UPDATE_TRACK || item.id !== "update-track"),
   );
   return items.filter(
     (item) =>

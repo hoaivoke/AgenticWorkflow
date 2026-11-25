@@ -81,6 +81,7 @@ import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { PM_DEFAULT_THEME } from "../../pm/ghostexTheme";
 import { PM_COLLECTS_USAGE_DATA } from "../../pm/usageData"; // t3code-pm:
 import { PmAppUpdateChecksRow } from "../../pm/appUpdateChecks"; // t3code-pm:
+import { PM_OFFERS_UPDATE_TRACK } from "../../pm/updateTrack"; // t3code-pm:
 import { isMacPlatform } from "../../lib/utils";
 import {
   useEnvironmentProviders,
@@ -355,7 +356,7 @@ function AboutVersionSection() {
           </Tooltip>
         }
       />
-      {hasDesktopBridge ? (
+      {!PM_OFFERS_UPDATE_TRACK && hasDesktopBridge ? null /* t3code-pm: */ : hasDesktopBridge ? (
         <SettingsRow
           {...setting("update-track")}
           description={

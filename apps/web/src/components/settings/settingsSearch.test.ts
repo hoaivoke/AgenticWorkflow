@@ -417,7 +417,7 @@ describe("movedSettingsPath", () => {
 
 // t3code-pm:
 describe("PM3code settings search", () => {
-  it("offers neither T3's privacy policy nor OpenTelemetry export", () => {
+  it("offers neither T3's privacy policy, OpenTelemetry export nor an update track", () => {
     const ids = filterAvailableSettingsSearchItems({
       hasCloudPublicConfig: true,
       hasEnvironment: true,
@@ -429,5 +429,6 @@ describe("PM3code settings search", () => {
     expect(ids).toContain("diagnostics");
     expect(ids).not.toContain("privacy-policy");
     expect(ids).not.toContain("telemetry-export");
+    expect(ids).not.toContain("update-track");
   });
 });

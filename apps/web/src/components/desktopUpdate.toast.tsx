@@ -51,9 +51,15 @@ export function showDesktopUpdateDownloadedToast(
   shell: DesktopUpdateShell & Pick<DesktopBridge, "installUpdate">, // t3code-pm:
   state: DesktopUpdateState,
 ): void {
-  // t3code-pm: PM3code offers Restart and Later right in the notice.
-  if (PM_UPDATE_READY_NOTICE) return showPmUpdateReadyToast(shell, state);
   const releaseUrl = getDesktopUpdateReleaseUrl(getDesktopUpdateDownloadedVersion(state));
+  // t3code-pm: PM3code offers What's new, Later and Restart right in the notice.
+  if (PM_UPDATE_READY_NOTICE) {
+    return showPmUpdateReadyToast(
+      shell,
+      state,
+      releaseUrl ? () => void openDesktopUpdateReleaseNotes(shell, releaseUrl) : null,
+    );
+  }
   toastManager.add({
     type: "success",
     title: m(msg("Update downloaded")),

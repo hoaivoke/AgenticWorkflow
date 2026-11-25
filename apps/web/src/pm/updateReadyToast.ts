@@ -37,7 +37,11 @@ async function restartToUpdate(bridge: UpdateShell, state: DesktopUpdateState): 
   }
 }
 
-export function showPmUpdateReadyToast(bridge: UpdateShell, state: DesktopUpdateState): void {
+export function showPmUpdateReadyToast(
+  bridge: UpdateShell,
+  state: DesktopUpdateState,
+  openReleaseNotes: (() => void) | null,
+): void {
   const version = getDesktopUpdateDownloadedVersion(state);
   const toastId = toastManager.add({
     type: "success",
@@ -56,6 +60,18 @@ export function showPmUpdateReadyToast(bridge: UpdateShell, state: DesktopUpdate
     },
     data: {
       hideCopyButton: true,
+      actionLayout: "stacked-end",
+      secondaryActionVariant: "ghost",
+      ...(openReleaseNotes
+        ? {
+            additionalActions: [
+              {
+                id: "whats-new",
+                props: { children: m(msg("What's new")), onClick: openReleaseNotes },
+              },
+            ],
+          }
+        : {}),
       secondaryActionProps: {
         children: m(msg("Later")),
         onClick: () => toastManager.close(toastId),
