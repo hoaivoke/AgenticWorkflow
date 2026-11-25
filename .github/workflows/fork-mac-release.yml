@@ -48,7 +48,16 @@ jobs:
           keychain="$RUNNER_TEMP/pm-signing.keychain-db"
           keychain_password="$(openssl rand -hex 16)"
           echo "::add-mask::$keychain_password"
-          printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/pm-signing.p12"
+          printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/pm-signing-source.p12"
+          # The keychain only reads PKCS#12 with SHA-1 MACs and 3DES, which newer OpenSSL no
+          # longer writes by default, so rewrite it in that format whatever made it.
+          ossl="$(brew --prefix openssl@3 2>/dev/null)/bin/openssl"
+          [[ -x "$ossl" ]] || ossl=openssl
+          (umask 077
+            "$ossl" pkcs12 -in "$RUNNER_TEMP/pm-signing-source.p12" -passin env:CERT_PASSWORD -nodes -out "$RUNNER_TEMP/pm-signing.pem"
+            "$ossl" pkcs12 -export -in "$RUNNER_TEMP/pm-signing.pem" -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES \
+              -macalg sha1 -passout env:CERT_PASSWORD -out "$RUNNER_TEMP/pm-signing.p12")
+          rm "$RUNNER_TEMP/pm-signing-source.p12" "$RUNNER_TEMP/pm-signing.pem"
           security create-keychain -p "$keychain_password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"

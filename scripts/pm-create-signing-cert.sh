@@ -24,10 +24,8 @@ EOF
 
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -config "$dir/cert.cnf" \
   -keyout "$dir/key.pem" -out "$dir/cert.pem" 2>/dev/null
-# macOS's keychain cannot read OpenSSL 3's default PKCS#12 encryption.
-legacy=()
-if openssl version | grep -q '^OpenSSL 3'; then legacy=(-legacy); fi
-openssl pkcs12 -export ${legacy[@]+"${legacy[@]}"} -inkey "$dir/key.pem" -in "$dir/cert.pem" \
+# fork-mac-release.yml rewrites this in the format the macOS keychain reads.
+openssl pkcs12 -export -inkey "$dir/key.pem" -in "$dir/cert.pem" \
   -name "AgenticWorkflow Self-Signed" -out "$dir/cert.p12" -passout "pass:$password"
 
 base64 <"$dir/cert.p12" | tr -d '\n' | gh secret set PM_MAC_CERT_P12 --repo "$repo"
