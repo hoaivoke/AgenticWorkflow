@@ -10,7 +10,11 @@ on:
   workflow_dispatch:
     inputs:
       promote:
-        description: "Replace the default branch with sync/upstream when it is ready (old tip kept as a branch)"
+        description: "Replace the default branch with sync/upstream when all checks pass (old tip kept as a backup branch)"
+        type: boolean
+        default: false
+      build_preview:
+        description: "Also build a downloadable Apple Silicon preview DMG from sync/upstream (does not publish a release)"
         type: boolean
         default: false
 
@@ -27,6 +31,10 @@ jobs:
     if: github.repository_owner == 'hoaivoke'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    outputs:
+      state: ${{ steps.rebase.outputs.state }}
+      ok: ${{ steps.check.outputs.ok }}
+      upstream: ${{ steps.rebase.outputs.upstream }}
     env:
       GH_TOKEN: ${{ github.token }}
       # gh defaults a fork's issues and PRs to the parent repo; keep everything in this one.
@@ -60,11 +68,24 @@ jobs:
           report=report.md
           if [ "$upstream" = "$mark" ]; then
             echo "state=current" >> "$GITHUB_OUTPUT"
-            echo "PM3code has nothing new since $(git rev-parse --short "$mark")." > "$report"
+            echo "PM3code has nothing new since \`$(git rev-parse --short "$mark")\`." > "$report"
             exit 0
           fi
           ours=$(git rev-list --count "$mark..origin/$BASE")
-          echo "PM3code moved from \`$(git rev-parse --short "$mark")\` to \`$(git rev-parse --short "$upstream")\` ($(git log -1 --format=%s "$upstream")). Replaying this fork's $ours commits on top." > "$report"
+          upstream_date=$(git log -1 --format=%ci "$upstream")
+          {
+            echo "PM3code (which tracks T3 Code nightlies) moved from \`$(git rev-parse --short "$mark")\` to \`$(git rev-parse --short "$upstream")\` ($upstream_date: $(git log -1 --format=%s "$upstream"))."
+            echo "Replaying this fork's $ours commits on top."
+            echo
+            echo "<details>"
+            echo "<summary>Recent upstream commits (newest first, up to 25)</summary>"
+            echo
+            echo '```text'
+            git log --oneline -n 25 "$upstream"
+            echo '```'
+            echo "</details>"
+            echo
+          } > "$report"
           git switch -c "$BRANCH" "origin/$BASE"
           if git rebase --onto "$upstream" "$mark"; then
             echo "state=rebased" >> "$GITHUB_OUTPUT"
@@ -86,7 +107,7 @@ jobs:
               echo "**Conflict** replaying \`$(git log -1 --format='%h %s' REBASE_HEAD)\`:"
               echo "$conflicts" | sed 's/^/- `/; s/$/`/'
               echo
-              echo "Resolve locally with the steps in docs/operations/upstream-sync.md."
+              echo "Resolve locally with the steps in \`docs/operations/upstream-sync.md\`."
             } >> "$report"
             git rebase --abort
             echo "state=conflict" >> "$GITHUB_OUTPUT"
@@ -98,17 +119,50 @@ jobs:
         if: steps.rebase.outputs.state == 'rebased'
         run: vp install
 
-      - name: Check this fork's changes on the new base
+      - name: Check this fork's changes and critical features on the new base
         id: check
         if: steps.rebase.outputs.state == 'rebased'
         run: |
+          all_ok=true
+
           if vp run check:changed pm3code/pm; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-            echo "Checks on this fork's changes (\`vp run check:changed\`): **passed**." >> report.md
+            echo "- \`vp run check:changed pm3code/pm\`: **passed**" >> report.md
           else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "Checks on this fork's changes (\`vp run check:changed\`): **failed**, see the workflow run." >> report.md
+            all_ok=false
+            echo "- \`vp run check:changed pm3code/pm\`: **failed**" >> report.md
           fi
+
+          if node scripts/pm-i18n.ts check; then
+            echo "- \`node scripts/pm-i18n.ts check\`: **passed**" >> report.md
+          else
+            all_ok=false
+            echo "- \`node scripts/pm-i18n.ts check\`: **failed**" >> report.md
+          fi
+
+          regression_tests=()
+          for test_file in \
+            packages/pm/src/identity.test.ts \
+            packages/client-runtime/src/state/orchestrationV2Projection.test.ts \
+            apps/server/src/project/AgentSessionImporter.test.ts \
+            apps/server/src/sessionSync/liveSync.logic.test.ts \
+            apps/server/src/sessionSync/AgentSessionLiveSync.test.ts \
+            apps/server/src/pipelines/PmRouting.test.ts \
+            apps/server/src/pm/PmReportWatcher.test.ts \
+            apps/server/src/swarm/SwarmService.test.ts; do
+            if [ -f "$test_file" ]; then
+              regression_tests+=("$test_file")
+            fi
+          done
+          if [ "${#regression_tests[@]}" -gt 0 ]; then
+            if vp test run "${regression_tests[@]}"; then
+              echo "- Fork regression suite (${#regression_tests[@]} test files): **passed**" >> report.md
+            else
+              all_ok=false
+              echo "- Fork regression suite (${#regression_tests[@]} test files): **failed**" >> report.md
+            fi
+          fi
+
+          echo "ok=$all_ok" >> "$GITHUB_OUTPUT"
 
       - name: Publish sync/upstream
         if: steps.rebase.outputs.state == 'rebased'
@@ -122,20 +176,29 @@ jobs:
           git push origin "origin/$BASE:refs/heads/$backup"
           git push --force-with-lease="$BASE:$(git rev-parse "origin/$BASE")" origin "$BRANCH:$BASE"
           git push --force origin "${{ steps.rebase.outputs.upstream }}:refs/heads/$MARK"
-          echo "Promoted: \`$BASE\` now has this fork's commits on PM3code \`$(git rev-parse --short "${{ steps.rebase.outputs.upstream }}")\`. The old tip is the branch \`$backup\`." >> report.md
+          echo >> report.md
+          echo "Promoted: \`$BASE\` now has this fork's commits on PM3code \`$(git rev-parse --short "${{ steps.rebase.outputs.upstream }}")\`. The old tip is saved at branch \`$backup\`." >> report.md
 
       - name: Report
-        if: steps.rebase.outputs.state != 'current'
         run: |
           {
             cat report.md
             echo
             if [ "${{ steps.promote.outcome }}" != "success" ] && [ "${{ steps.rebase.outputs.state }}" = "rebased" ]; then
-              echo "To take it: Actions, Sync upstream, Run workflow, tick **promote**. Or test the \`$BRANCH\` branch first."
+              if [ "${{ steps.check.outputs.ok }}" = "true" ]; then
+                echo "All checks passed on \`$BRANCH\`. To promote it to \`$BASE\` (and trigger a new Agent Space Mac release): **Actions → Sync upstream → Run workflow → tick \`promote\`**."
+                echo "To test a preview DMG first without touching \`$BASE\`, tick \`build_preview\`."
+              else
+                echo "One or more checks failed on \`$BRANCH\`. Review the workflow logs before promoting."
+              fi
             fi
             echo
             echo "[Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } > body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.rebase.outputs.state }}" = "current" ]; then
+            exit 0
+          fi
           number=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number')
           if [ -n "$number" ]; then
             gh issue comment "$number" --body-file body.md
@@ -143,3 +206,38 @@ jobs:
           elif [ "${{ steps.promote.outcome }}" != "success" ]; then
             gh issue create --title "$ISSUE_TITLE" --body-file body.md
           fi
+
+  preview_mac_arm64:
+    name: Build preview Mac DMG (sync/upstream)
+    needs: sync
+    if: github.repository_owner == 'hoaivoke' && inputs.build_preview && !inputs.promote && needs.sync.outputs.state == 'rebased' && needs.sync.outputs.ok == 'true'
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - name: Checkout sync/upstream
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: sync/upstream
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+
+      - name: Build preview app (unsigned)
+        env:
+          T3CODE_DESKTOP_SIGNED: "false"
+          T3CODE_TELEMETRY_CHANNEL: dev
+        run: |
+          set -euo pipefail
+          version="1.${{ github.run_number }}.0-preview.0"
+          vp run dist:desktop:dmg:arm64 --build-version "$version" --verbose
+
+      - name: Upload preview DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-space-sync-preview-arm64
+          path: release/*.dmg
+          retention-days: 7
