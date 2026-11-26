@@ -1043,9 +1043,9 @@ export class PullRequestUnavailableError extends Schema.TaggedError<PullRequestU
         return "Change requests cannot be browsed for this project's host yet.";
       case "repository-without-project":
         if (this.host !== undefined) {
-          return `No project in PM3code is on ${this.host}. Add any ${this.host} project to read its change requests.`; // t3code-pm:
+          return `No project in Agent Space is on ${this.host}. Add any ${this.host} project to read its change requests.`; // t3code-pm:
         }
-        return `${this.repository ?? "This repository"} is not a project in PM3code. Add it as a project to read its change requests.`; // t3code-pm:
+        return `${this.repository ?? "This repository"} is not a project in Agent Space. Add it as a project to read its change requests.`; // t3code-pm:
     }
   }
 }

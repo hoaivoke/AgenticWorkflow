@@ -191,9 +191,9 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
           onBackdrop ? "text-white/70" : "text-muted-foreground",
         )}
       >
-        {/* t3code-pm: the fork's name, PM3code, in place of the T3 mark and "Code" */}
-        <span className={onBackdrop ? "text-white" : "text-foreground"}>PM3</span>
-        code
+        {/* t3code-pm: the fork's name, Agent Space, in place of the T3 mark and "Code" */}
+        {/* oxlint-disable-next-line t3code/no-untranslated-copy -- split brand wordmark for Agent Space */}
+        <span className={onBackdrop ? "text-white" : "text-foreground"}>Agent</span> Space
       </span>
     </span>
   );

@@ -102,7 +102,7 @@ export function PmSettingsPanel() {
               checked={settings?.enabled ?? false}
               disabled={settings === null || !canWrite}
               onCheckedChange={(checked) => void save({ enabled: Boolean(checked) })}
-              aria-label={gt("Project Managers (PM3code)")}
+              aria-label={gt("Project Managers (Agent Space)")}
             />
           }
         />

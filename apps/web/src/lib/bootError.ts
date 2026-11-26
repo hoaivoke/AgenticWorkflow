@@ -277,7 +277,7 @@ export function showBootError(error: unknown) {
   };
 
   const message = element("div", {}, [
-    element("h1", { textContent: "PM3code failed to start" }), // t3code-pm:
+    element("h1", { textContent: "Agent Space failed to start" }), // t3code-pm:
     element("p", {
       textContent: offline
         ? "This browser appears to be offline. Check the connection, then reload."
@@ -352,7 +352,7 @@ export function showBootError(error: unknown) {
 
   const issue = new URL(ISSUE_URL);
   issue.searchParams.set("template", "bug_report.yml");
-  issue.searchParams.set("title", "PM3code failed to start"); // t3code-pm:
+  issue.searchParams.set("title", "Agent Space failed to start"); // t3code-pm:
   issue.searchParams.set("area", "apps/web");
   issue.searchParams.set("version", `${environment.version} (${environment.channel})`);
   issue.searchParams.set("environment", `${environment.surface}, ${environment.platform}`);
@@ -368,7 +368,7 @@ export function showBootError(error: unknown) {
             DOWNLOAD_URL, // t3code-pm: PM3code has no nightly channel
             nightly
               ? "Download and reinstall the latest nightly build"
-              : "Download and reinstall PM3code",
+              : "Download and reinstall Agent Space",
           ),
         ]
       : []),
@@ -376,7 +376,7 @@ export function showBootError(error: unknown) {
       element("p", {
         // t3code-pm: PM3code
         textContent:
-          "Run this on the computer that runs PM3code. Your agent can check the local logs and help you file a bug report.",
+          "Run this on the computer that runs Agent Space. Your agent can check the local logs and help you file a bug report.",
       }),
       element("div", { id: "boot-error-command" }, [command, copyCommand]),
     ]),

@@ -288,7 +288,7 @@ const make = Effect.gen(function* () {
       : Effect.fail(
           new PmError({
             code: "disabled",
-            message: "Project Managers (PM3code) are turned off in Settings.",
+            message: "Project Managers (Agent Space) are turned off in Settings.",
           }),
         ),
   );
@@ -994,7 +994,7 @@ const make = Effect.gen(function* () {
         detail: () => "",
       },
       {
-        heading: "A worker on it is not moving, even after PM3code nudged it",
+        heading: "A worker on it is not moving, even after Agent Space nudged it",
         fix: 'Heal it: read the worker with t3_thread_read (see "While workers run").',
         entries: derived.filter((entry) => entry.quietWorkers.length > 0),
         detail: (entry: (typeof derived)[number]) =>

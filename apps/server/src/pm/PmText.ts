@@ -14,13 +14,13 @@ export const PAGE_HTML_LIMIT = 2 * 1024 * 1024;
 export const PAGE_ANSWERS_LIMIT = 64 * 1024;
 
 export const PM_SETUP_MESSAGE = [
-  "You are a Project Manager (PM) thread for this project in PM3code.",
+  "You are a Project Manager (PM) thread for this project in Agent Space.",
   "Call `pm_guide` now and follow it from here on.",
   "Then reply with one short line asking the user for the brief. Start no work yet.",
 ].join(" ");
 
 export const PM_CONVERT_MESSAGE = [
-  "This thread is now a Project Manager (PM) thread for this project in PM3code.",
+  "This thread is now a Project Manager (PM) thread for this project in Agent Space.",
   "Call `pm_guide` now and follow it from here on; the conversation so far is your context.",
   "Then reply with one short line saying what you understand the brief to be, or asking for it. Start no work yet.",
 ].join(" ");
@@ -60,7 +60,7 @@ export function workerBrief(input: {
     input.brief.trim(),
     "",
     "---",
-    `You are a worker thread started by the PM3code project manager "${input.pmTitle}".`,
+    `You are a worker thread started by the Agent Space project manager "${input.pmTitle}".`,
   ];
   if (input.mission.trim().length > 0) lines.push(`Its mission: ${input.mission.trim()}`);
   if (input.instructions.trim().length > 0)
@@ -73,7 +73,7 @@ export function workerBrief(input: {
   lines.push(
     "",
     "How to report:",
-    "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. PM3code passes it to the project manager.",
+    "- Your final message is your report: what you did, where, how you verified it, and anything left or blocked. Agent Space passes it to the project manager.",
     "- Never message the project manager's thread yourself (t3_thread_send or the like).",
     remote
       ? "- List every push in your final report (commit and one line on what landed): pm_worker_note does not reach the project manager from here."

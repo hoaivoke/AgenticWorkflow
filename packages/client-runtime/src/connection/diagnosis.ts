@@ -453,7 +453,7 @@ const HOP_MARK = { ok: "ok", failed: "FAILED", unchecked: "not checked" } as con
 /** One plain-text block for bug reports. */
 export function connectionDiagnosisText(hostLabel: string, diagnosis: ConnectionDiagnosis): string {
   return [
-    `PM3code connection to ${hostLabel}: ${diagnosis.headline}`, // t3code-pm:
+    `Agent Space connection to ${hostLabel}: ${diagnosis.headline}`, // t3code-pm:
     "",
     ...diagnosis.hops.map((hop) => `${hop.label}: ${HOP_MARK[hop.result]}`),
     "",

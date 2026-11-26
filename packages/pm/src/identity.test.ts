@@ -46,12 +46,12 @@ describe("PM3code update feed", () => {
 
 describe("pmAppName", () => {
   it.each([
-    ["Welcome to T3 Code", "Welcome to PM3code"],
-    ["T3 Code's CLI and T3 Code again", "PM3code's CLI and PM3code again"],
-    ["Restart the T3 server on {label}.", "Restart the PM3code server on {label}."],
-    ["Leave empty to use the T3 home folder.", "Leave empty to use the PM3code home folder."],
-    ["Use T3 desktop for automatic return", "Use PM3code desktop for automatic return"],
-    ["Bienvenue dans T3 Code", "Bienvenue dans PM3code"],
+    ["Welcome to T3 Code", "Welcome to Agent Space"],
+    ["T3 Code's CLI and T3 Code again", "Agent Space's CLI and Agent Space again"],
+    ["Restart the T3 server on {label}.", "Restart the Agent Space server on {label}."],
+    ["Leave empty to use the T3 home folder.", "Leave empty to use the Agent Space home folder."],
+    ["Use T3 desktop for automatic return", "Use Agent Space desktop for automatic return"],
+    ["Bienvenue dans T3 Code", "Bienvenue dans Agent Space"],
     ["T3 Connect and T3 Chat are T3's services", "T3 Connect and T3 Chat are T3's services"],
     ["github.com/pingdotgg/t3code", "github.com/pingdotgg/t3code"],
     [
@@ -92,9 +92,9 @@ describe("pmAppName", () => {
         c: { c: "Sent by T3 Code", d: { b: { one: "T3 Code" } } },
       }),
     ).toEqual({
-      a: "Get PM3code",
-      b: ["Run ", { k: "name", i: 1, t: "Var" }, " in PM3code"],
-      c: { c: "Sent by PM3code", d: { b: { one: "PM3code" } } },
+      a: "Get Agent Space",
+      b: ["Run ", { k: "name", i: 1, t: "Var" }, " in Agent Space"],
+      c: { c: "Sent by Agent Space", d: { b: { one: "Agent Space" } } },
     });
   });
 });

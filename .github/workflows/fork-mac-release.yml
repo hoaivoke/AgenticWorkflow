@@ -106,5 +106,5 @@ jobs:
           gh release create "v$VERSION" \
             release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml \
             --target "$GITHUB_SHA" \
-            --title "PM3code $VERSION" \
+            --title "Agent Space $VERSION" \
             --notes "Built from $GITHUB_SHA. Installed copies update themselves; for a first install, see docs/user/pipelines.md."

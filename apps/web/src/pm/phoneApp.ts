@@ -22,5 +22,5 @@ export const pmPhoneStores = <S extends PhoneStore>(upstream: ReadonlyArray<S>):
 
 /** Upstream copy PM3code replaces outright, keyed by its English source. */
 export const PM_COPY_OVERRIDES: ReadonlyMap<string, string> = new Map([
-  ["T3 Code app for iPhone and Android", msg("PM3code Android app (APK) on GitHub Releases")],
+  ["T3 Code app for iPhone and Android", msg("Agent Space Android app (APK) on GitHub Releases")],
 ]);

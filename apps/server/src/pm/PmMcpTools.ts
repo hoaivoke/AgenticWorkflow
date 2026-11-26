@@ -110,7 +110,7 @@ const PmComputersTool = pmToolWithoutParameters(
 );
 const PmWorkerStartTool = pmTool(
   "pm_worker_start",
-  "Start a worker thread in your project with a brief that stands alone. PM3code adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours. `computer` starts it on another computer the user linked.",
+  "Start a worker thread in your project with a brief that stands alone. Agent Space adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours. `computer` starts it on another computer the user linked.",
   {
     computer: Schema.optional(ComputerRef),
     clone_to: Schema.optional(

@@ -25,7 +25,7 @@ import { executeAuthenticatedEnvironmentHttpRequest } from "./environmentHttpAut
 import { createEnvironmentCommand } from "./runtime.ts";
 
 const MINT_TIMEOUT_MS = 8_000;
-const PEER_PAIRING_CODE_LABEL = "PM3code link"; // t3code-pm:
+const PEER_PAIRING_CODE_LABEL = "Agent Space link"; // t3code-pm:
 const MCP_APPROVAL_CODE_LABEL = "App sign-in";
 
 /** Minting failed; the user can still paste a code from the other environment. */

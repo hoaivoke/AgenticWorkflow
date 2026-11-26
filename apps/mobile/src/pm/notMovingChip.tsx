@@ -8,7 +8,7 @@ export function PmNotMovingChip() {
   const gt = useGT();
   return (
     <View
-      accessibilityHint={gt("No progress for a while, even after PM3code nudged it")}
+      accessibilityHint={gt("No progress for a while, even after Agent Space nudged it")}
       className="rounded-full border border-danger-border bg-danger px-1.5"
     >
       <Text className="text-xs text-danger-foreground">{gt("Not moving")}</Text>

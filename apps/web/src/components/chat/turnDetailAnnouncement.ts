@@ -186,7 +186,7 @@ export interface TurnDetailMemory {
 }
 
 /** The heading every agent message has in the timeline. */
-const MESSAGE_AUTHOR = "PM3code"; // t3code-pm:
+const MESSAGE_AUTHOR = "Agent Space"; // t3code-pm:
 
 /**
  * Decides which of the turn's messages and steps a screen reader hears next.
