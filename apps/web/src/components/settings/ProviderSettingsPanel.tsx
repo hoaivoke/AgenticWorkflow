@@ -927,28 +927,31 @@ export function EnvironmentProviderSettings({
   const refreshInstanceModels = useStableCallback(async (instanceId: ProviderInstanceId) => {
     if (!canRefreshProviders) return;
     setRefreshingModelInstanceIds((current) => new Set(current).add(instanceId));
-    try {
-      const result = await refreshServerProviders({
-        environmentId,
-        input: { instanceId, refreshModels: true, reloadSecrets: true },
-      });
-      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        toastManager.add({
-          type: "error",
-          title: gt("Could not refresh provider models"),
-          description:
-            error instanceof Error
-              ? (thrownErrorMessage(error, resolveNow) ?? error.message)
-              : gt("The model refresh failed."),
-        });
-      }
-    } finally {
+    const clearRefreshing = () => {
       setRefreshingModelInstanceIds((current) => {
         if (!current.has(instanceId)) return current;
         const next = new Set(current);
         next.delete(instanceId);
         return next;
+      });
+    };
+    const result = await refreshServerProviders({
+      environmentId,
+      input: { instanceId, refreshModels: true, reloadSecrets: true },
+    }).catch((error: unknown) => {
+      clearRefreshing();
+      throw error;
+    });
+    clearRefreshing();
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      const error = squashAtomCommandFailure(result);
+      toastManager.add({
+        type: "error",
+        title: gt("Could not refresh provider models"),
+        description:
+          error instanceof Error
+            ? (thrownErrorMessage(error, resolveNow) ?? error.message)
+            : gt("The model refresh failed."),
       });
     }
   });

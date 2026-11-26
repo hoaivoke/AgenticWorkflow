@@ -19,7 +19,7 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as OrchestratorMcpService from "../mcp/OrchestratorMcpService.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
-import { layerPm, makeWorld, PROJECT, type PmWorld } from "../pm/Pm.testkit.ts";
+import { layerPm, layerPmRemoteHere, makeWorld, PROJECT, type PmWorld } from "../pm/Pm.testkit.ts";
 import * as PmMcpHandlers from "../pm/PmMcpHandlers.ts";
 import { PmToolkit } from "../pm/PmMcpTools.ts";
 import { PmService } from "../pm/PmService.ts";
@@ -91,6 +91,7 @@ const layerScheduler = Layer.mock(OrchestratorMcpService.OrchestratorMcpService)
 
 const harness = (world: PmWorld, files: PipelineService.TestFiles = []) =>
   McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
+    Layer.provideMerge(layerPmRemoteHere),
     Layer.provideMerge(layerPm(world)),
     Layer.provideMerge(PipelineService.layerTest({ providers: PROVIDERS, files })),
     Layer.provideMerge(layerScheduler),

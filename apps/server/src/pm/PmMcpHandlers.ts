@@ -31,12 +31,13 @@ const asPm = Effect.fn("PmMcp.asPm")(function* <A, R = never>(
 });
 
 /** As `asPm`, with the caller's scope for calls over the user's links (t3code-pm). */
-const asPmRemote = Effect.fn("PmMcp.asPmRemote")(function* <A>(
+// pipelines: generic in R so role routing can read its own services.
+const asPmRemote = Effect.fn("PmMcp.asPmRemote")(function* <A, R = never>(
   run: (
     remote: PmRemote["Service"],
     scope: McpInvocationContext.McpInvocationScope,
     pm: string,
-  ) => Effect.Effect<A, PmError>,
+  ) => Effect.Effect<A, PmError, R>,
 ) {
   const scope = yield* McpInvocationContext.McpInvocationContext;
   const caller = yield* McpInvocationContext.requireThreadScope(scope, "This tool");

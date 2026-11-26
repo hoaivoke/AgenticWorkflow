@@ -68,25 +68,22 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
     const text = draft.trim();
     if (!text || posting) return;
     setPosting(true);
-    try {
-      const ok = await runPmCommand(
-        pmCommands.swarmPost,
-        {
-          environmentId: props.threadRef.environmentId,
-          input: {
-            threadId: props.threadRef.threadId,
-            text,
-            channel: activeComposeChannel,
-          },
+    const ok = await runPmCommand(
+      pmCommands.swarmPost,
+      {
+        environmentId: props.threadRef.environmentId,
+        input: {
+          threadId: props.threadRef.threadId,
+          text,
+          channel: activeComposeChannel,
         },
-        gt("Could not post to the swarm board"),
-      );
-      if (ok) {
-        setDraft("");
-        refresh();
-      }
-    } finally {
-      setPosting(false);
+      },
+      gt("Could not post to the swarm board"),
+    ).catch(() => false);
+    setPosting(false);
+    if (ok) {
+      setDraft("");
+      refresh();
     }
   };
 
