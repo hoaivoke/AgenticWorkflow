@@ -194,11 +194,11 @@ repository's Releases page. Installed copies find new releases on their own and
 offer the update like any other app, in **Settings → About**.
 
 The first install is by hand. Download the `.dmg` from the latest release, drag
-PM3code into Applications, then run this once, because the app is signed with the
+Agent Space into Applications, then run this once, because the app is signed with the
 fork's own certificate rather than an Apple one:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/PM3code.app
+xattr -dr com.apple.quarantine "/Applications/Agent Space.app"
 ```
 
 Before the first release, run `scripts/pm-create-signing-cert.sh` once from your

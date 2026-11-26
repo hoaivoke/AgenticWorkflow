@@ -16,13 +16,16 @@ workflow). When PM3code has moved, it:
 
 1. replays this fork's commits onto PM3code's newest `pm` as the branch `sync/upstream`,
    regenerating `pnpm-lock.yaml` when that is the only conflict;
-2. runs `vp run check:changed` for this fork's changes on the new base;
-3. comments on the open "Upstream sync" issue (or opens one) with what moved and whether the checks
-   passed, or with the files that conflicted and the commit that hit them.
+2. runs `vp run check:changed pm3code/pm`, `node scripts/pm-i18n.ts check`, and the fork regression
+   test suite on the new base;
+3. comments on the open "Upstream sync" issue (or opens one) and writes a Job Summary with the
+   recent upstream commits, check results, or conflicting files.
 
-It never changes `pm` on a schedule. To take an update, run the workflow with **promote** ticked:
-it keeps the old tip as `pm-before-sync-<date>`, moves `pm` to `sync/upstream`, and moves the
-`upstream/pm3code` marker. Test the `sync/upstream` branch first if the change is large.
+It never changes `pm` on a schedule. To test-drive a big update before promoting, run the workflow
+with **build_preview** ticked to get a downloadable Apple Silicon `.dmg` artifact from
+`sync/upstream` without publishing a release. To take the update, run the workflow with **promote**
+ticked: it keeps the old tip as `pm-before-sync-<date>`, moves `pm` to `sync/upstream`, and moves
+the `upstream/pm3code` marker.
 
 One-time setup: Actions are off by default on forks; enable them in the repo's Actions tab.
 
