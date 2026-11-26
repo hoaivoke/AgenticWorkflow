@@ -1,0 +1,30 @@
+description: Rebase Agent Space onto the latest maddada/pm3code (which tracks pingdotgg/t3code), resolve conflicts safely on sync/upstream, and verify all fork invariants.
+tier: frontier
+maxTier: frontier
+access: write
+effort: high
+candidates:
+  - { provider: claude, model: opus, effort: high }
+  - { provider: claude, model: sonnet, effort: high }
+contextFiles:
+  - docs/operations/upstream-sync.md
+  - AGENTS.md
+outputContract: "Write sync-report.md in the run folder starting with either `STATUS: UP_TO_DATE`, `STATUS: READY`, or `STATUS: BLOCKED`, followed by upstream commit range, highlights of new PM3code/T3 Code changes, every conflict resolved (with why), DB migration check, and exact commands run."
+instructions: |
+  You maintain the Agent Space fork (`hoaivoke/AgenticWorkflow`) on top of `maddada/pm3code` (which rebases onto `pingdotgg/t3code` nightlies).
+
+  Strict safety rules — never violate these:
+  1. NEVER push to `pm`, `main`, or `upstream/pm3code`. Only push your verified result to `origin sync/upstream`.
+  2. Never touch `~/.t3-pm/userdata` or `~/.t3/userdata`.
+  3. First ensure the `pm3code` remote points to `https://github.com/maddada/pm3code.git`, then run `git fetch origin` and `git fetch --no-tags pm3code pm`.
+  4. Compare `git rev-parse pm3code/pm` against `git rev-parse origin/upstream/pm3code`. If they are equal, write `STATUS: UP_TO_DATE` into `sync-report.md` and stop immediately.
+  5. Otherwise rebase `origin/upstream/pm3code..origin/pm` onto `pm3code/pm` on a branch (`git rebase --onto pm3code/pm origin/upstream/pm3code`):
+     - `pnpm-lock.yaml` conflicts: take upstream (`git checkout --ours pnpm-lock.yaml`), run `vp install --lockfile-only`, `git add pnpm-lock.yaml`.
+     - Translation catalog conflicts (`apps/{web,mobile}/src/pm/i18n/translations/*.json`): take upstream (`git checkout --ours ...`), then run `node scripts/pm-i18n.ts generate` and stage them.
+     - Preserve all `// pipelines:` and `// t3code-pm:` fork edits alongside upstream's new code.
+     - Preserve `Agent Space` branding (`packages/pm/src/identity.ts`, `SidebarChrome.tsx`, `scripts/build-desktop-artifact.ts`, `.github/workflows/fork-mac-release.yml`, and PM copy).
+     - Keep `T3CODE_DESKTOP_UPDATE_REPOSITORY` taking priority over `pmUpdatePublishConfig` in `scripts/build-desktop-artifact.ts`.
+     - Keep fork SQLite migrations in `apps/server/src/pm/PmMigrations.ts` at high IDs (`>= 100`) so they never collide with upstream sequential IDs.
+     - Preserve live Claude session sync (`AgentSessionLiveSync`, `TurnItemPositionStore.reposition`, `orchestrationV2Projection`), Antigravity models/sessions/OS keyring usage limits, Swarm mode, and role harnesses.
+  6. Run `vp i`, fix any typecheck/lint/React Compiler/test breakages introduced by upstream refactors, commit fixes cleanly, and force-push ONLY to `origin HEAD:sync/upstream`.
+  7. Write `sync-report.md` in the run folder and stop cleanly for the gates and reviewer audit stages.

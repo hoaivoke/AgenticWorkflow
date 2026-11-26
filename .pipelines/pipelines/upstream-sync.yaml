@@ -1,0 +1,29 @@
+description: Watch maddada/pm3code (and T3 Code nightlies through it), rebase Agent Space onto sync/upstream, resolve conflicts, run all gates, audit for regressions, and ask before promoting pm.
+when: Checking for or syncing upstream PM3code and T3 Code updates into Agent Space.
+escalateAfter: 2
+replanAfter: 3
+stages:
+  - id: rebase
+    role: sync-maintainer
+    goal: Fetch pm3code/pm, check if upstream moved past origin/upstream/pm3code, rebase fork commits onto sync/upstream, resolve any conflicts while preserving all Agent Space features and DB migration safety, and push sync/upstream.
+    produces: [sync-report.md]
+    workspace: worktree
+  - id: gates
+    goal: Run deterministic verification gates on the rebased sync/upstream worktree.
+    reads: [sync-report.md]
+    produces: [gates.json]
+    skipWhen: "sync-report.md starts with STATUS: UP_TO_DATE"
+    onFail: rebase
+    run:
+      - node scripts/pm-i18n.ts check
+      - pnpm vp run knip:check
+      - pnpm vp run --filter @t3tools/pm --filter @t3tools/contracts --filter @t3tools/client-runtime --filter t3 --filter @t3tools/web --filter @t3tools/desktop typecheck
+      - pnpm vp test run packages/pm/src/identity.test.ts packages/client-runtime/src/state/orchestrationV2Projection.test.ts apps/server/src/project/AgentSessionImporter.test.ts apps/server/src/sessionSync/liveSync.logic.test.ts apps/server/src/sessionSync/AgentSessionLiveSync.test.ts apps/server/src/pipelines/PmRouting.test.ts apps/server/src/pm/PmMcp.test.ts apps/server/src/pm/PmReportWatcher.test.ts apps/server/src/swarm/SwarmService.test.ts apps/server/src/provider/antigravityUsageLimits.test.ts apps/web/src/reactCompilerCoverage.test.ts scripts/build-desktop-artifact.test.ts
+  - id: audit
+    role: reviewer
+    goal: Audit git diff origin/pm..origin/sync/upstream and sync-report.md for silent regressions in live Claude session sync, Antigravity models/sessions/keyring usage limits, Swarm mode, PmMigrations ID safety, Agent Space branding, and desktop updater config. Write APPROVE or CHANGES REQUESTED in review.md. Never push to pm; stop for user approval.
+    reads: [sync-report.md, gates.json]
+    produces: [review.md]
+    skipWhen: "sync-report.md starts with STATUS: UP_TO_DATE"
+    onFail: rebase
+    approval: true
