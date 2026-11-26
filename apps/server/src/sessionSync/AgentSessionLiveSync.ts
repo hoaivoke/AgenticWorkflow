@@ -94,10 +94,18 @@ const make = Effect.gen(function* () {
     const fresh = messagesToAppend(stored, transcript);
     if (fresh === null || fresh.length === 0) return 0;
     const firstIndex = nextImportedMessageIndex(records.messages.map((message) => message.id));
+    // Place live-synced messages after the latest settled app run instead of in the pre-run 0..999_999 band.
+    const maxRunOrdinal = records.runs.reduce((max, run) => Math.max(max, run.ordinal), 0);
+    const ordinalBase = maxRunOrdinal * 1_000_000;
     const lastAt = DateTime.makeUnsafe(fresh.at(-1)!.createdAt);
     const events: Array<OrchestrationV2DomainEvent> = [
       ...fresh.flatMap((message, offset) =>
-        AgentSessionImporter.messageEvents({ threadId, index: firstIndex + offset, message }),
+        AgentSessionImporter.messageEvents({
+          threadId,
+          index: firstIndex + offset,
+          ordinal: ordinalBase + firstIndex + offset + 1,
+          message,
+        }),
       ),
       {
         id: EventId.make(

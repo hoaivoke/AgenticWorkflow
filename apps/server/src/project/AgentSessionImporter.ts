@@ -113,9 +113,10 @@ type HistoryMessage = Omit<AgentSessionScanner.AgentSessionThreadMessage, "role"
 export function messageEvents(input: {
   readonly threadId: ThreadId;
   readonly index: number;
+  readonly ordinal?: number;
   readonly message: HistoryMessage;
 }): ReadonlyArray<OrchestrationV2DomainEvent> {
-  const ordinal = input.index + 1;
+  const ordinal = input.ordinal ?? input.index + 1;
   const suffix = String(input.index).padStart(6, "0");
   const messageId = MessageId.make(`${input.threadId}:${suffix}`);
   const turnItemId = TurnItemId.make(

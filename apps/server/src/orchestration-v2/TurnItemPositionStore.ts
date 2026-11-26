@@ -141,13 +141,18 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
       allocate,
       // Per-event normalization shares the enclosing orchestration span.
       normalize: Effect.fnUntraced(function* (item, runOrdinal) {
+        // pipelines: live-synced transcript items have runId: null but carry an ordinal in the latest settled run's band so they sort at the bottom of the timeline.
+        const effectiveRunOrdinal =
+          runOrdinal === undefined && item.runId === null && item.ordinal >= 1_000_000
+            ? Math.floor(item.ordinal / 1_000_000)
+            : runOrdinal;
         return yield* allocate({
           threadId: item.threadId,
           turnItemId: item.id,
           runId: item.runId,
           // Queued steers keep their submission order until their run starts (see Orchestrator).
           keepExisting: item.status === "pending",
-          ...(runOrdinal === undefined ? {} : { runOrdinal }),
+          ...(effectiveRunOrdinal === undefined ? {} : { runOrdinal: effectiveRunOrdinal }),
         }).pipe(Effect.map((ordinal) => (item.ordinal === ordinal ? item : { ...item, ordinal })));
       }),
     });
