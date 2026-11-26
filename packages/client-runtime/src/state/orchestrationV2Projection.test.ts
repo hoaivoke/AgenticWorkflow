@@ -482,6 +482,41 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
         expect(next).toBe(projection);
       }
     });
+
+    it("keeps a runId-null transcript item that lands inside the loaded partial window, and drops one below it", () => {
+      const first = runItem("item-first", steerRunId, 2_000_001);
+      const later = runItem("item-later", steerRunId, 2_000_010);
+      const projection = windowOf([run, steerRun], [first, later]);
+      const repairedInWindow = {
+        ...commandItem("item-repaired", "Approve, start M4", 2_000_005),
+        runId: null,
+      };
+      const olderBelowWindow = { ...commandItem("item-older", "M1", 50), runId: null };
+
+      const afterInWindow = applyOrchestrationV2ProjectionEvent(
+        projection,
+        itemEvent(repairedInWindow),
+        {
+          partialTimeline: true,
+          latestLocalTurnOrdinal: later.ordinal,
+        },
+      );
+      expect(afterInWindow?.visibleTurnItems.map((row) => row.item.id)).toEqual([
+        first.id,
+        repairedInWindow.id,
+        later.id,
+      ]);
+
+      const afterBelowWindow = applyOrchestrationV2ProjectionEvent(
+        projection,
+        itemEvent(olderBelowWindow),
+        {
+          partialTimeline: true,
+          latestLocalTurnOrdinal: later.ordinal,
+        },
+      );
+      expect(afterBelowWindow).toBe(projection);
+    });
   });
 
   it("hides a steer that fell back to the queue until its run starts", () => {

@@ -502,6 +502,7 @@ function isPiConversationRecord(
 export function parseAgentSessionTranscript(
   input: AgentSessionTranscriptMetadata & {
     readonly contents: string;
+    readonly maxMessages?: number;
   },
   lines = splitTranscriptRecords(input.contents, MAX_IMPORT_RECORDS + 1),
 ): AgentSessionThread | null {
@@ -511,7 +512,13 @@ export function parseAgentSessionTranscript(
     input.source === "claudeAgent"
       ? records.reduce(foldClaudeFields, emptyClaudeFields)
       : emptyClaudeFields;
-  const thread = parseAgentSessionRecords(input, records, claudeFields, 0);
+  const thread = parseAgentSessionRecords(
+    input,
+    records,
+    claudeFields,
+    0,
+    input.maxMessages ?? MAX_IMPORTED_MESSAGES,
+  );
   return thread === "empty" ? null : thread;
 }
 
@@ -520,6 +527,7 @@ function parseAgentSessionRecords(
   records: ReadonlyArray<DecodedTranscriptRecord>,
   claudeFields: ClaudeFields,
   droppedMessageCount: number,
+  maxMessages: number = MAX_IMPORTED_MESSAGES,
 ): AgentSessionThread | "empty" | null {
   const fallbackTimestamp = DateTime.formatIso(DateTime.makeUnsafe(input.lastActiveAtMs));
   // Claude filenames are session IDs. Codex rollout filenames include extra
@@ -615,7 +623,7 @@ function parseAgentSessionRecords(
     hasAssistantMessage ||= message.role === "assistant";
     conversationMessageCount += 1;
     messages.push(message);
-    if (messages.length > MAX_IMPORTED_MESSAGES) messages.shift();
+    if (messages.length > maxMessages) messages.shift();
   };
 
   const hasMatchingCodexEventInTurn = (text: string) => {
@@ -750,7 +758,12 @@ function parseAgentSessionRecords(
   const { codexResponseUser: _codexResponseUser, ...visibleFirstUserMessage } = firstUserMessage;
   const retainedMessages = firstUserMessageRetained
     ? visibleMessages
-    : [visibleFirstUserMessage, ...visibleMessages.slice(-(MAX_IMPORTED_MESSAGES - 1))];
+    : [
+        visibleFirstUserMessage,
+        ...(Number.isFinite(maxMessages)
+          ? visibleMessages.slice(-(maxMessages - 1))
+          : visibleMessages),
+      ];
 
   return {
     source: input.source,

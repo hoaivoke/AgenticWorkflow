@@ -154,7 +154,10 @@ function shouldDropMissingPartialTurnItem(
     return false;
   }
   if (item.runId === null) {
-    return isBelowPartialWindow(projection, item, latestLocalTurnOrdinal);
+    // Live-synced or repaired transcript items landing inside/after the loaded window must appear;
+    // only truly older scrolled-off history below the window's oldest local item is dropped.
+    const oldest = oldestLocalTurnOrdinal(projection.visibleTurnItems);
+    return oldest !== null && item.ordinal < oldest;
   }
   // A queued run keeps the ordinal it got when queued, so a steer sent later
   // can raise the watermark past it. Items of a run that has not finished are

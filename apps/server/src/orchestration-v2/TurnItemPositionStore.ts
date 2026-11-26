@@ -31,6 +31,11 @@ export interface TurnItemPositionStoreV2Shape {
     item: OrchestrationV2TurnItem,
     runOrdinal?: number,
   ) => Effect.Effect<OrchestrationV2TurnItem, TurnItemPositionStoreError>;
+  /** Atomically moves a batch of turn items to exact ordinals without unique-ordinal collisions. */
+  readonly reposition: (
+    threadId: ThreadId,
+    positions: ReadonlyArray<{ readonly turnItemId: TurnItemId; readonly ordinal: number }>,
+  ) => Effect.Effect<void, TurnItemPositionStoreError>;
 }
 
 export class TurnItemPositionStoreV2 extends Context.Service<
@@ -154,6 +159,37 @@ export const layer: Layer.Layer<TurnItemPositionStoreV2, never, SqlClient.SqlCli
           keepExisting: item.status === "pending",
           ...(effectiveRunOrdinal === undefined ? {} : { runOrdinal: effectiveRunOrdinal }),
         }).pipe(Effect.map((ordinal) => (item.ordinal === ordinal ? item : { ...item, ordinal })));
+      }),
+      reposition: Effect.fn("TurnItemPositionStoreV2.reposition")(function* (threadId, positions) {
+        if (positions.length === 0) return;
+        const turnItemIds = positions.map((entry) => entry.turnItemId);
+        yield* sql
+          .withTransaction(
+            Effect.gen(function* () {
+              // Clear moving rows first so shifts within one band never trip UNIQUE(thread_id, ordinal).
+              yield* sql`
+                DELETE FROM orchestration_v2_turn_item_positions
+                WHERE thread_id = ${threadId}
+                  AND turn_item_id IN ${sql.in(turnItemIds)}
+              `;
+              for (const entry of positions) {
+                yield* sql`
+                  INSERT INTO orchestration_v2_turn_item_positions (thread_id, turn_item_id, ordinal)
+                  VALUES (${threadId}, ${entry.turnItemId}, ${entry.ordinal})
+                `;
+              }
+            }),
+          )
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new TurnItemPositionStoreError({
+                  threadId,
+                  turnItemId: positions[0]!.turnItemId,
+                  cause,
+                }),
+            ),
+          );
       }),
     });
   }),
