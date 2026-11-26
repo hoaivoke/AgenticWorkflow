@@ -2838,7 +2838,10 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     ),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: pmBuild("PM3code-${version}-${arch}.${ext}", "T3-Code-${version}-${arch}.${ext}"), // t3code-pm:
+    artifactName: pmBuild(
+      "Agent-Space-${version}-${arch}.${ext}",
+      "T3-Code-${version}-${arch}.${ext}",
+    ), // t3code-pm:
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,

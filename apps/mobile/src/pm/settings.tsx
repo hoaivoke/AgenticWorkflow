@@ -49,7 +49,7 @@ function PmSettingsSwitch(props: {
     >
       <ListToggleRow
         icon="list.number"
-        label={gt("Project managers (PM3code)")}
+        label={gt("Project managers (Agent Space)")}
         value={props.enabled}
         onValueChange={async (enabled) => {
           const saved = await runPm(
@@ -107,7 +107,7 @@ function PmT3ImportSection(props: { readonly environmentId: EnvironmentId }) {
         result.backupPath === null
           ? null
           : gt(
-              "Backup: {path}. To put it back, quit PM3code, copy it over statev2.sqlite in the userdata folder above it, delete statev2.sqlite-wal and statev2.sqlite-shm beside it, then start PM3code.",
+              "Backup: {path}. To put it back, quit Agent Space, copy it over statev2.sqlite in the userdata folder above it, delete statev2.sqlite-wal and statev2.sqlite-shm beside it, then start Agent Space.",
               { path: result.backupPath },
             ),
       ]
@@ -117,9 +117,9 @@ function PmT3ImportSection(props: { readonly environmentId: EnvironmentId }) {
   };
   const confirmReplace = () =>
     Alert.alert(
-      gt("Replace PM3code's threads?"),
+      gt("Replace Agent Space's threads?"),
       gt(
-        "PM3code's {pmThreads} threads, with their PMs, items and asks, are removed, and T3 Code's {threads} threads are copied in. A backup is saved first.",
+        "Agent Space's {pmThreads} threads, with their PMs, items and asks, are removed, and T3 Code's {threads} threads are copied in. A backup is saved first.",
         { pmThreads: status.pmThreads, threads: source?.threads ?? 0 },
       ),
       [
@@ -140,10 +140,10 @@ function PmT3ImportSection(props: { readonly environmentId: EnvironmentId }) {
           ? gt("T3 Code was not found on this computer.")
           : source.newer
             ? gt(
-                "T3 Code's database is newer than this PM3code understands. Update PM3code, then import.",
+                "T3 Code's database is newer than this Agent Space understands. Update Agent Space, then import.",
               )
             : gt(
-                "T3 Code ({home}): {threads} threads in {projects} projects. PM3code: {pmThreads} threads, {imported} of them imported.",
+                "T3 Code ({home}): {threads} threads in {projects} projects. Agent Space: {pmThreads} threads, {imported} of them imported.",
                 {
                   home: source.home,
                   threads: source.threads,

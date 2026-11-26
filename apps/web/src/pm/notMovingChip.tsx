@@ -15,7 +15,7 @@ export function PmNotMovingChip() {
         {gt("Not moving")}
       </TooltipTrigger>
       <TooltipPopup side="top">
-        {gt("No progress for a while, even after PM3code nudged it")}
+        {gt("No progress for a while, even after Agent Space nudged it")}
       </TooltipPopup>
     </Tooltip>
   );

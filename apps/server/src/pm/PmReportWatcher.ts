@@ -135,7 +135,7 @@ const make = Effect.gen(function* () {
         shell,
         kind: "stopped",
         dedupeKey: `run:${runId}`,
-        body: `It paused at a usage limit, which resets at ${at}. It is not stuck: PM3code carries it on after the reset. Do nothing unless a later report says it could not.`,
+        body: `It paused at a usage limit, which resets at ${at}. It is not stuck: Agent Space carries it on after the reset. Do nothing unless a later report says it could not.`,
         line: "Paused at a usage limit",
       });
     }
@@ -168,7 +168,7 @@ const make = Effect.gen(function* () {
       shell,
       kind: "restarted",
       dedupeKey: `restart:${sourceRunId}`,
-      body: "The server restarted while it ran, and PM3code told it to carry on. Do nothing unless a later report says it failed.",
+      body: "The server restarted while it ran, and Agent Space told it to carry on. Do nothing unless a later report says it failed.",
       line: "Restarted and carrying on",
     });
 
@@ -310,8 +310,8 @@ const make = Effect.gen(function* () {
           kind: "quiet",
           dedupeKey: `quiet:${streak}:${round}`,
           body: nudge
-            ? "No new output for 8 minutes while its turn runs. PM3code nudged it once. Read it with t3_thread_read: a build whose output still comes is not stuck."
-            : `Still no new output (${round * 8} minutes), even after PM3code nudged it. Not nudged again: heal it if it hung.`,
+            ? "No new output for 8 minutes while its turn runs. Agent Space nudged it once. Read it with t3_thread_read: a build whose output still comes is not stuck."
+            : `Still no new output (${round * 8} minutes), even after Agent Space nudged it. Not nudged again: heal it if it hung.`,
           line: `Quiet for ${round * 8} min`,
         });
         continue;
@@ -355,8 +355,8 @@ const make = Effect.gen(function* () {
         dedupeKey: `idle:${worker.lastReportAt}`,
         body:
           usageLimitResetOf(shell) === null
-            ? `It has been idle for 10 minutes since its last report (${worker.lastReportKind}) and its work is not done. PM3code sent it "carry on".`
-            : `Its usage limit reset 10 minutes ago and it has not carried on; its work is not done. PM3code sent it "carry on".`,
+            ? `It has been idle for 10 minutes since its last report (${worker.lastReportKind}) and its work is not done. Agent Space sent it "carry on".`
+            : `Its usage limit reset 10 minutes ago and it has not carried on; its work is not done. Agent Space sent it "carry on".`,
         line: "Idle while owing work",
       });
     }

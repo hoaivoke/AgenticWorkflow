@@ -85,7 +85,7 @@ export async function handleDesktopAppActivationRequest(
       return failure(
         request.requestId,
         "project-create-failed",
-        errorMessage(error, "PM3code could not add the project."), // t3code-pm:
+        errorMessage(error, "Agent Space could not add the project."), // t3code-pm:
       );
     }
   }
@@ -99,7 +99,7 @@ export async function handleDesktopAppActivationRequest(
       return failure(
         request.requestId,
         "thread-open-failed",
-        "PM3code could not open a new thread for the project.", // t3code-pm:
+        "Agent Space could not open a new thread for the project.", // t3code-pm:
       );
     }
     return {
@@ -113,7 +113,7 @@ export async function handleDesktopAppActivationRequest(
     return failure(
       request.requestId,
       "thread-open-failed",
-      errorMessage(error, "PM3code could not open a new thread for the project."), // t3code-pm:
+      errorMessage(error, "Agent Space could not open a new thread for the project."), // t3code-pm:
     );
   }
 }

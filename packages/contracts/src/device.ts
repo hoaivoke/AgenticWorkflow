@@ -602,7 +602,7 @@ export class DeviceOperationError extends Schema.TaggedError<DeviceOperationErro
       settings_failed: "Could not read or save device settings.",
       hub_rejected: "The device hub could not complete the request.",
       package_manager_missing:
-        "Device support needs npm, which is not on the PM3code server's PATH. Install npm (it comes with Node.js from nodejs.org), restart PM3code, then retry.", // t3code-pm:
+        "Device support needs npm, which is not on the Agent Space server's PATH. Install npm (it comes with Node.js from nodejs.org), restart Agent Space, then retry.", // t3code-pm:
     }[this.reason];
     return `Device ${this.operation} failed: ${explanation}`;
   }

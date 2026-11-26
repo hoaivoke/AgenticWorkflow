@@ -111,6 +111,7 @@ const WHOLE_TEXT_NAMES = new Set([
 const PROPER_NOUNS = [
   "T3 Code",
   "PM3code", // t3code-pm:
+  "Agent Space", // t3code-pm:
   "T3 Connect",
   "T3 Chat",
   "GitHub",

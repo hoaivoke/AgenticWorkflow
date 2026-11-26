@@ -1,8 +1,8 @@
 // t3code-pm: the fork desktop app's identity, so it installs and runs beside official T3 Code.
 export const PM_DESKTOP_IDENTITY = {
   appId: "com.t3codepm.desktop",
-  baseName: "PM3code",
-  productName: "PM3code",
+  baseName: "Agent Space",
+  productName: "Agent Space",
   scheme: "t3code-pm",
   devScheme: "t3code-pm-dev",
   /** Electron profile folders, with no legacy folder to migrate from. Separate folders also

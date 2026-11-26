@@ -86,7 +86,7 @@ export function UseInAnotherAppDialogHost() {
 function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentId | null }) {
   const { environment, label } = useAccessEnvironment(requested);
   const gt = useGT();
-  const title = `${gt("Use T3 Code in another app (MCP)")} · ${label ?? "PM3code"}`; // t3code-pm:
+  const title = `${gt("Use T3 Code in another app (MCP)")} · ${label ?? "Agent Space"}`; // t3code-pm:
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())}>
       <WizardPopup>

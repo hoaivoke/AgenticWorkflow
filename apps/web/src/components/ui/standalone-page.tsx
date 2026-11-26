@@ -22,7 +22,7 @@ export function StandalonePageHeader({
     <>
       <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
         {/* t3code-pm: the fork's name, not T3's wordmark */}
-        <span className="text-lg font-medium tracking-tight text-foreground">PM3code</span>
+        <span className="text-lg font-medium tracking-tight text-foreground">Agent Space</span>
         {context ? <span className="text-sm">{context}</span> : null}
       </div>
       <h1 className="mt-6 text-xl leading-tight font-semibold">{title}</h1>

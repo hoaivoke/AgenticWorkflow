@@ -6,7 +6,7 @@ export const PM_SETTINGS_PATH = "/settings/project-managers" as const;
 export const PM_SETTINGS_SEARCH_ITEMS = [
   {
     id: "project-managers",
-    title: msg("Project Managers (PM3code)"),
+    title: msg("Project Managers (Agent Space)"),
     to: PM_SETTINGS_PATH,
     searchTerms: [msg("pm project manager coordinator workers turn off on")],
   },

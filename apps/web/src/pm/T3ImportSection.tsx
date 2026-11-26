@@ -76,7 +76,7 @@ export function T3ImportSection(props: {
       : source === null
         ? gt("T3 Code was not found on this computer.")
         : gt(
-            "T3 Code ({home}): {threads} threads in {projects} projects. PM3code: {pmThreads} threads, {imported} of them imported.",
+            "T3 Code ({home}): {threads} threads in {projects} projects. Agent Space: {pmThreads} threads, {imported} of them imported.",
             {
               home: source.home,
               threads: source.threads,
@@ -116,13 +116,13 @@ export function T3ImportSection(props: {
         description={
           <>
             {gt(
-              "Import copies T3 Code's threads in full and puts them beside yours. Replace removes PM3code's threads first, after a backup. Threads running in T3 Code are left out.",
+              "Import copies T3 Code's threads in full and puts them beside yours. Replace removes Agent Space's threads first, after a backup. Threads running in T3 Code are left out.",
             )}
             {sourceLine === null ? null : <span className="mt-1 block">{sourceLine}</span>}
             {source?.newer === true ? (
               <span className="mt-1 block text-destructive-foreground">
                 {gt(
-                  "T3 Code's database is newer than this PM3code understands. Update PM3code, then import.",
+                  "T3 Code's database is newer than this Agent Space understands. Update Agent Space, then import.",
                 )}
               </span>
             ) : null}
@@ -157,10 +157,10 @@ export function T3ImportSection(props: {
       <Dialog open={confirmReplace} onOpenChange={setConfirmReplace}>
         <DialogPopup className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{gt("Replace PM3code's threads?")}</DialogTitle>
+            <DialogTitle>{gt("Replace Agent Space's threads?")}</DialogTitle>
             <DialogDescription>
               {gt(
-                "PM3code's {pmThreads} threads, with their PMs, items and asks, are removed, and T3 Code's {threads} threads are copied in. Projects and settings stay.",
+                "Agent Space's {pmThreads} threads, with their PMs, items and asks, are removed, and T3 Code's {threads} threads are copied in. Projects and settings stay.",
                 { pmThreads: status?.pmThreads ?? 0, threads: source?.threads ?? 0 },
               )}
             </DialogDescription>
@@ -168,7 +168,7 @@ export function T3ImportSection(props: {
           <DialogPanel>
             <p className="text-sm">
               {gt(
-                "A backup of PM3code's database is saved first. The result shows where it is and how to put it back.",
+                "A backup of Agent Space's database is saved first. The result shows where it is and how to put it back.",
               )}
             </p>
           </DialogPanel>
@@ -224,7 +224,7 @@ function ImportResultText({ result }: { readonly result: PmT3ImportResult }) {
       {result.backupPath === null ? null : (
         <span>
           {gt(
-            "Backup: {path}. To put it back, quit PM3code, copy it over statev2.sqlite in the userdata folder above it, delete statev2.sqlite-wal and statev2.sqlite-shm beside it, then start PM3code.",
+            "Backup: {path}. To put it back, quit Agent Space, copy it over statev2.sqlite in the userdata folder above it, delete statev2.sqlite-wal and statev2.sqlite-shm beside it, then start Agent Space.",
             { path: result.backupPath },
           )}
         </span>

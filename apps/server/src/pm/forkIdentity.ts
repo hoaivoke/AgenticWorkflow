@@ -9,7 +9,7 @@ import * as ServerConfig from "../config.ts";
 // npm's `t3` is upstream: installing it would replace this fork. The desktop app's own updater
 // follows the fork's release feed, so desktop-managed updates still pass through.
 const FORK_UPDATE_REFUSAL =
-  "This is a PM3code fork build. It never installs upstream's npm `t3`; update it by pulling and rebuilding the fork.";
+  "This is an Agent Space fork build. It never installs upstream's npm `t3`; update it by pulling and rebuilding the fork.";
 
 export const layerForkNpmRelease = Layer.effect(
   NpmRelease.NpmRelease,
