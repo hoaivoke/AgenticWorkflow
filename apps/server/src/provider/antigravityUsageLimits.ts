@@ -49,6 +49,9 @@ const CliToken = Schema.Struct({
     expiry: Schema.optional(Schema.String),
   }),
 });
+const AuthStateFile = Schema.Struct({
+  methodId: Schema.optional(Schema.String),
+});
 const TokenResponse = Schema.Struct({
   access_token: Schema.NonEmptyString,
   expires_in: Schema.Number.check(Schema.isGreaterThan(0)),
@@ -90,6 +93,7 @@ const Models = Schema.Struct({
 
 const decodeTokenFile = Schema.decodeEffect(Schema.fromJsonString(TokenFile));
 const decodeCliToken = Schema.decodeEffect(Schema.fromJsonString(CliToken));
+const decodeAuthStateFile = Schema.decodeEffect(Schema.fromJsonString(AuthStateFile));
 const decodeTokenResponse = Schema.decodeUnknownEffect(TokenResponse);
 const decodeUserInfo = Schema.decodeUnknownEffect(UserInfo);
 const decodeSummary = Schema.decodeUnknownEffect(Summary);
@@ -334,6 +338,12 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     "antigravity-acp",
     "antigravity-oauth-token",
   );
+  const authStatePath = path.join(
+    input.profileDirectory,
+    "antigravity-acp",
+    "cache",
+    "acp-auth-state.json",
+  );
   const readKeyringSecret = input.readKeyringSecret ?? readCliKeyringSecret(platform, architecture);
   let cached:
     | { fingerprint: string; account: string; accessToken: string; expiresAt: number }
@@ -359,10 +369,20 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     let projectId: string | undefined;
     if (!(yield* fs.exists(tokenPath))) {
       cached = undefined;
-      // Google account instances bypass the keyring, whose one entry every profile shares.
+      // pipelines: agy CLI 1.5+ can authenticate personal Google accounts via the OS keyring
+      // even when per-profile file storage is requested, leaving cache/acp-auth-state.json on disk.
+      const hasProfilePersonalAuthState =
+        input.authMethod === "oauth-personal" && (yield* fs.exists(authStatePath))
+          ? yield* fs.readFileString(authStatePath).pipe(
+              Effect.flatMap(decodeAuthStateFile),
+              Effect.map((state) => state.methodId === "oauth-personal"),
+              Effect.orElseSucceed(() => false),
+            )
+          : false;
+      // Unauthenticated Google account instances still skip the shared keyring.
       const stored = (yield* fs.exists(cliTokenPath))
         ? yield* fs.readFileString(cliTokenPath)
-        : input.authMethod === "oauth-business"
+        : input.authMethod === "oauth-business" || hasProfilePersonalAuthState
           ? yield* readKeyringSecret
           : undefined;
       if (stored === undefined) {
