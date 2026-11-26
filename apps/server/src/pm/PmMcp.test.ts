@@ -10,6 +10,7 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as PipelineService from "../pipelines/PipelineService.ts"; // pipelines:
+import * as OrchestrationStudioService from "../pipelines/OrchestrationStudioService.ts"; // pipelines:
 import * as ThreadHarnessService from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import * as ThreadHarnessStore from "../pipelines/ThreadHarnessStore.ts"; // pipelines:
 import {
@@ -45,14 +46,20 @@ type ToolName = keyof typeof PmToolkit.tools;
 
 const harness = (world: PmWorld) => {
   const pipelinesLayer = PipelineService.layerTest({});
+  const pmLayer = layerPm(world);
   const threadHarnessLayer = ThreadHarnessService.layer.pipe(
     Layer.provide(ThreadHarnessStore.layer),
     Layer.provide(pipelinesLayer),
   );
+  const studioLayer = OrchestrationStudioService.layer.pipe(
+    Layer.provide(pmLayer),
+    Layer.provide(pipelinesLayer),
+  );
   return McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
     Layer.provideMerge(layerPmRemoteHere),
-    Layer.provideMerge(layerPm(world)),
+    Layer.provideMerge(pmLayer),
     Layer.provideMerge(threadHarnessLayer), // pipelines:
+    Layer.provideMerge(studioLayer), // pipelines:
     Layer.provideMerge(pipelinesLayer), // pipelines:
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );

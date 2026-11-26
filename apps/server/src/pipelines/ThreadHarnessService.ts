@@ -302,19 +302,22 @@ const make = Effect.gen(function* () {
       sections.push(renderRoleBrief(role, role.tier, resolvedHarness));
     } else {
       if (resolvedHarness.contextFiles && resolvedHarness.contextFiles.length > 0) {
-        const blocks = resolvedHarness.contextFiles.map(
-          (file) => `### ${file.path}\n${file.content}`,
+        const sortedContext = [...resolvedHarness.contextFiles].toSorted((a, b) =>
+          a.path.localeCompare(b.path),
         );
+        const blocks = sortedContext.map((file) => `### ${file.path}\n${file.content}`);
         sections.push(`Carried-over repository context:\n\n${blocks.join("\n\n")}`);
       }
       if (resolvedHarness.skills && resolvedHarness.skills.length > 0) {
-        const blocks = resolvedHarness.skills.map(
-          (skill) => `### Skill: ${skill.name}\n${skill.content}`,
+        const sortedSkills = [...resolvedHarness.skills].toSorted((a, b) =>
+          a.name.localeCompare(b.name),
         );
+        const blocks = sortedSkills.map((skill) => `### Skill: ${skill.name}\n${skill.content}`);
         sections.push(`Carried-over skills from earlier turns:\n\n${blocks.join("\n\n")}`);
       }
     }
 
+    // Dynamic provenance is appended after the static prefix so providers keep prompt-cache hits.
     if (row.trackedSkills.length > 0 || row.trackedContextFiles.length > 0) {
       const provenanceLines: Array<string> = ["Tracked thread provenance:"];
       if (row.trackedSkills.length > 0) {
@@ -325,7 +328,7 @@ const make = Effect.gen(function* () {
           `- Key context files read/edited: ${row.trackedContextFiles.join(", ")}`,
         );
       }
-      sections.push(provenanceLines.join("\n"));
+      sections.push(`---\n\n${provenanceLines.join("\n")}`);
     }
 
     const body = sections.filter((section) => section.trim().length > 0).join("\n\n");

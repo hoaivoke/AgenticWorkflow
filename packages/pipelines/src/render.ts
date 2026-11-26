@@ -62,10 +62,12 @@ export function renderPipeline(
   });
   const rules = [
     `Run folder: ${RUNS_DIR}/<short-run-name>/ under the project root. Create it, give every worker its absolute path, and keep ${RUNS_DIR}/ out of git.`,
-    "Start each stage's workers with pm_worker_start and role set to the stage's role. Role harnesses (skills, context files, toolkits) load automatically; put only the stage goal, artifact paths, and task card in the brief.",
-    "For stages with deterministic `run:` commands (such as gatekeeper), prefer `pm_run_gates` so checks run directly at zero LLM cost before spawning an agent.",
+    "Call `pm_pipeline_run_start` when starting this pipeline and `pm_pipeline_stage_update` as each stage starts, waits for approval, passes, or fails so the Live Runs graph tracks progress, cost, and budget guardrails.",
+    "Start each stage's workers with pm_worker_start and role set to the stage's role. Role harnesses (skills, context files, toolkits) load automatically in prompt-cache-stable order; put only the stage goal, artifact paths, and task card in the brief.",
+    "For deterministic checks and app/website verification stages, call `pm_run_gates` or `pm_verify_app` directly at zero LLM cost before spawning an agent.",
     `A failed card goes back to its stage with the failure attached. After ${pipeline.escalateAfter ?? 2} failed attempts on one card, start the next attempt with escalate: 1 (one tier up)${pipeline.replanAfter === undefined ? "" : `; after ${pipeline.replanAfter}, send it back to planning`}.`,
-    "Never let a worker review or QA its own work. Read gates.json, review.md and validated.json yourself; do not take a worker's word that checks passed.",
+    "Never let a worker review or QA its own work. Read gates.json, verify-report.md, review.md and validated.json yourself; do not take a worker's word that checks passed.",
+    "When a review or failure uncovers a reusable lesson for this repository, call `pm_learning_propose` so the user can promote it into the role's `.pipelines/roles/<role>.yaml` harness for future runs.",
   ];
   return [
     `Pipeline ${pipeline.name}: ${pipeline.description}`,
@@ -154,14 +156,19 @@ export function renderRoleBrief(role: Role, tier: string, harness?: ResolvedRole
   }
   lines.push("", role.instructions);
   if (harness?.contextFiles && harness.contextFiles.length > 0) {
+    // Stable alphabetical ordering preserves prompt-cache prefix reuse across turns and providers.
+    const sortedContext = [...harness.contextFiles].toSorted((a, b) =>
+      a.path.localeCompare(b.path),
+    );
     lines.push("", "## Role Context");
-    for (const file of harness.contextFiles) {
+    for (const file of sortedContext) {
       lines.push(`### ${file.path}`, file.content);
     }
   }
   if (harness?.skills && harness.skills.length > 0) {
+    const sortedSkills = [...harness.skills].toSorted((a, b) => a.name.localeCompare(b.name));
     lines.push("", "## Role Skills");
-    for (const skill of harness.skills) {
+    for (const skill of sortedSkills) {
       lines.push(`### Skill: ${skill.name}`, skill.content);
     }
   }

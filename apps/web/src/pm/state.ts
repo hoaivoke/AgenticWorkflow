@@ -27,6 +27,9 @@ const pmThreadDetail = pmClient.threadDetail;
 const pmSwarmBoardQuery = pmClient.swarmBoard;
 const pmPipelinesSnapshotQuery = pmClient.pipelinesSnapshot;
 const pmThreadHarnessQuery = pmClient.threadHarness;
+const pmPipelineRunsQuery = pmClient.pipelineRuns;
+const pmEvalRunsQuery = pmClient.evalRuns;
+const pmLearningsQuery = pmClient.learnings;
 
 /** Upstream tests that mock `useAtomValue` hand back their own values; those read as no PMs. */
 export const usePmIndex = (): PmIndex => asPmIndex(useAtomValue(pmIndexAtom));
@@ -94,5 +97,47 @@ export function useThreadHarness(
     environmentId === null || threadId === null || !enabled || !canRead
       ? null
       : pmThreadHarnessQuery({ environmentId, input: { threadId: threadId as ThreadId } }),
+  );
+}
+
+/** Tracked live pipeline execution runs (stages, token cost, savings, budget caps). */
+export function usePipelineRuns(
+  environmentId: EnvironmentId | null,
+  projectId: ProjectId | string | null,
+  enabled = true,
+) {
+  const canRead = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
+  return useEnvironmentQuery(
+    environmentId === null || projectId === null || !enabled || !canRead
+      ? null
+      : pmPipelineRunsQuery({ environmentId, input: { projectId: projectId as ProjectId } }),
+  );
+}
+
+/** A/B Eval Arena runs comparing raw single-model baseline vs pipeline treatment. */
+export function useEvalRuns(
+  environmentId: EnvironmentId | null,
+  projectId: ProjectId | string | null,
+  enabled = true,
+) {
+  const canRead = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
+  return useEnvironmentQuery(
+    environmentId === null || projectId === null || !enabled || !canRead
+      ? null
+      : pmEvalRunsQuery({ environmentId, input: { projectId: projectId as ProjectId } }),
+  );
+}
+
+/** Self-improving harness lessons proposed by reviewers/PMs or applied to role YAMLs. */
+export function useHarnessLearnings(
+  environmentId: EnvironmentId | null,
+  projectId: ProjectId | string | null,
+  enabled = true,
+) {
+  const canRead = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
+  return useEnvironmentQuery(
+    environmentId === null || projectId === null || !enabled || !canRead
+      ? null
+      : pmLearningsQuery({ environmentId, input: { projectId: projectId as ProjectId } }),
   );
 }

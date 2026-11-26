@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as RuntimeLayer from "../orchestration-v2/runtimeLayer.ts";
+import * as OrchestrationStudioService from "../pipelines/OrchestrationStudioService.ts"; // pipelines:
 import * as ThreadHarnessService from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as ServerActivation from "../serverActivation.ts";
@@ -30,17 +31,20 @@ const layerSwarm = SwarmService.layer.pipe(
   Layer.provideMerge(layerPipelines),
 );
 
-/** With the T3 Code import. One value, so every use memoizes to one instance. */
-export const layer = Layer.mergeAll(
-  PmT3Import.layer.pipe(
-    Layer.provideMerge(layerCore),
-    Layer.provideMerge(layerPipelines), // pipelines:
-    Layer.provideMerge(layerThreadHarness), // pipelines:
-    // The runtime's own instances (layers memoize by reference), so imports publish to live clients.
-    Layer.provide(Layer.merge(RuntimeLayer.layerEventSink, ProjectionStore.layer)),
+const layerStudio = OrchestrationStudioService.layer.pipe(
+  Layer.provideMerge(
+    PmT3Import.layer.pipe(
+      Layer.provideMerge(layerCore),
+      Layer.provideMerge(layerPipelines),
+      Layer.provideMerge(layerThreadHarness),
+      Layer.provide(Layer.merge(RuntimeLayer.layerEventSink, ProjectionStore.layer)),
+    ),
   ),
-  layerSwarm,
+  Layer.provide(RuntimeLayer.layerProjectService),
 );
+
+/** With the T3 Code import. One value, so every use memoizes to one instance. */
+export const layer = Layer.mergeAll(layerStudio, layerSwarm);
 
 /** Starts the worker report watcher once the server is active. */
 export const layerWatcher = Layer.mergeAll(

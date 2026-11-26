@@ -58,6 +58,24 @@ export function createPmClient<R, ER>(
     staleTimeMs: 2_000,
     idleTtlMs: 60_000,
   });
+  const pipelineRuns = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:pipeline-runs-list",
+    tag: PM_WS_METHODS.pipelineRunsList,
+    staleTimeMs: 3_000,
+    idleTtlMs: 60_000,
+  });
+  const evalRuns = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:eval-runs-list",
+    tag: PM_WS_METHODS.evalRunsList,
+    staleTimeMs: 3_000,
+    idleTtlMs: 60_000,
+  });
+  const learnings = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:learnings-list",
+    tag: PM_WS_METHODS.learningsList,
+    staleTimeMs: 5_000,
+    idleTtlMs: 60_000,
+  });
   const commands = {
     create: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pm:create",
@@ -175,6 +193,42 @@ export function createPmClient<R, ER>(
       label: "environment-data:pm:thread-harness-set",
       tag: PM_WS_METHODS.threadHarnessSet,
     }),
+    pipelineRunStart: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:pipeline-run-start",
+      tag: PM_WS_METHODS.pipelineRunStart,
+    }),
+    pipelineStageDecide: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:pipeline-stage-decide",
+      tag: PM_WS_METHODS.pipelineStageDecide,
+    }),
+    appVerifyRun: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:app-verify-run",
+      tag: PM_WS_METHODS.appVerifyRun,
+    }),
+    evalRunStart: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:eval-run-start",
+      tag: PM_WS_METHODS.evalRunStart,
+    }),
+    evalRunVerify: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:eval-run-verify",
+      tag: PM_WS_METHODS.evalRunVerify,
+    }),
+    evalRunDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:eval-run-delete",
+      tag: PM_WS_METHODS.evalRunDelete,
+    }),
+    learningPropose: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:learning-propose",
+      tag: PM_WS_METHODS.learningPropose,
+    }),
+    learningApply: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:learning-apply",
+      tag: PM_WS_METHODS.learningApply,
+    }),
+    learningDismiss: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:learning-dismiss",
+      tag: PM_WS_METHODS.learningDismiss,
+    }),
   };
 
   /** Every connected environment's PMs in one index: a thread list's single read. */
@@ -207,6 +261,9 @@ export function createPmClient<R, ER>(
     swarmBoard,
     pipelinesSnapshot,
     threadHarness,
+    pipelineRuns,
+    evalRuns,
+    learnings,
     commands,
     indexAtom,
   };

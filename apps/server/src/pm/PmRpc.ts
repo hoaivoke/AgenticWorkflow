@@ -5,6 +5,7 @@ import * as Stream from "effect/Stream";
 import { PM_WS_METHODS, PmError, PmRpcGroup, RpcScopeAuthorization } from "@t3tools/contracts";
 
 import { RpcInstrumentation } from "../observability/RpcInstrumentation.ts";
+import { OrchestrationStudioService } from "../pipelines/OrchestrationStudioService.ts"; // pipelines:
 import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
 import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import { SwarmService } from "../swarm/SwarmService.ts";
@@ -63,6 +64,18 @@ const unavailableHandlers = PmServerRpcGroup.of({
   [PM_WS_METHODS.pipelineDelete]: refuse,
   [PM_WS_METHODS.threadHarnessGet]: refuse,
   [PM_WS_METHODS.threadHarnessSet]: refuse,
+  [PM_WS_METHODS.pipelineRunsList]: refuse,
+  [PM_WS_METHODS.pipelineRunStart]: refuse,
+  [PM_WS_METHODS.pipelineStageDecide]: refuse,
+  [PM_WS_METHODS.appVerifyRun]: refuse,
+  [PM_WS_METHODS.evalRunsList]: refuse,
+  [PM_WS_METHODS.evalRunStart]: refuse,
+  [PM_WS_METHODS.evalRunVerify]: refuse,
+  [PM_WS_METHODS.evalRunDelete]: refuse,
+  [PM_WS_METHODS.learningsList]: refuse,
+  [PM_WS_METHODS.learningPropose]: refuse,
+  [PM_WS_METHODS.learningApply]: refuse,
+  [PM_WS_METHODS.learningDismiss]: refuse,
 });
 
 /** Thin transport: each handler calls one PmService method. */
@@ -74,6 +87,7 @@ export const makePmRpcHandlers = Effect.gen(function* () {
   const swarm = Option.getOrUndefined(yield* Effect.serviceOption(SwarmService));
   const pipelines = Option.getOrUndefined(yield* Effect.serviceOption(PipelineService)); // pipelines:
   const threadHarness = Option.getOrUndefined(yield* Effect.serviceOption(ThreadHarnessService)); // pipelines:
+  const studio = Option.getOrUndefined(yield* Effect.serviceOption(OrchestrationStudioService)); // pipelines:
   const t3Call = <A>(run: (service: PmT3Import["Service"]) => Effect.Effect<A, PmError>) =>
     t3 === undefined ? Effect.fail(missing) : run(t3);
   const swarmCall = <A>(run: (service: SwarmService["Service"]) => Effect.Effect<A, PmError>) =>
@@ -84,6 +98,9 @@ export const makePmRpcHandlers = Effect.gen(function* () {
   const harnessCall = <A>(
     run: (service: ThreadHarnessService["Service"]) => Effect.Effect<A, PmError>,
   ) => (threadHarness === undefined ? Effect.fail(missing) : run(threadHarness));
+  const studioCall = <A>(
+    run: (service: OrchestrationStudioService["Service"]) => Effect.Effect<A, PmError>,
+  ) => (studio === undefined ? Effect.fail(missing) : run(studio));
   return PmServerRpcGroup.of({
     [PM_WS_METHODS.subscribe]: ({ projectId }) => pm.subscribe(projectId),
     [PM_WS_METHODS.subscribeThread]: ({ pm: thread }) => pm.subscribeThread(thread),
@@ -145,6 +162,28 @@ export const makePmRpcHandlers = Effect.gen(function* () {
       harnessCall((service) =>
         service.setHarness({ threadId, roleName, trackedSkills, trackedContextFiles }),
       ),
+    [PM_WS_METHODS.pipelineRunsList]: ({ projectId }) =>
+      studioCall((service) => service.listRuns(projectId)),
+    [PM_WS_METHODS.pipelineRunStart]: ({ projectId, pipelineName, goal, budgetUsd }) =>
+      studioCall((service) => service.startRun({ projectId, pipelineName, goal, budgetUsd })),
+    [PM_WS_METHODS.pipelineStageDecide]: ({ runId, stageId, decision, note }) =>
+      studioCall((service) => service.decideStage({ runId, stageId, decision, note })),
+    [PM_WS_METHODS.appVerifyRun]: (input) => studioCall((service) => service.verifyApp(input)),
+    [PM_WS_METHODS.evalRunsList]: ({ projectId }) =>
+      studioCall((service) => service.listEvals(projectId)),
+    [PM_WS_METHODS.evalRunStart]: (input) => studioCall((service) => service.startEval(input)),
+    [PM_WS_METHODS.evalRunVerify]: ({ evalId }) =>
+      studioCall((service) => service.verifyEval(evalId)),
+    [PM_WS_METHODS.evalRunDelete]: ({ evalId }) =>
+      ok(studioCall((service) => service.deleteEval(evalId))),
+    [PM_WS_METHODS.learningsList]: ({ projectId }) =>
+      studioCall((service) => service.listLearnings(projectId)),
+    [PM_WS_METHODS.learningPropose]: (input) =>
+      studioCall((service) => service.proposeLearning(input)),
+    [PM_WS_METHODS.learningApply]: ({ learningId }) =>
+      studioCall((service) => service.applyLearning(learningId)),
+    [PM_WS_METHODS.learningDismiss]: ({ learningId }) =>
+      studioCall((service) => service.dismissLearning(learningId)),
   });
 });
 
@@ -155,6 +194,7 @@ export const capturePmService = Effect.gen(function* () {
   const swarm = yield* Effect.serviceOption(SwarmService);
   const pipelines = yield* Effect.serviceOption(PipelineService); // pipelines:
   const threadHarness = yield* Effect.serviceOption(ThreadHarnessService); // pipelines:
+  const studio = yield* Effect.serviceOption(OrchestrationStudioService); // pipelines:
   return Layer.mergeAll(
     Option.isNone(service) ? Layer.empty : Layer.succeed(PmService, service.value),
     Option.isNone(t3) ? Layer.empty : Layer.succeed(PmT3Import, t3.value),
@@ -163,5 +203,6 @@ export const capturePmService = Effect.gen(function* () {
     Option.isNone(threadHarness)
       ? Layer.empty
       : Layer.succeed(ThreadHarnessService, threadHarness.value),
+    Option.isNone(studio) ? Layer.empty : Layer.succeed(OrchestrationStudioService, studio.value),
   );
 });

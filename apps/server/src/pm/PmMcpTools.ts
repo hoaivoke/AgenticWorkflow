@@ -2,11 +2,15 @@ import {
   ModelSelection,
   OrchestrationV2ThreadLaunchWorkspaceStrategy,
   OrchestratorMcpFailure,
+  PmAppVerifyTargetKind,
+  PmHarnessLearningCategory,
   PmPipelineDefinition,
   PmPipelineRole,
+  PmPipelineStageRunStatus,
   ProviderInteractionMode,
   RuntimeMode,
   ScheduledTaskUpsertSchedule,
+  ThreadId,
   TrimmedNonEmptyString,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -15,6 +19,7 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as OrchestratorMcpService from "../mcp/OrchestratorMcpService.ts"; // pipelines:
+import { OrchestrationStudioService } from "../pipelines/OrchestrationStudioService.ts"; // pipelines:
 import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
 import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import { PmHostStatus, PmRemote } from "./PmRemote.ts";
@@ -42,6 +47,7 @@ const shared = {
     PmStore, // pipelines:
     PipelineService, // pipelines:
     ThreadHarnessService, // pipelines:
+    OrchestrationStudioService, // pipelines:
     OrchestratorMcpService.OrchestratorMcpService, // pipelines:
   ],
 };
@@ -352,6 +358,63 @@ const PmThreadHarnessGetTool = Tool.make("pm_thread_harness_get", {
   .annotate(Tool.Readonly, true)
   .annotate(McpSchema.EnabledWhen, hiddenUnlessThread);
 
+const PmPipelineRunStartTool = pmTool(
+  "pm_pipeline_run_start",
+  "Register a live tracked pipeline execution run so the Pipelines Studio Live Runs graph tracks each stage, token cost, cache hit %, savings vs all-frontier, and optional USD budget cap.",
+  {
+    pipeline: TrimmedNonEmptyString,
+    goal: Schema.optional(Schema.String),
+    budget_usd: Schema.optional(Schema.Number),
+  },
+);
+
+const PmPipelineStageUpdateTool = pmTool(
+  "pm_pipeline_stage_update",
+  "Update a stage in a live tracked pipeline run (`pending`, `running`, `waiting_approval`, `passed`, `failed`, `skipped`), linking the worker thread so its token cost and latency stream live to the graph.",
+  {
+    run_id: TrimmedNonEmptyString,
+    stage_id: TrimmedNonEmptyString,
+    status: PmPipelineStageRunStatus,
+    worker_thread_id: Schema.optional(ThreadId),
+    provider_model: Schema.optional(TrimmedNonEmptyString),
+    tier: Schema.optional(TrimmedNonEmptyString),
+    summary: Schema.optional(Schema.String),
+    artifacts: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  },
+);
+
+const PmVerifyAppTool = Tool.make("pm_verify_app", {
+  ...shared,
+  description:
+    "Run deterministic verification for a website or app (`website`, `web_app`, `fullstack_app`, `cli_or_api`) at zero LLM cost: executes check commands (or auto-detects from package.json), optionally boots a dev server to probe HTTP routes, and runs headless Chrome/Playwright desktop + mobile screenshots, console errors, horizontal overflow, and DOM accessibility checks.",
+  parameters: Schema.Struct({
+    target_kind: Schema.optional(PmAppVerifyTargetKind),
+    cwd: Schema.optional(TrimmedNonEmptyString),
+    commands: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+    start_command: Schema.optional(TrimmedNonEmptyString),
+    url: Schema.optional(TrimmedNonEmptyString),
+    routes: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+    run_folder: Schema.optional(TrimmedNonEmptyString),
+  }),
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(McpSchema.EnabledWhen, hiddenUnlessThread);
+
+const PmLearningProposeTool = Tool.make("pm_learning_propose", {
+  ...shared,
+  description:
+    "Propose a reusable rule/lesson discovered during verification or code review so the user can promote it with 1 click into the target role's `.pipelines/roles/<role>.yaml` harness for all future runs.",
+  parameters: Schema.Struct({
+    role: TrimmedNonEmptyString,
+    category: Schema.optional(PmHarnessLearningCategory),
+    title: TrimmedNonEmptyString,
+    rule_text: TrimmedNonEmptyString,
+    run_id: Schema.optional(TrimmedNonEmptyString),
+  }),
+})
+  .annotate(Tool.Destructive, true)
+  .annotate(McpSchema.EnabledWhen, hiddenUnlessThread);
+
 export const PmToolkit = Toolkit.make(
   PmGuideTool,
   PmStatusTool,
@@ -385,4 +448,8 @@ export const PmToolkit = Toolkit.make(
   PmRoleSaveTool, // pipelines:
   PmPipelineSaveTool, // pipelines:
   PmThreadHarnessGetTool, // pipelines:
+  PmPipelineRunStartTool, // pipelines:
+  PmPipelineStageUpdateTool, // pipelines:
+  PmVerifyAppTool, // pipelines:
+  PmLearningProposeTool, // pipelines:
 );

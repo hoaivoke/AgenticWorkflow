@@ -283,6 +283,89 @@ const createThreadHarnessTable = Effect.gen(function* () {
   `;
 });
 
+const createOrchestrationStudioTables = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_pipeline_runs (
+      run_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      pm_thread_id TEXT,
+      pipeline_name TEXT NOT NULL,
+      goal TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'running',
+      budget_usd REAL,
+      spent_usd REAL NOT NULL DEFAULT 0,
+      baseline_frontier_usd REAL NOT NULL DEFAULT 0,
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT
+    ) WITHOUT ROWID
+  `;
+  yield* sql`CREATE INDEX IF NOT EXISTS pm_pipeline_runs_project ON pm_pipeline_runs (project_id, updated_at)`;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_pipeline_stage_runs (
+      run_id TEXT NOT NULL,
+      stage_id TEXT NOT NULL,
+      stage_index INTEGER NOT NULL,
+      role_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      worker_thread_id TEXT,
+      provider_model TEXT,
+      tier TEXT,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cached_tokens INTEGER NOT NULL DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0,
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      summary TEXT,
+      artifacts_json TEXT NOT NULL DEFAULT '[]',
+      started_at TEXT,
+      completed_at TEXT,
+      PRIMARY KEY (run_id, stage_id)
+    ) WITHOUT ROWID
+  `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_eval_runs (
+      eval_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      target_kind TEXT NOT NULL DEFAULT 'web_app',
+      baseline_model_json TEXT NOT NULL,
+      treatment_pipeline TEXT NOT NULL,
+      baseline_thread_id TEXT,
+      treatment_thread_id TEXT,
+      baseline_worktree TEXT,
+      treatment_worktree TEXT,
+      verify_commands_json TEXT NOT NULL DEFAULT '[]',
+      verify_start_command TEXT,
+      verify_url TEXT,
+      status TEXT NOT NULL DEFAULT 'running',
+      baseline_verify_json TEXT,
+      treatment_verify_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) WITHOUT ROWID
+  `;
+  yield* sql`CREATE INDEX IF NOT EXISTS pm_eval_runs_project ON pm_eval_runs (project_id, updated_at)`;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_harness_learnings (
+      learning_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      role_name TEXT NOT NULL,
+      source_run_id TEXT,
+      source_thread_id TEXT,
+      category TEXT NOT NULL DEFAULT 'bug_pattern',
+      title TEXT NOT NULL,
+      rule_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'proposed',
+      created_at TEXT NOT NULL,
+      resolved_at TEXT
+    ) WITHOUT ROWID
+  `;
+  yield* sql`CREATE INDEX IF NOT EXISTS pm_harness_learnings_project ON pm_harness_learnings (project_id, status, created_at)`;
+});
+
 const pmMigrationEntries = [
   [1, "PmTables", createTables],
   [2, "PmInbox", addInboxColumns],
@@ -292,6 +375,7 @@ const pmMigrationEntries = [
   // pipelines: high id keeps fork migrations out of upstream's sequential pm_migrations ids.
   [100, "PmSwarm", createSwarmTables],
   [101, "PmThreadHarness", createThreadHarnessTable],
+  [102, "PmOrchestrationStudio", createOrchestrationStudioTables],
 ] as const;
 
 const run = Migrator.make({});

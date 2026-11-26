@@ -14,8 +14,10 @@ import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
 import { msg, T, useGT, Var } from "gt-react";
 import {
+  ActivityIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  BookOpenCheckIcon,
   BotIcon,
   CpuIcon,
   GitBranchIcon,
@@ -25,6 +27,7 @@ import {
   RefreshCwIcon,
   RotateCcwIcon,
   SaveIcon,
+  ScaleIcon,
   ShieldCheckIcon,
   TerminalIcon,
   Trash2Icon,
@@ -46,9 +49,19 @@ import { cn } from "../lib/utils";
 import { useProjects } from "../state/entities";
 import { buildThreadRouteParams } from "../threadRoutes";
 import { runPmCommand } from "./actions";
-import { pmCommands, usePipelinesSnapshot } from "./state";
+import {
+  pmCommands,
+  useEvalRuns,
+  useHarnessLearnings,
+  usePipelineRuns,
+  usePipelinesSnapshot,
+} from "./state";
+import { StudioArenaTab } from "./StudioArenaTab";
+import { StudioLearningsTab } from "./StudioLearningsTab";
+import { StudioLiveRunsTab } from "./StudioLiveRunsTab";
+import { StudioVerifyTab } from "./StudioVerifyTab";
 
-type StudioTab = "pipelines" | "roles" | "skills";
+type StudioTab = "pipelines" | "runs" | "arena" | "verify" | "roles" | "learnings" | "skills";
 
 interface CandidateDraft extends PmPipelineCandidate {
   readonly _key: string;
@@ -235,6 +248,14 @@ export function PipelinesStudioPage() {
 
   const snapshotQuery = usePipelinesSnapshot(activeEnvironmentId, activeProjectId);
   const snapshot = snapshotQuery.data ?? null;
+  const runsQuery = usePipelineRuns(activeEnvironmentId, activeProjectId);
+  const evalsQuery = useEvalRuns(activeEnvironmentId, activeProjectId);
+  const learningsQuery = useHarnessLearnings(activeEnvironmentId, activeProjectId);
+  const runsCount = runsQuery.data?.length ?? 0;
+  const evalsCount = evalsQuery.data?.length ?? 0;
+  const pendingLearningsCount = (learningsQuery.data ?? []).filter(
+    (entry) => entry.status === "proposed",
+  ).length;
 
   const [activeTab, setActiveTab] = useState<StudioTab>("pipelines");
   const [selectedPipelineName, setSelectedPipelineName] = useState<string | null>(null);
@@ -740,7 +761,7 @@ export function PipelinesStudioPage() {
             <div
               role="tablist"
               aria-label={gt("Pipelines studio sections")}
-              className="flex items-center gap-1 border-b border-border pb-2"
+              className="flex flex-wrap items-center gap-1 border-b border-border pb-2"
             >
               <Button
                 type="button"
@@ -761,6 +782,49 @@ export function PipelinesStudioPage() {
               <Button
                 type="button"
                 role="tab"
+                aria-selected={activeTab === "runs"}
+                variant={activeTab === "runs" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("runs")}
+              >
+                <ActivityIcon className="size-3.5" aria-hidden />
+                <T>Live Runs</T>
+                {runsCount > 0 ? (
+                  <Badge variant="outline" size="sm" className="ml-1">
+                    {runsCount}
+                  </Badge>
+                ) : null}
+              </Button>
+              <Button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "arena"}
+                variant={activeTab === "arena" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("arena")}
+              >
+                <ScaleIcon className="size-3.5" aria-hidden />
+                <T>A/B Eval Arena</T>
+                {evalsCount > 0 ? (
+                  <Badge variant="outline" size="sm" className="ml-1">
+                    {evalsCount}
+                  </Badge>
+                ) : null}
+              </Button>
+              <Button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "verify"}
+                variant={activeTab === "verify" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("verify")}
+              >
+                <ShieldCheckIcon className="size-3.5" aria-hidden />
+                <T>App Verification</T>
+              </Button>
+              <Button
+                type="button"
+                role="tab"
                 aria-selected={activeTab === "roles"}
                 variant={activeTab === "roles" ? "secondary" : "ghost"}
                 size="sm"
@@ -771,6 +835,22 @@ export function PipelinesStudioPage() {
                 {snapshot ? (
                   <Badge variant="outline" size="sm" className="ml-1">
                     {snapshot.roles.length}
+                  </Badge>
+                ) : null}
+              </Button>
+              <Button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "learnings"}
+                variant={activeTab === "learnings" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("learnings")}
+              >
+                <BookOpenCheckIcon className="size-3.5" aria-hidden />
+                <T>Learnings</T>
+                {pendingLearningsCount > 0 ? (
+                  <Badge variant="warning" size="sm" className="ml-1">
+                    {pendingLearningsCount}
                   </Badge>
                 ) : null}
               </Button>
@@ -2106,6 +2186,35 @@ export function PipelinesStudioPage() {
                   </div>
                 )}
               </div>
+            ) : null}
+
+            {activeTab === "runs" && activeEnvironmentId && activeProjectId ? (
+              <StudioLiveRunsTab
+                environmentId={activeEnvironmentId}
+                projectId={activeProjectId}
+                snapshot={snapshot}
+              />
+            ) : null}
+
+            {activeTab === "arena" && activeEnvironmentId && activeProjectId ? (
+              <StudioArenaTab
+                environmentId={activeEnvironmentId}
+                projectId={activeProjectId}
+                snapshot={snapshot}
+              />
+            ) : null}
+
+            {activeTab === "verify" && activeEnvironmentId && activeProjectId ? (
+              <StudioVerifyTab environmentId={activeEnvironmentId} projectId={activeProjectId} />
+            ) : null}
+
+            {activeTab === "learnings" && activeEnvironmentId && activeProjectId ? (
+              <StudioLearningsTab
+                environmentId={activeEnvironmentId}
+                projectId={activeProjectId}
+                snapshot={snapshot}
+                onAppliedRoleChange={() => snapshotQuery.refresh()}
+              />
             ) : null}
           </>
         )}

@@ -473,6 +473,190 @@ export const PmThreadHarnessState = Schema.Struct({
 });
 export type PmThreadHarnessState = typeof PmThreadHarnessState.Type;
 
+// pipelines: live pipeline run graph, cost/budget telemetry, app verification gate, A/B eval arena, and self-improving harness learnings.
+export const PmPipelineRunStatus = Schema.Literals([
+  "running",
+  "waiting_approval",
+  "completed",
+  "failed",
+  "budget_paused",
+]);
+export type PmPipelineRunStatus = typeof PmPipelineRunStatus.Type;
+
+export const PmPipelineStageRunStatus = Schema.Literals([
+  "pending",
+  "running",
+  "waiting_approval",
+  "passed",
+  "failed",
+  "skipped",
+]);
+export type PmPipelineStageRunStatus = typeof PmPipelineStageRunStatus.Type;
+
+export const PmPipelineStageRun = Schema.Struct({
+  runId: Schema.String,
+  stageId: Schema.String,
+  stageIndex: Schema.Number,
+  roleName: Schema.String,
+  status: PmPipelineStageRunStatus,
+  workerThreadId: Schema.NullOr(ThreadId),
+  providerModel: Schema.NullOr(Schema.String),
+  tier: Schema.NullOr(Schema.String),
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  cachedTokens: Schema.Number,
+  costUsd: Schema.Number,
+  durationMs: Schema.Number,
+  summary: Schema.NullOr(Schema.String),
+  artifacts: Schema.Array(Schema.String),
+  startedAt: Schema.NullOr(Schema.String),
+  completedAt: Schema.NullOr(Schema.String),
+});
+export type PmPipelineStageRun = typeof PmPipelineStageRun.Type;
+
+export const PmPipelineRun = Schema.Struct({
+  runId: Schema.String,
+  projectId: ProjectId,
+  pmThreadId: Schema.NullOr(ThreadId),
+  pipelineName: Schema.String,
+  goal: Schema.String,
+  status: PmPipelineRunStatus,
+  budgetUsd: Schema.NullOr(Schema.Number),
+  spentUsd: Schema.Number,
+  baselineFrontierUsd: Schema.Number,
+  savingsPercent: Schema.Number,
+  cacheHitPercent: Schema.Number,
+  stages: Schema.Array(PmPipelineStageRun),
+  startedAt: Schema.String,
+  updatedAt: Schema.String,
+  completedAt: Schema.NullOr(Schema.String),
+});
+export type PmPipelineRun = typeof PmPipelineRun.Type;
+
+export const PmAppVerifyTargetKind = Schema.Literals([
+  "website",
+  "web_app",
+  "fullstack_app",
+  "cli_or_api",
+]);
+export type PmAppVerifyTargetKind = typeof PmAppVerifyTargetKind.Type;
+
+export const PmAppVerifyCheck = Schema.Struct({
+  command: Schema.String,
+  exitCode: Schema.Number,
+  durationMs: Schema.Number,
+  passed: Schema.Boolean,
+  summary: Schema.String,
+});
+export type PmAppVerifyCheck = typeof PmAppVerifyCheck.Type;
+
+export const PmAppVerifyScreenshot = Schema.Struct({
+  viewport: Schema.String,
+  route: Schema.String,
+  path: Schema.String,
+  width: Schema.Number,
+  height: Schema.Number,
+  horizontalOverflow: Schema.Boolean,
+});
+export type PmAppVerifyScreenshot = typeof PmAppVerifyScreenshot.Type;
+
+export const PmAppVerifyA11yIssue = Schema.Struct({
+  severity: Schema.Literals(["error", "warning"]),
+  route: Schema.String,
+  rule: Schema.String,
+  message: Schema.String,
+  count: Schema.Number,
+});
+export type PmAppVerifyA11yIssue = typeof PmAppVerifyA11yIssue.Type;
+
+export const PmAppVerifyReport = Schema.Struct({
+  passed: Schema.Boolean,
+  targetKind: PmAppVerifyTargetKind,
+  checkedAt: Schema.String,
+  durationMs: Schema.Number,
+  checks: Schema.Array(PmAppVerifyCheck),
+  routesChecked: Schema.Array(
+    Schema.Struct({
+      route: Schema.String,
+      status: Schema.Number,
+      ok: Schema.Boolean,
+      latencyMs: Schema.Number,
+    }),
+  ),
+  screenshots: Schema.Array(PmAppVerifyScreenshot),
+  consoleErrors: Schema.Array(Schema.String),
+  a11yIssues: Schema.Array(PmAppVerifyA11yIssue),
+  browserUsed: Schema.Boolean,
+  browserNote: Schema.NullOr(Schema.String),
+  reportPath: Schema.NullOr(Schema.String),
+  summary: Schema.String,
+});
+export type PmAppVerifyReport = typeof PmAppVerifyReport.Type;
+
+export const PmEvalArmMetrics = Schema.Struct({
+  threadId: Schema.NullOr(ThreadId),
+  status: Schema.String,
+  modelLabel: Schema.String,
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  cachedTokens: Schema.Number,
+  cacheHitPercent: Schema.Number,
+  estimatedCostUsd: Schema.Number,
+  durationMs: Schema.Number,
+  humanInterventions: Schema.Number,
+  filesChanged: Schema.Number,
+  insertions: Schema.Number,
+  deletions: Schema.Number,
+  verify: Schema.NullOr(PmAppVerifyReport),
+});
+export type PmEvalArmMetrics = typeof PmEvalArmMetrics.Type;
+
+export const PmEvalRun = Schema.Struct({
+  evalId: Schema.String,
+  projectId: ProjectId,
+  title: Schema.String,
+  prompt: Schema.String,
+  targetKind: PmAppVerifyTargetKind,
+  treatmentPipeline: Schema.String,
+  verifyCommands: Schema.Array(Schema.String),
+  verifyStartCommand: Schema.NullOr(Schema.String),
+  verifyUrl: Schema.NullOr(Schema.String),
+  status: Schema.Literals(["running", "completed", "failed"]),
+  baseline: PmEvalArmMetrics,
+  treatment: PmEvalArmMetrics,
+  costDeltaPercent: Schema.NullOr(Schema.Number),
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+});
+export type PmEvalRun = typeof PmEvalRun.Type;
+
+export const PmHarnessLearningCategory = Schema.Literals([
+  "bug_pattern",
+  "style_rule",
+  "verification",
+  "architecture",
+  "skill_gap",
+]);
+export type PmHarnessLearningCategory = typeof PmHarnessLearningCategory.Type;
+
+export const PmHarnessLearningStatus = Schema.Literals(["proposed", "applied", "dismissed"]);
+export type PmHarnessLearningStatus = typeof PmHarnessLearningStatus.Type;
+
+export const PmHarnessLearning = Schema.Struct({
+  learningId: Schema.String,
+  projectId: ProjectId,
+  roleName: Schema.String,
+  sourceRunId: Schema.NullOr(Schema.String),
+  sourceThreadId: Schema.NullOr(ThreadId),
+  category: PmHarnessLearningCategory,
+  title: Schema.String,
+  ruleText: Schema.String,
+  status: PmHarnessLearningStatus,
+  createdAt: Schema.String,
+  resolvedAt: Schema.NullOr(Schema.String),
+});
+export type PmHarnessLearning = typeof PmHarnessLearning.Type;
+
 const PmRpcError = Schema.Union([PmError, EnvironmentAuthorizationError]);
 const PmTarget = { pm: ThreadId };
 const Ok = Schema.Struct({});
@@ -514,6 +698,18 @@ export const PM_WS_METHODS = {
   pipelineDelete: "pm.pipelines.pipelineDelete",
   threadHarnessGet: "pm.harness.get",
   threadHarnessSet: "pm.harness.set",
+  pipelineRunsList: "pm.pipelines.runsList",
+  pipelineRunStart: "pm.pipelines.runStart",
+  pipelineStageDecide: "pm.pipelines.stageDecide",
+  appVerifyRun: "pm.verify.run",
+  evalRunsList: "pm.eval.list",
+  evalRunStart: "pm.eval.start",
+  evalRunVerify: "pm.eval.verify",
+  evalRunDelete: "pm.eval.delete",
+  learningsList: "pm.learnings.list",
+  learningPropose: "pm.learnings.propose",
+  learningApply: "pm.learnings.apply",
+  learningDismiss: "pm.learnings.dismiss",
 } as const;
 
 /** The streaming `pm.*` methods, for the client runtime's subscription factory. */
@@ -741,6 +937,107 @@ export const PmRpcGroup = RpcGroup.make(
     success: PmThreadHarnessState,
     error: PmRpcError,
   }),
+  Rpc.make(PM_WS_METHODS.pipelineRunsList, {
+    payload: Schema.Struct({ projectId: ProjectId }),
+    success: Schema.Array(PmPipelineRun),
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.pipelineRunStart, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      pipelineName: TrimmedNonEmptyString,
+      goal: Schema.optional(Schema.String),
+      budgetUsd: Schema.optional(Schema.NullOr(Schema.Number)),
+    }),
+    success: PmPipelineRun,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.pipelineStageDecide, {
+    payload: Schema.Struct({
+      runId: TrimmedNonEmptyString,
+      stageId: TrimmedNonEmptyString,
+      decision: Schema.Literals(["approve", "reject"]),
+      note: Schema.optional(Schema.String),
+    }),
+    success: PmPipelineRun,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.appVerifyRun, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      targetKind: PmAppVerifyTargetKind,
+      cwd: Schema.optional(TrimmedNonEmptyString),
+      commands: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+      startCommand: Schema.optional(TrimmedNonEmptyString),
+      url: Schema.optional(TrimmedNonEmptyString),
+      routes: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+      runFolder: Schema.optional(TrimmedNonEmptyString),
+    }),
+    success: PmAppVerifyReport,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.evalRunsList, {
+    payload: Schema.Struct({ projectId: ProjectId }),
+    success: Schema.Array(PmEvalRun),
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.evalRunStart, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      title: TrimmedNonEmptyString,
+      prompt: TrimmedNonEmptyString,
+      targetKind: PmAppVerifyTargetKind,
+      baselineModelSelection: ModelSelection,
+      treatmentPipeline: TrimmedNonEmptyString,
+      verifyCommands: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+      verifyStartCommand: Schema.optional(TrimmedNonEmptyString),
+      verifyUrl: Schema.optional(TrimmedNonEmptyString),
+    }),
+    success: PmEvalRun,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.evalRunVerify, {
+    payload: Schema.Struct({
+      evalId: TrimmedNonEmptyString,
+    }),
+    success: PmEvalRun,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.evalRunDelete, {
+    payload: Schema.Struct({
+      evalId: TrimmedNonEmptyString,
+    }),
+    success: Ok,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.learningsList, {
+    payload: Schema.Struct({ projectId: ProjectId }),
+    success: Schema.Array(PmHarnessLearning),
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.learningPropose, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      roleName: TrimmedNonEmptyString,
+      category: PmHarnessLearningCategory,
+      title: TrimmedNonEmptyString,
+      ruleText: TrimmedNonEmptyString,
+      sourceRunId: Schema.optional(TrimmedNonEmptyString),
+      sourceThreadId: Schema.optional(ThreadId),
+    }),
+    success: PmHarnessLearning,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.learningApply, {
+    payload: Schema.Struct({ learningId: TrimmedNonEmptyString }),
+    success: PmHarnessLearning,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.learningDismiss, {
+    payload: Schema.Struct({ learningId: TrimmedNonEmptyString }),
+    success: PmHarnessLearning,
+    error: PmRpcError,
+  }),
 );
 
 /** What a client needs before it offers a PM action; the server checks `PM_RPC_SCOPES`. */
@@ -773,6 +1070,15 @@ export const PM_CLIENT_GUARDED_RPC_SCOPES = {
   [PM_WS_METHODS.pipelineSave]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.pipelineDelete]: AuthOrchestrationOperateScope,
   [PM_WS_METHODS.threadHarnessSet]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pipelineRunStart]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pipelineStageDecide]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.appVerifyRun]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.evalRunStart]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.evalRunVerify]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.evalRunDelete]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.learningPropose]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.learningApply]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.learningDismiss]: AuthOrchestrationOperateScope,
 } as const;
 
 /** Read methods; with the guarded ones above, every `pm.*` method has exactly one scope. */
@@ -785,4 +1091,7 @@ export const PM_READ_RPC_SCOPES = {
   [PM_WS_METHODS.swarmGet]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.pipelinesGet]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.threadHarnessGet]: AuthOrchestrationReadScope,
+  [PM_WS_METHODS.pipelineRunsList]: AuthOrchestrationReadScope,
+  [PM_WS_METHODS.evalRunsList]: AuthOrchestrationReadScope,
+  [PM_WS_METHODS.learningsList]: AuthOrchestrationReadScope,
 } as const;

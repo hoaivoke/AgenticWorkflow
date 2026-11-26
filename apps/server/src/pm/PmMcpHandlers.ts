@@ -1,9 +1,10 @@
-import { OrchestratorMcpFailure, ThreadId, type PmError } from "@t3tools/contracts";
+import { OrchestratorMcpFailure, PmError, ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts"; // pipelines:
+import { OrchestrationStudioService } from "../pipelines/OrchestrationStudioService.ts"; // pipelines:
 import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
 import * as PmRouting from "../pipelines/PmRouting.ts"; // pipelines:
 import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
@@ -301,5 +302,161 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
       ];
       return { result: lines.join("\n") };
     }),
+  ),
+  pm_pipeline_run_start: McpToolAccess.writesWithCapability(({ pipeline, goal, budget_usd }) =>
+    // pipelines:
+    asPm((service, pm) =>
+      Effect.gen(function* () {
+        const threads = yield* ThreadManagement.ThreadManagementService;
+        const shell = yield* threads.getThreadShell(ThreadId.make(pm)).pipe(
+          Effect.mapError(
+            () =>
+              new PmError({
+                code: "unavailable",
+                message: "Could not read PM thread.",
+              }),
+          ),
+        );
+        if (shell === null) {
+          return yield* new PmError({
+            code: "not_found",
+            message: "PM thread not found.",
+          });
+        }
+        const studio = yield* OrchestrationStudioService;
+        const run = yield* studio.startRun({
+          projectId: shell.projectId,
+          pmThreadId: ThreadId.make(pm),
+          pipelineName: pipeline,
+          goal,
+          budgetUsd: budget_usd,
+        });
+        return yield* service.toolResult(pm, () =>
+          Effect.succeed(
+            `Started tracked pipeline run "${run.runId}" (${run.pipelineName}, ${run.stages.length} stages). Update each stage with pm_pipeline_stage_update.`,
+          ),
+        );
+      }),
+    ),
+  ),
+  pm_pipeline_stage_update: McpToolAccess.writesWithCapability(
+    ({ run_id, stage_id, status, worker_thread_id, provider_model, tier, summary, artifacts }) =>
+      // pipelines:
+      asPm((service, pm) =>
+        Effect.gen(function* () {
+          const studio = yield* OrchestrationStudioService;
+          const run = yield* studio.updateStage({
+            runId: run_id,
+            stageId: stage_id,
+            status,
+            workerThreadId: worker_thread_id,
+            providerModel: provider_model,
+            tier,
+            summary,
+            artifacts,
+          });
+          const budgetWarning =
+            run.status === "budget_paused"
+              ? ` BUDGET ALERT: spent $${run.spentUsd.toFixed(4)} exceeded cap $${run.budgetUsd?.toFixed(2) ?? ""}. Ask the user via pm_ask before starting new workers.`
+              : "";
+          return yield* service.toolResult(pm, () =>
+            Effect.succeed(
+              `Updated stage "${stage_id}" -> ${status} (run status: ${run.status}, spent: $${run.spentUsd.toFixed(4)}, savings: ${run.savingsPercent}%, cache hit: ${run.cacheHitPercent}%).${budgetWarning}`,
+            ),
+          );
+        }),
+      ),
+  ),
+  pm_verify_app: McpToolAccess.reads(
+    ({ target_kind, cwd, commands, start_command, url, routes, run_folder }) =>
+      // pipelines:
+      Effect.gen(function* () {
+        const scope = yield* McpInvocationContext.McpInvocationContext;
+        const caller = yield* McpInvocationContext.requireThreadScope(scope, "pm_verify_app");
+        const threads = yield* ThreadManagement.ThreadManagementService;
+        const shell = yield* threads.getThreadShell(caller.thread.threadId).pipe(
+          Effect.mapError(
+            () =>
+              new OrchestratorMcpFailure({
+                code: "orchestration_error",
+                message: "Could not read caller thread.",
+              }),
+          ),
+        );
+        if (shell === null) {
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "Caller thread not found.",
+          });
+        }
+        const studio = yield* OrchestrationStudioService;
+        const report = yield* studio
+          .verifyApp({
+            projectId: shell.projectId,
+            targetKind: target_kind ?? "web_app",
+            cwd: cwd ?? shell.worktreePath ?? undefined,
+            commands,
+            startCommand: start_command,
+            url,
+            routes,
+            runFolder: run_folder,
+          })
+          .pipe(Effect.mapError(toFailure));
+        const lines = [
+          report.summary,
+          ...report.checks.map(
+            (check) =>
+              `- check \`${check.command}\`: exit ${check.exitCode} (${check.durationMs}ms)${check.summary && !check.passed ? `\n  ${check.summary}` : ""}`,
+          ),
+          ...report.routesChecked.map(
+            (route) => `- route \`${route.route}\`: HTTP ${route.status} (${route.latencyMs}ms)`,
+          ),
+          ...report.a11yIssues.map(
+            (issue) =>
+              `- a11y [${issue.severity}] ${issue.route} (${issue.rule}): ${issue.message}`,
+          ),
+          ...report.consoleErrors.map((err) => `- console: ${err}`),
+        ];
+        return { result: lines.join("\n") };
+      }),
+  ),
+  pm_learning_propose: McpToolAccess.writesWithCapability(
+    ({ role, category, title, rule_text, run_id }) =>
+      // pipelines:
+      Effect.gen(function* () {
+        const scope = yield* McpInvocationContext.McpInvocationContext;
+        const caller = yield* McpInvocationContext.requireThreadScope(scope, "pm_learning_propose");
+        const threads = yield* ThreadManagement.ThreadManagementService;
+        const shell = yield* threads.getThreadShell(caller.thread.threadId).pipe(
+          Effect.mapError(
+            () =>
+              new OrchestratorMcpFailure({
+                code: "orchestration_error",
+                message: "Could not read caller thread.",
+              }),
+          ),
+        );
+        if (shell === null) {
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "Caller thread not found.",
+          });
+        }
+        const studio = yield* OrchestrationStudioService;
+        const learning = yield* studio
+          .proposeLearning({
+            projectId: shell.projectId,
+            roleName: role,
+            category: category ?? "bug_pattern",
+            title,
+            ruleText: rule_text,
+            sourceRunId: run_id,
+            sourceThreadId: caller.thread.threadId,
+          })
+          .pipe(Effect.mapError(toFailure));
+        return {
+          result: `Proposed harness learning "${learning.title}" for role "${learning.roleName}" (${learning.learningId}). The user can apply it with 1 click in Pipelines -> Learnings.`,
+        };
+      }),
   ),
 });
