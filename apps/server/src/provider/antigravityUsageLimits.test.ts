@@ -727,39 +727,31 @@ describe("Antigravity subscription limits", () => {
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
-  it.effect(
-    "reads a personal Google keyring sign-in when the profile recorded oauth-personal auth state",
-    () =>
-      Effect.gen(function* () {
-        yield* TestClock.setTime(
-          DateTime.toEpochMillis(DateTime.makeUnsafe("2026-10-09T12:00:00Z")),
-        );
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const keyringSecret = JSON.stringify({
-          token: {
-            access_token: "access-token",
-            refresh_token: "r",
-            expiry: "2026-10-09T14:00:00Z",
-          },
-          auth_method: "consumer",
-        });
-        const signedIn = yield* fixture({
-          authMethod: "oauth-personal",
-          missingToken: true,
-          userId: "google-user-1",
-          keyringSecret,
-        });
-        const cacheDir = path.join(path.dirname(signedIn.tokenPath), "cache");
-        yield* fs.makeDirectory(cacheDir, { recursive: true });
-        yield* fs.writeFileString(
-          path.join(cacheDir, "acp-auth-state.json"),
-          JSON.stringify({ methodId: "oauth-personal" }),
-        );
-        const limits = yield* signedIn.probe;
-        expect(limits.unavailable).toBeUndefined();
-        expect(limits.windows).toHaveLength(4);
-      }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  it.effect("returns unsupported without reading keyring or making requests when disabled", () =>
+    Effect.gen(function* () {
+      let keyringCalled = false;
+      let httpCalled = false;
+      const http = HttpClient.make(() =>
+        Effect.sync(() => {
+          httpCalled = true;
+          throw new Error("should not make network requests when disabled");
+        }),
+      );
+      const usage = yield* makeAntigravityUsageProbe({
+        profileDirectory: "/nonexistent",
+        authMethod: "oauth-personal",
+        disabled: true,
+        readKeyringSecret: Effect.sync(() => {
+          keyringCalled = true;
+          return undefined;
+        }),
+      }).pipe(Effect.provideService(HttpClient.HttpClient, http));
+      const limits = yield* usage.probe;
+      expect(limits.unavailable?.reason).toBe("unsupported");
+      expect(limits.unavailable?.message).toContain("Terms of Service");
+      expect(keyringCalled).toBe(false);
+      expect(httpCalled).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
   it.effect.runIf(HostProcess.Platform.defaultValue() === "win32")(

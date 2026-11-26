@@ -49,9 +49,6 @@ const CliToken = Schema.Struct({
     expiry: Schema.optional(Schema.String),
   }),
 });
-const AuthStateFile = Schema.Struct({
-  methodId: Schema.optional(Schema.String),
-});
 const TokenResponse = Schema.Struct({
   access_token: Schema.NonEmptyString,
   expires_in: Schema.Number.check(Schema.isGreaterThan(0)),
@@ -93,7 +90,6 @@ const Models = Schema.Struct({
 
 const decodeTokenFile = Schema.decodeEffect(Schema.fromJsonString(TokenFile));
 const decodeCliToken = Schema.decodeEffect(Schema.fromJsonString(CliToken));
-const decodeAuthStateFile = Schema.decodeEffect(Schema.fromJsonString(AuthStateFile));
 const decodeTokenResponse = Schema.decodeUnknownEffect(TokenResponse);
 const decodeUserInfo = Schema.decodeUnknownEffect(UserInfo);
 const decodeSummary = Schema.decodeUnknownEffect(Summary);
@@ -325,7 +321,23 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
   readonly profileDirectory: string;
   readonly authMethod: AntigravitySettings["authMethod"];
   readonly readKeyringSecret?: Effect.Effect<string | undefined, AntigravityKeyringError>;
+  readonly disabled?: boolean;
 }) {
+  // pipelines: when disabled, never read local OAuth tokens or call private Google cloudcode endpoints.
+  if (input.disabled === true) {
+    return {
+      probe: Effect.gen(function* () {
+        const checkedAt = DateTime.formatIso(yield* DateTime.now);
+        return makeUnavailableUsageLimits({
+          checkedAt,
+          reason: "unsupported",
+          message:
+            "Antigravity usage probing is disabled to comply with Google's Terms of Service. Check quota in Antigravity IDE or run `agy -p /usage`.",
+        });
+      }),
+      clear: Effect.void,
+    };
+  }
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
@@ -337,12 +349,6 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     input.profileDirectory,
     "antigravity-acp",
     "antigravity-oauth-token",
-  );
-  const authStatePath = path.join(
-    input.profileDirectory,
-    "antigravity-acp",
-    "cache",
-    "acp-auth-state.json",
   );
   const readKeyringSecret = input.readKeyringSecret ?? readCliKeyringSecret(platform, architecture);
   let cached:
@@ -369,20 +375,10 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     let projectId: string | undefined;
     if (!(yield* fs.exists(tokenPath))) {
       cached = undefined;
-      // pipelines: agy CLI 1.5+ can authenticate personal Google accounts via the OS keyring
-      // even when per-profile file storage is requested, leaving cache/acp-auth-state.json on disk.
-      const hasProfilePersonalAuthState =
-        input.authMethod === "oauth-personal" && (yield* fs.exists(authStatePath))
-          ? yield* fs.readFileString(authStatePath).pipe(
-              Effect.flatMap(decodeAuthStateFile),
-              Effect.map((state) => state.methodId === "oauth-personal"),
-              Effect.orElseSucceed(() => false),
-            )
-          : false;
       // Unauthenticated Google account instances still skip the shared keyring.
       const stored = (yield* fs.exists(cliTokenPath))
         ? yield* fs.readFileString(cliTokenPath)
-        : input.authMethod === "oauth-business" || hasProfilePersonalAuthState
+        : input.authMethod === "oauth-business"
           ? yield* readKeyringSecret
           : undefined;
       if (stored === undefined) {

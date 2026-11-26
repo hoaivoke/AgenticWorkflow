@@ -632,6 +632,8 @@ export const AntigravityDriver: ProviderDriver<
     const usage = yield* makeAntigravityUsageProbe({
       profileDirectory,
       authMethod: auth.authMethod,
+      // pipelines: disabled to avoid reusing Antigravity OAuth tokens against private Google endpoints.
+      disabled: true,
     }).pipe(
       Effect.provideService(FileSystem.FileSystem, fileSystem),
       Effect.provideService(Path.Path, path),
