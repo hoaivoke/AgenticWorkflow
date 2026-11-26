@@ -26,11 +26,11 @@ export const PM_DESKTOP_IDENTITY = {
   },
 } as const;
 
-/** The desktop app's update feed: PM3code's own GitHub releases, never upstream's. */
+/** The desktop app's update feed: Agent Space's own GitHub releases, never upstream's. */
 export const PM_UPDATE_FEED = {
   provider: "github",
-  owner: "maddada",
-  repo: "pm3code",
+  owner: "hoaivoke",
+  repo: "AgenticWorkflow",
   releaseType: "release",
 } as const;
 

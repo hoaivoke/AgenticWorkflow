@@ -12,8 +12,8 @@ describe("PM3code update feed", () => {
   it("follows PM3code's own stable GitHub releases", () => {
     expect(pmUpdatePublishConfig("latest", false)).toEqual({
       provider: "github",
-      owner: "maddada",
-      repo: "pm3code",
+      owner: "hoaivoke",
+      repo: "AgenticWorkflow",
       releaseType: "release",
     });
   });
@@ -39,7 +39,7 @@ describe("PM3code update feed", () => {
 
   it("links release notes to the pm-v tag", () => {
     expect(pmReleaseTagUrl("0.2.5")).toBe(
-      "https://github.com/maddada/pm3code/releases/tag/pm-v0.2.5",
+      "https://github.com/hoaivoke/AgenticWorkflow/releases/tag/pm-v0.2.5",
     );
   });
 });

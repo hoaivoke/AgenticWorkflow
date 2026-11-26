@@ -103,7 +103,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh release create "v$VERSION" \
+          # t3code-pm: DesktopUpdates ignores releases without a pm-v<semver> tag (isPmReleaseTag).
+          gh release create "pm-v$VERSION" \
             release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml \
             --target "$GITHUB_SHA" \
             --title "Agent Space $VERSION" \
