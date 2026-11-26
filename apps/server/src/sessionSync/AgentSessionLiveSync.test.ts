@@ -1,7 +1,15 @@
 // pipelines: live sync over a real Claude Code transcript file, a real event sink and projections.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
-import { ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+import {
+  EventId,
+  MessageId,
+  ProjectId,
+  ProviderInstanceId,
+  RunId,
+  ThreadId,
+  TurnItemId,
+} from "@t3tools/contracts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -18,6 +26,7 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProviderAdapterRegistry from "../orchestration-v2/ProviderAdapterRegistry.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
+import * as TurnItemPositionStore from "../orchestration-v2/TurnItemPositionStore.ts";
 import * as ProviderSessionRuntime from "../persistence/ProviderSessionRuntime.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as AgentSessionImporter from "../project/AgentSessionImporter.ts";
@@ -31,9 +40,11 @@ const sessionId = "0f6c1d2e-3b4a-4c5d-8e9f-a0b1c2d3e4f5";
 const threadId = ThreadId.make(`import:claudeAgent:${sessionId}`);
 const createdAt = "2026-11-25T07:00:00.000Z";
 
-const stores = Layer.mergeAll(EventStore.layer, ProjectionStore.layer).pipe(
-  Layer.provideMerge(SqlitePersistence.layerMemory),
-);
+const stores = Layer.mergeAll(
+  EventStore.layer,
+  ProjectionStore.layer,
+  TurnItemPositionStore.layer,
+).pipe(Layer.provideMerge(SqlitePersistence.layerMemory));
 const persistence = Layer.mergeAll(
   stores,
   EventSink.layer.pipe(Layer.provide(stores)),
@@ -108,6 +119,10 @@ const setup = Effect.fn(function* (filePath: string) {
     Layer.succeed(
       ThreadCommandExecutor.ThreadCommandExecutor,
       yield* ThreadCommandExecutor.ThreadCommandExecutor,
+    ),
+    Layer.succeed(
+      TurnItemPositionStore.TurnItemPositionStoreV2,
+      yield* TurnItemPositionStore.TurnItemPositionStoreV2,
     ),
     orchestrator,
   );
@@ -233,4 +248,174 @@ it.effect("adds nothing when the transcript no longer holds the thread's history
     expect((yield* sync.sweep()).appended).toBe(0);
     expect((yield* threadTexts).texts).toEqual(["user: Fix it", "assistant: Fixed"]);
   }).pipe(Effect.scoped, Effect.provide(Layer.merge(persistence, NodeServices.layer))),
+);
+
+it.effect(
+  "repairs previously misplaced post-run transcript items into chronological order and continues appending at the bottom",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-live-sync-repair-" });
+      const file = path.join(dir, `${sessionId}.jsonl`);
+      const lineAt = (ts: string, role: "user" | "assistant", text: string) =>
+        `${JSON.stringify(
+          role === "user"
+            ? { type: "user", sessionId, timestamp: ts, message: { role, content: text } }
+            : {
+                type: "assistant",
+                sessionId,
+                timestamp: ts,
+                message: { role, content: [{ type: "text", text }] },
+              },
+        )}\n`;
+      yield* fs.writeFileString(
+        file,
+        lineAt("2026-11-25T07:00:00.000Z", "user", "Fix it") +
+          lineAt("2026-11-25T07:00:05.000Z", "assistant", "Fixed"),
+      );
+      const sync = yield* setup(file);
+      const eventSink = yield* EventSink.EventSinkV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+
+      // Simulate an app run (PM setup) at 07:13:00Z at ordinal 1_000_001
+      const runId = RunId.make("run:pm-setup:1");
+      const runAt = DateTime.makeUnsafe("2026-11-25T07:13:00.000Z");
+      yield* eventSink.write({
+        events: [
+          {
+            id: EventId.make("evt:run:created"),
+            type: "run.created",
+            threadId,
+            occurredAt: runAt,
+            payload: {
+              id: runId,
+              threadId,
+              ordinal: 1,
+              providerInstanceId: ProviderInstanceId.make("claudeAgent"),
+              modelSelection: {
+                instanceId: ProviderInstanceId.make("claudeAgent"),
+                model: "claude-opus-5-5",
+              },
+              providerThreadId: null,
+              userMessageId: MessageId.make("msg:pm-setup"),
+              rootNodeId: null,
+              activeAttemptId: null,
+              status: "completed",
+              requestedAt: runAt,
+              startedAt: runAt,
+              completedAt: runAt,
+              checkpointId: null,
+              contextHandoffId: null,
+            },
+          },
+          {
+            id: EventId.make("evt:run:item"),
+            type: "turn-item.updated",
+            threadId,
+            occurredAt: runAt,
+            payload: {
+              id: TurnItemId.make("turn-item:pm-setup:reply"),
+              threadId,
+              runId,
+              nodeId: null,
+              providerThreadId: null,
+              providerTurnId: null,
+              nativeItemRef: null,
+              parentItemId: null,
+              ordinal: 1_000_001,
+              type: "assistant_message",
+              messageId: MessageId.make("msg:pm-setup:reply"),
+              text: "PM setup complete",
+              streaming: false,
+              status: "completed",
+              title: null,
+              startedAt: runAt,
+              completedAt: runAt,
+              updatedAt: runAt,
+            },
+          },
+        ],
+      });
+
+      // Simulate historical bug: post-run messages (M3 finish + Approve M4) inserted at ord < 1_000_000,
+      // followed by a newer M4 message inserted at ord 1_000_002
+      yield* eventSink.write({
+        events: [
+          ...AgentSessionImporter.messageEvents({
+            threadId,
+            index: 2,
+            ordinal: 3,
+            message: {
+              role: "assistant",
+              text: "M3 is finished",
+              createdAt: "2026-11-26T03:42:09.000Z",
+            },
+          }),
+          ...AgentSessionImporter.messageEvents({
+            threadId,
+            index: 3,
+            ordinal: 4,
+            message: {
+              role: "user",
+              text: "Approve, start M4",
+              createdAt: "2026-11-26T03:42:17.000Z",
+            },
+          }),
+          ...AgentSessionImporter.messageEvents({
+            threadId,
+            index: 4,
+            ordinal: 1_000_005,
+            message: {
+              role: "assistant",
+              text: "Writing factions next.",
+              createdAt: "2026-11-26T04:06:30.000Z",
+            },
+          }),
+        ],
+      });
+
+      // Sweep WITHOUT touching the transcript file: repair runs automatically on first sweep!
+      yield* sync.sweep();
+
+      const orderedAfterRepair = (yield* projections.getThreadRecords(threadId, [
+        "turnItems",
+      ])).turnItems
+        .toSorted((a, b) => a.ordinal - b.ordinal)
+        .map((item) => ("text" in item ? item.text : item.type));
+      expect(orderedAfterRepair).toEqual([
+        "Fix it",
+        "Fixed",
+        "PM setup complete",
+        "M3 is finished",
+        "Approve, start M4",
+        "Writing factions next.",
+      ]);
+
+      // Appending a new transcript message after repair lands strictly at the bottom!
+      yield* fs.writeFileString(
+        file,
+        lineAt("2026-11-26T03:42:09.000Z", "assistant", "M3 is finished") +
+          lineAt("2026-11-26T03:42:17.000Z", "user", "Approve, start M4") +
+          lineAt("2026-11-26T04:06:30.000Z", "assistant", "Writing factions next.") +
+          lineAt("2026-11-26T04:10:00.000Z", "assistant", "M4 tests pass."),
+        { flag: "a" },
+      );
+      expect((yield* sync.sweep()).appended).toBe(1);
+
+      const orderedAfterAppend = (yield* projections.getThreadRecords(threadId, [
+        "turnItems",
+      ])).turnItems
+        .toSorted((a, b) => a.ordinal - b.ordinal)
+        .map((item) => ("text" in item ? item.text : item.type));
+      expect(orderedAfterAppend).toEqual([
+        "Fix it",
+        "Fixed",
+        "PM setup complete",
+        "M3 is finished",
+        "Approve, start M4",
+        "Writing factions next.",
+        "M4 tests pass.",
+      ]);
+    }).pipe(Effect.scoped, Effect.provide(Layer.merge(persistence, NodeServices.layer))),
 );

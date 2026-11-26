@@ -58,3 +58,87 @@ export function nextImportedMessageIndex(messageIds: ReadonlyArray<string>): num
   }
   return next;
 }
+
+export interface SettledRunAnchor {
+  readonly id: string;
+  readonly ordinal: number;
+  readonly anchorMs: number;
+}
+
+export interface TimelineItemSummary {
+  readonly id: string;
+  readonly runId: string | null;
+  readonly ordinal: number;
+  readonly timestampMs: number;
+}
+
+export interface RepositionedTurnItem {
+  readonly id: string;
+  readonly ordinal: number;
+}
+
+/**
+ * Plans exact chronological ordinals for `runId: null` (imported / live-synced) turn items on a
+ * thread that also has settled app runs. Each run occupies `[run.ordinal * 1_000_000, +999_999]`;
+ * transcript items created after a settled run belong immediately after that run's own items,
+ * sorted strictly by `(timestampMs, id)`. Returns only items whose ordinal changes.
+ */
+export function planTurnItemOrderRepair(input: {
+  readonly runs: ReadonlyArray<SettledRunAnchor>;
+  readonly items: ReadonlyArray<TimelineItemSummary>;
+}): ReadonlyArray<RepositionedTurnItem> {
+  if (input.runs.length === 0) return [];
+  const runs = [...input.runs].toSorted((left, right) => left.ordinal - right.ordinal);
+
+  const maxOwnOrdinalByBand = new Map<number, number>();
+  for (const run of runs) {
+    maxOwnOrdinalByBand.set(run.ordinal, run.ordinal * 1_000_000);
+  }
+  for (const item of input.items) {
+    if (item.runId === null) continue;
+    const band = Math.floor(item.ordinal / 1_000_000);
+    const current = maxOwnOrdinalByBand.get(band);
+    if (current !== undefined && item.ordinal > current) {
+      maxOwnOrdinalByBand.set(band, item.ordinal);
+    }
+  }
+
+  const byBand = new Map<number, Array<TimelineItemSummary>>();
+  for (const item of input.items) {
+    if (item.runId !== null) continue;
+    let targetBand = 0;
+    for (const run of runs) {
+      if (run.anchorMs <= item.timestampMs) {
+        targetBand = run.ordinal;
+      }
+    }
+    let group = byBand.get(targetBand);
+    if (group === undefined) {
+      group = [];
+      byBand.set(targetBand, group);
+    }
+    group.push(item);
+  }
+
+  const updates: Array<RepositionedTurnItem> = [];
+  for (const [band, group] of byBand.entries()) {
+    group.sort(
+      (left, right) => left.timestampMs - right.timestampMs || left.id.localeCompare(right.id),
+    );
+    if (band === 0) {
+      const anyOutOfBand = group.some((item) => item.ordinal >= 1_000_000);
+      if (!anyOutOfBand) continue;
+      for (const [offset, item] of group.entries()) {
+        const desired = offset + 1;
+        if (item.ordinal !== desired) updates.push({ id: item.id, ordinal: desired });
+      }
+      continue;
+    }
+    const base = maxOwnOrdinalByBand.get(band) ?? band * 1_000_000;
+    for (const [offset, item] of group.entries()) {
+      const desired = base + 1 + offset;
+      if (item.ordinal !== desired) updates.push({ id: item.id, ordinal: desired });
+    }
+  }
+  return updates;
+}

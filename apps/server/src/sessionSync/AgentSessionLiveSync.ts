@@ -17,6 +17,7 @@ import * as Option from "effect/Option";
 import * as EventSink from "../orchestration-v2/EventSink.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
+import * as TurnItemPositionStore from "../orchestration-v2/TurnItemPositionStore.ts";
 import * as ProviderSessionRuntime from "../persistence/ProviderSessionRuntime.ts";
 import * as AgentSessionImporter from "../project/AgentSessionImporter.ts";
 import {
@@ -24,7 +25,11 @@ import {
   parseAgentSessionTranscript,
 } from "../project/AgentSessionScanner.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
-import { messagesToAppend, nextImportedMessageIndex } from "./liveSync.logic.ts";
+import {
+  messagesToAppend,
+  nextImportedMessageIndex,
+  planTurnItemOrderRepair,
+} from "./liveSync.logic.ts";
 
 /**
  * Codex's parser drops a turn's response-copied user messages once the turn ends, so a
@@ -53,13 +58,85 @@ const make = Effect.gen(function* () {
   const orchestrator = yield* Orchestrator.OrchestratorV2;
   const eventSink = yield* EventSink.EventSinkV2;
   const threadCommands = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+  const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
   const importer = yield* AgentSessionImporter.AgentSessionImporter;
 
   /** Last transcript size and mtime handled per thread; unchanged files cost one stat. */
   const handled = new Map<ThreadId, string>();
+  /** Threads whose historical post-run transcript items have already been verified/repaired. */
+  const repaired = new Set<ThreadId>();
   /** Threads deleted, no longer imported, or with transcripts gone or too large to follow. */
   const stopped = new Set<ThreadId>();
   let sweeps = 0;
+
+  const repairOrdering = Effect.fn("AgentSessionLiveSync.repairOrdering")(function* (
+    threadId: ThreadId,
+  ) {
+    const records = yield* orchestrator.getThreadRecords(threadId, ["runs", "turnItems"]);
+    if (records.thread.historyOrigin !== "v1_import" || records.thread.deletedAt !== null) {
+      stopped.add(threadId);
+      return null;
+    }
+    if (records.runs.length === 0) return 0;
+    if (records.runs.some((run) => !SETTLED_RUN_STATUSES.has(run.status))) return null;
+
+    const updates = planTurnItemOrderRepair({
+      runs: records.runs.map((run) => ({
+        id: run.id,
+        ordinal: run.ordinal,
+        anchorMs: DateTime.toEpochMillis(run.completedAt ?? run.startedAt ?? run.requestedAt),
+      })),
+      items: records.turnItems.map((item) => ({
+        id: item.id,
+        runId: item.runId,
+        ordinal: item.ordinal,
+        timestampMs: DateTime.toEpochMillis(item.startedAt ?? item.completedAt ?? item.updatedAt),
+      })),
+    });
+    if (updates.length === 0) return 0;
+
+    const itemById = new Map(records.turnItems.map((item) => [item.id, item]));
+    const positions = updates.flatMap((update) => {
+      const item = itemById.get(update.id as (typeof records.turnItems)[number]["id"]);
+      return item === undefined ? [] : [{ turnItemId: item.id, ordinal: update.ordinal, item }];
+    });
+    if (positions.length === 0) return 0;
+
+    yield* turnItemPositions.reposition(
+      threadId,
+      positions.map(({ turnItemId, ordinal }) => ({ turnItemId, ordinal })),
+    );
+    const latestAt = positions.reduce(
+      (max, entry) =>
+        DateTime.toEpochMillis(entry.item.updatedAt) > DateTime.toEpochMillis(max)
+          ? entry.item.updatedAt
+          : max,
+      records.thread.updatedAt,
+    );
+    const events: Array<OrchestrationV2DomainEvent> = [
+      ...positions.map(({ item, ordinal }): OrchestrationV2DomainEvent => ({
+        id: EventId.make(
+          `${AgentSessionImporter.IMPORT_EVENT_PREFIX}:repair:${threadId}:${item.id}:${ordinal}`,
+        ),
+        type: "turn-item.updated",
+        threadId,
+        occurredAt: item.updatedAt,
+        payload: { ...item, ordinal },
+      })),
+      {
+        id: EventId.make(
+          `${AgentSessionImporter.IMPORT_EVENT_PREFIX}:thread:${threadId}:repair:${positions.at(-1)!.ordinal}`,
+        ),
+        type: "thread.metadata-updated",
+        threadId,
+        providerInstanceId: records.thread.providerInstanceId,
+        occurredAt: latestAt,
+        payload: { ...records.thread, updatedAt: latestAt },
+      },
+    ];
+    yield* eventSink.write({ events });
+    return positions.length;
+  });
 
   const append = Effect.fn("AgentSessionLiveSync.append")(function* (
     threadId: ThreadId,
@@ -126,6 +203,10 @@ const make = Effect.gen(function* () {
     threadId: ThreadId,
     source: AgentSessionImportSource,
   ) {
+    if (!repaired.has(threadId)) {
+      const moved = yield* threadCommands.withLock(threadId, repairOrdering(threadId));
+      if (moved !== null) repaired.add(threadId);
+    }
     const stats = yield* fs.stat(source.filePath).pipe(Effect.option);
     if (Option.isNone(stats)) {
       stopped.add(threadId);
@@ -150,6 +231,7 @@ const make = Effect.gen(function* () {
       fallbackSessionId: source.providerSessionId,
       lastActiveAtMs: mtimeMs ?? 0,
       contents,
+      maxMessages: Number.POSITIVE_INFINITY,
     });
     const appended =
       parsed === null

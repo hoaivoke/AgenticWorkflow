@@ -443,6 +443,7 @@ export const layerProduction = Layer.mergeAll(
         layerAgentSessionImporterProvided,
         layerOrchestratorProvided,
         layerEventSink,
+        TurnItemPositionStore.layer,
         ProviderSessionRuntime.layer,
         ThreadCommandExecutor.layer,
       ),
