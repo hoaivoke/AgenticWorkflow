@@ -2,6 +2,8 @@ import {
   ModelSelection,
   OrchestrationV2ThreadLaunchWorkspaceStrategy,
   OrchestratorMcpFailure,
+  PmPipelineDefinition,
+  PmPipelineRole,
   ProviderInteractionMode,
   RuntimeMode,
   ScheduledTaskUpsertSchedule,
@@ -14,10 +16,16 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as OrchestratorMcpService from "../mcp/OrchestratorMcpService.ts"; // pipelines:
 import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
+import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import { PmHostStatus, PmRemote } from "./PmRemote.ts";
 import { PmService } from "./PmService.ts";
 import { PmStore } from "./PmStore.ts"; // pipelines:
-import { hiddenUnlessPeerLink, hiddenUnlessPm, hiddenUnlessPmWorker } from "./PmVisibility.ts";
+import {
+  hiddenUnlessPeerLink,
+  hiddenUnlessPm,
+  hiddenUnlessPmWorker,
+  hiddenUnlessThread,
+} from "./PmVisibility.ts";
 
 const shared = {
   failure: OrchestratorMcpFailure,
@@ -33,6 +41,7 @@ const shared = {
     PmRemote,
     PmStore, // pipelines:
     PipelineService, // pipelines:
+    ThreadHarnessService, // pipelines:
     OrchestratorMcpService.OrchestratorMcpService, // pipelines:
   ],
 };
@@ -308,6 +317,41 @@ const PmRunGatesTool = pmTool(
   },
 );
 
+const PmRoleSaveTool = Tool.make("pm_role_save", {
+  ...shared,
+  description:
+    "Create or update a reusable agent role/harness in the project's `.pipelines/roles/<name>.yaml`. Lets the main agent assign a tier or explicit model candidates, attach skills and repository context files, define an outputContract, and set standing instructions.",
+  parameters: Schema.Struct({
+    role: PmPipelineRole,
+    previous_name: Schema.optional(TrimmedNonEmptyString),
+  }),
+})
+  .annotate(Tool.Destructive, true)
+  .annotate(McpSchema.EnabledWhen, hiddenUnlessThread);
+
+const PmPipelineSaveTool = Tool.make("pm_pipeline_save", {
+  ...shared,
+  description:
+    "Create or update a multi-agent workflow pipeline in the project's `.pipelines/pipelines/<name>.yaml`. Defines ordered stages, assigned roles, parallelism, worktrees, approval gates, cross-provider reviews (`differentProviderFrom`), loop-back (`onFail`), and deterministic `run` gates.",
+  parameters: Schema.Struct({
+    pipeline: PmPipelineDefinition,
+    previous_name: Schema.optional(TrimmedNonEmptyString),
+  }),
+})
+  .annotate(Tool.Destructive, true)
+  .annotate(McpSchema.EnabledWhen, hiddenUnlessThread);
+
+const PmThreadHarnessGetTool = Tool.make("pm_thread_harness_get", {
+  ...shared,
+  description:
+    "Inspect the active unified role/harness and live tracked skills & repository context files carried across models (Claude, Codex, Antigravity/Gemini) on this thread or another thread.",
+  parameters: Schema.Struct({
+    thread: Schema.optional(TrimmedNonEmptyString),
+  }),
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(McpSchema.EnabledWhen, hiddenUnlessThread);
+
 export const PmToolkit = Toolkit.make(
   PmGuideTool,
   PmStatusTool,
@@ -338,4 +382,7 @@ export const PmToolkit = Toolkit.make(
   PmPipelinesTool, // pipelines:
   PmRolesTool, // pipelines:
   PmRunGatesTool, // pipelines:
+  PmRoleSaveTool, // pipelines:
+  PmPipelineSaveTool, // pipelines:
+  PmThreadHarnessGetTool, // pipelines:
 );

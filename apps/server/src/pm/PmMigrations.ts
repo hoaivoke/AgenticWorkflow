@@ -268,6 +268,21 @@ const createSwarmTables = Effect.gen(function* () {
   `;
 });
 
+const createThreadHarnessTable = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS pm_thread_harness (
+      thread_id TEXT PRIMARY KEY,
+      role_name TEXT,
+      tracked_skills_json TEXT NOT NULL DEFAULT '[]',
+      tracked_context_files_json TEXT NOT NULL DEFAULT '[]',
+      delivered_by_provider_thread_json TEXT NOT NULL DEFAULT '{}',
+      revision INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    ) WITHOUT ROWID
+  `;
+});
+
 const pmMigrationEntries = [
   [1, "PmTables", createTables],
   [2, "PmInbox", addInboxColumns],
@@ -276,6 +291,7 @@ const pmMigrationEntries = [
   [5, "PmWorkerComputers", addWorkerComputerColumns],
   // pipelines: high id keeps fork migrations out of upstream's sequential pm_migrations ids.
   [100, "PmSwarm", createSwarmTables],
+  [101, "PmThreadHarness", createThreadHarnessTable],
 ] as const;
 
 const run = Migrator.make({});

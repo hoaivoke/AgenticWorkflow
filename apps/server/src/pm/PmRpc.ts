@@ -5,6 +5,8 @@ import * as Stream from "effect/Stream";
 import { PM_WS_METHODS, PmError, PmRpcGroup, RpcScopeAuthorization } from "@t3tools/contracts";
 
 import { RpcInstrumentation } from "../observability/RpcInstrumentation.ts";
+import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
+import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import { SwarmService } from "../swarm/SwarmService.ts";
 
 import { PmService } from "./PmService.ts";
@@ -54,6 +56,13 @@ const unavailableHandlers = PmServerRpcGroup.of({
   [PM_WS_METHODS.t3Import]: refuse,
   [PM_WS_METHODS.swarmGet]: () => Effect.succeed(null),
   [PM_WS_METHODS.swarmPost]: refuse,
+  [PM_WS_METHODS.pipelinesGet]: refuse,
+  [PM_WS_METHODS.roleSave]: refuse,
+  [PM_WS_METHODS.roleDelete]: refuse,
+  [PM_WS_METHODS.pipelineSave]: refuse,
+  [PM_WS_METHODS.pipelineDelete]: refuse,
+  [PM_WS_METHODS.threadHarnessGet]: refuse,
+  [PM_WS_METHODS.threadHarnessSet]: refuse,
 });
 
 /** Thin transport: each handler calls one PmService method. */
@@ -63,10 +72,18 @@ export const makePmRpcHandlers = Effect.gen(function* () {
   const pm = service.value;
   const t3 = Option.getOrUndefined(yield* Effect.serviceOption(PmT3Import));
   const swarm = Option.getOrUndefined(yield* Effect.serviceOption(SwarmService));
+  const pipelines = Option.getOrUndefined(yield* Effect.serviceOption(PipelineService)); // pipelines:
+  const threadHarness = Option.getOrUndefined(yield* Effect.serviceOption(ThreadHarnessService)); // pipelines:
   const t3Call = <A>(run: (service: PmT3Import["Service"]) => Effect.Effect<A, PmError>) =>
     t3 === undefined ? Effect.fail(missing) : run(t3);
   const swarmCall = <A>(run: (service: SwarmService["Service"]) => Effect.Effect<A, PmError>) =>
     swarm === undefined ? Effect.fail(missing) : run(swarm);
+  const pipelinesCall = <A>(
+    run: (service: PipelineService["Service"]) => Effect.Effect<A, PmError>,
+  ) => (pipelines === undefined ? Effect.fail(missing) : run(pipelines));
+  const harnessCall = <A>(
+    run: (service: ThreadHarnessService["Service"]) => Effect.Effect<A, PmError>,
+  ) => (threadHarness === undefined ? Effect.fail(missing) : run(threadHarness));
   return PmServerRpcGroup.of({
     [PM_WS_METHODS.subscribe]: ({ projectId }) => pm.subscribe(projectId),
     [PM_WS_METHODS.subscribeThread]: ({ pm: thread }) => pm.subscribeThread(thread),
@@ -107,6 +124,27 @@ export const makePmRpcHandlers = Effect.gen(function* () {
       swarm === undefined ? Effect.succeed(null) : swarm.getBoardForThread(threadId),
     [PM_WS_METHODS.swarmPost]: ({ threadId, text, channel }) =>
       swarmCall((service) => service.postFromUser(threadId, text, channel)),
+    [PM_WS_METHODS.pipelinesGet]: ({ projectId }) =>
+      pipelinesCall((service) => service.snapshotFor(projectId)),
+    [PM_WS_METHODS.roleSave]: ({ projectId, role, previousName }) =>
+      pipelinesCall((service) => service.saveRole({ projectId, role, previousName })),
+    [PM_WS_METHODS.roleDelete]: ({ projectId, name }) =>
+      pipelinesCall((service) => service.deleteRole({ projectId, name })),
+    [PM_WS_METHODS.pipelineSave]: ({ projectId, pipeline, previousName }) =>
+      pipelinesCall((service) => service.savePipeline({ projectId, pipeline, previousName })),
+    [PM_WS_METHODS.pipelineDelete]: ({ projectId, name }) =>
+      pipelinesCall((service) => service.deletePipeline({ projectId, name })),
+    [PM_WS_METHODS.threadHarnessGet]: ({ threadId }) =>
+      harnessCall((service) => service.getState(threadId)),
+    [PM_WS_METHODS.threadHarnessSet]: ({
+      threadId,
+      roleName,
+      trackedSkills,
+      trackedContextFiles,
+    }) =>
+      harnessCall((service) =>
+        service.setHarness({ threadId, roleName, trackedSkills, trackedContextFiles }),
+      ),
   });
 });
 
@@ -115,9 +153,15 @@ export const capturePmService = Effect.gen(function* () {
   const service = yield* Effect.serviceOption(PmService);
   const t3 = yield* Effect.serviceOption(PmT3Import);
   const swarm = yield* Effect.serviceOption(SwarmService);
+  const pipelines = yield* Effect.serviceOption(PipelineService); // pipelines:
+  const threadHarness = yield* Effect.serviceOption(ThreadHarnessService); // pipelines:
   return Layer.mergeAll(
     Option.isNone(service) ? Layer.empty : Layer.succeed(PmService, service.value),
     Option.isNone(t3) ? Layer.empty : Layer.succeed(PmT3Import, t3.value),
     Option.isNone(swarm) ? Layer.empty : Layer.succeed(SwarmService, swarm.value),
+    Option.isNone(pipelines) ? Layer.empty : Layer.succeed(PipelineService, pipelines.value),
+    Option.isNone(threadHarness)
+      ? Layer.empty
+      : Layer.succeed(ThreadHarnessService, threadHarness.value),
   );
 });

@@ -14,11 +14,13 @@ import {
 import {
   type EnvironmentId,
   type ModelSelection,
+  type ProjectId,
   type ProviderDriverKind,
   type ProviderInstanceId,
   type RuntimeMode,
   type ServerProvider,
 } from "@t3tools/contracts";
+import { ComposerHarnessPicker } from "../../pm/ComposerHarnessPicker"; // pipelines:
 import type { EffortDisplay } from "@t3tools/contracts/settings";
 import { cn } from "~/lib/utils";
 import { resolveComposerTraitsInput } from "./composerProviderState";
@@ -42,6 +44,7 @@ const MODEL_TRIGGER_STATES = "data-popup-open:bg-accent data-popup-open:text-for
 
 export function ComposerControlsBar(props: {
   environmentId: EnvironmentId;
+  projectId: ProjectId | null;
   workspaceCwd: string | null;
   routeKind: ChatComposerProps["routeKind"];
   routeThreadRef: ChatComposerProps["routeThreadRef"];
@@ -266,6 +269,15 @@ export function ComposerControlsBar(props: {
   ) : (
     <>
       {composerModelPicker}
+      {routeKind === "server" && !composerControlsHidden ? (
+        <ComposerHarnessPicker
+          environmentId={environmentId}
+          projectId={props.projectId}
+          threadId={routeThreadRef?.threadId ?? null}
+          size={controlSize}
+          disabled={isSendBusy}
+        />
+      ) : null}
 
       <>
         {restingBlockDefs.map((def, index) => {

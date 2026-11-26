@@ -64,6 +64,9 @@ import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts
 import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as WorkspaceFolders from "../workspace/WorkspaceFolders.ts";
 import * as TaskFolderStore from "../workspace/TaskFolderStore.ts";
+import * as PipelineService from "../pipelines/PipelineService.ts"; // pipelines:
+import * as ThreadHarnessService from "../pipelines/ThreadHarnessService.ts"; // pipelines:
+import * as ThreadHarnessStore from "../pipelines/ThreadHarnessStore.ts"; // pipelines:
 
 export const layerEventInfrastructure = Layer.mergeAll(
   OrchestrationEventStore.layer,
@@ -117,6 +120,14 @@ export const layerProjectService = ProjectService.layer.pipe(
       layerLegacyV1ThreadImporterProvided,
     ),
   ),
+);
+
+// pipelines: shared memoized pipelines & thread-harness layers for ProviderTurnStartService and PmLayer.
+// Keep ProjectService as an outer requirement (same as ProviderTurnStartService) so runtimeLayer.layer tests keep working.
+export const layerPipelines = PipelineService.layer;
+export const layerThreadHarness = ThreadHarnessService.layer.pipe(
+  Layer.provideMerge(ThreadHarnessStore.layer),
+  Layer.provideMerge(layerPipelines),
 );
 
 const layerProviderEventIngestorProvided = ProviderEventIngestor.layer.pipe(
@@ -191,6 +202,7 @@ const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pip
       layerRunExecutionServiceProvided,
       layerRuntimePolicyProvided,
       TurnItemPositionStore.layer,
+      layerThreadHarness, // pipelines:
     ),
   ),
 );

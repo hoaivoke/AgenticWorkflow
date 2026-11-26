@@ -10,6 +10,8 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as PipelineService from "../pipelines/PipelineService.ts"; // pipelines:
+import * as ThreadHarnessService from "../pipelines/ThreadHarnessService.ts"; // pipelines:
+import * as ThreadHarnessStore from "../pipelines/ThreadHarnessStore.ts"; // pipelines:
 import {
   ASK_DETAIL,
   layerPm,
@@ -41,13 +43,20 @@ const scopeFor = (threadId: string) => ({
 
 type ToolName = keyof typeof PmToolkit.tools;
 
-const harness = (world: PmWorld) =>
-  McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
+const harness = (world: PmWorld) => {
+  const pipelinesLayer = PipelineService.layerTest({});
+  const threadHarnessLayer = ThreadHarnessService.layer.pipe(
+    Layer.provide(ThreadHarnessStore.layer),
+    Layer.provide(pipelinesLayer),
+  );
+  return McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
     Layer.provideMerge(layerPmRemoteHere),
     Layer.provideMerge(layerPm(world)),
-    Layer.provideMerge(PipelineService.layerTest({})), // pipelines:
+    Layer.provideMerge(threadHarnessLayer), // pipelines:
+    Layer.provideMerge(pipelinesLayer), // pipelines:
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
+};
 
 /** Calls one tool as `threadId`; returns the success value or the returned failure. */
 const callAs = Effect.fn("test.callAs")(function* (

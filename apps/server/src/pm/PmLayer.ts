@@ -2,8 +2,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
-import * as PipelineService from "../pipelines/PipelineService.ts"; // pipelines:
 import * as RuntimeLayer from "../orchestration-v2/runtimeLayer.ts";
+import * as ThreadHarnessService from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as ServerActivation from "../serverActivation.ts";
 import * as PmRemote from "./PmRemote.ts";
@@ -17,8 +17,13 @@ import * as PmT3Import from "./t3/PmT3Import.ts";
 /** PmService over its store. */
 export const layerCore = PmService.layer.pipe(Layer.provideMerge(PmStore.layer));
 
-// pipelines: role routing for pm_worker_start, beside the PM services in the server's layer.
-const layerPipelines = PipelineService.layer.pipe(Layer.provide(RuntimeLayer.layerProjectService));
+// pipelines: shared memoized instances from runtimeLayer so ProviderTurnStartService, RPC and MCP agree.
+const layerPipelines = RuntimeLayer.layerPipelines.pipe(
+  Layer.provide(RuntimeLayer.layerProjectService),
+);
+const layerThreadHarness = RuntimeLayer.layerThreadHarness.pipe(
+  Layer.provide(RuntimeLayer.layerProjectService),
+);
 
 const layerSwarm = SwarmService.layer.pipe(
   Layer.provideMerge(SwarmStore.layer),
@@ -30,6 +35,7 @@ export const layer = Layer.mergeAll(
   PmT3Import.layer.pipe(
     Layer.provideMerge(layerCore),
     Layer.provideMerge(layerPipelines), // pipelines:
+    Layer.provideMerge(layerThreadHarness), // pipelines:
     // The runtime's own instances (layers memoize by reference), so imports publish to live clients.
     Layer.provide(Layer.merge(RuntimeLayer.layerEventSink, ProjectionStore.layer)),
   ),
@@ -52,6 +58,10 @@ export const layerWatcher = Layer.mergeAll(
     Layer.provide(Scheduler.layer),
   ),
   SwarmService.layerWatcher.pipe(Layer.provide(layer)),
+  ThreadHarnessService.layerWatcher.pipe(
+    Layer.provide(layer),
+    Layer.provide(RuntimeLayer.layerProjectService),
+  ),
 );
 
 /** Workers on the user's linked computers. One value: /mcp and the followers share one instance. */

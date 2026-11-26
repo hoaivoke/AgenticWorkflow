@@ -89,6 +89,7 @@ import {
   stoppedDelegatedTasksNote,
 } from "./RestartBackgroundNote.ts";
 import { pmBundleAppName } from "@t3tools/pm/identity"; // t3code-pm:
+import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 
 export class ProviderTurnStartError extends Schema.TaggedError<ProviderTurnStartError>()(
   "ProviderTurnStartError",
@@ -308,6 +309,7 @@ export const layer: Layer.Layer<
     const runtimePolicy = yield* RuntimePolicy.RuntimePolicyV2;
     const restoreMissingWorktree = yield* makeRestoreMissingWorktree;
     const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
+    const threadHarness = Option.getOrUndefined(yield* Effect.serviceOption(ThreadHarnessService)); // pipelines:
 
     // Build draining callbacks outside startup scope so they cannot retain full thread history.
     const makeRunControls = (input: {
@@ -2137,7 +2139,22 @@ export const layer: Layer.Layer<
             ),
             ...(sideChatContext === "" || sideChatHandoff === undefined ? [] : [sideChatHandoff]),
           ];
-          const context = [delivery.context, sideChatContext, restartNote]
+          // pipelines: inject unified thread role/harness and live tracked skills/context across models.
+          const preparedHarness =
+            threadHarness === undefined || compact || slashCommand
+              ? null
+              : yield* threadHarness
+                  .prepareTurnContext({
+                    threadId: projection.thread.id,
+                    projectId: projection.thread.projectId,
+                    providerThreadId: runningProviderThread.id,
+                    isNewNativeSession:
+                      runningProviderThread.nativeThreadRef === null ||
+                      effectiveHandoffs.length > 0,
+                  })
+                  .pipe(Effect.orElseSucceed(() => null));
+          const harnessContext = preparedHarness?.context ?? "";
+          const context = [harnessContext, delivery.context, sideChatContext, restartNote]
             .filter((part) => part !== "")
             .join("\n\n");
           const { restartContinuationOfRunId: _resumedRunId, ...promptedInput } = turnInput;
@@ -2202,6 +2219,15 @@ export const layer: Layer.Layer<
               yield* Effect.forEach(
                 [
                   delivery.delivered,
+                  ...(preparedHarness === null || threadHarness === undefined
+                    ? []
+                    : [
+                        threadHarness.markDelivered({
+                          threadId: projection.thread.id,
+                          providerThreadId: runningProviderThread.id,
+                          revision: preparedHarness.revision,
+                        }),
+                      ]),
                   ...(sideChatContext === "" ||
                   sideChatHandoff === undefined ||
                   nativeThreadId == null

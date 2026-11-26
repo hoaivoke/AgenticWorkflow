@@ -29,6 +29,9 @@ const callerThreadId = () => {
   return scope?.thread?.threadId;
 };
 
+/** `McpSchema.EnabledWhen` for tools usable by any thread (regular or PM). */
+export const hiddenUnlessThread = (): boolean => callerThreadId() !== undefined;
+
 /** `McpSchema.EnabledWhen` for `pm_*` tools: only PM threads see them, and only while on. */
 export const hiddenUnlessPm = (): boolean => {
   const threadId = callerThreadId();

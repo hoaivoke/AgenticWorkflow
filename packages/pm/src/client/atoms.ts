@@ -46,6 +46,18 @@ export function createPmClient<R, ER>(
     staleTimeMs: 0,
     idleTtlMs: 30_000,
   });
+  const pipelinesSnapshot = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:pipelines-get",
+    tag: PM_WS_METHODS.pipelinesGet,
+    staleTimeMs: 5_000,
+    idleTtlMs: 60_000,
+  });
+  const threadHarness = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:pm:thread-harness-get",
+    tag: PM_WS_METHODS.threadHarnessGet,
+    staleTimeMs: 2_000,
+    idleTtlMs: 60_000,
+  });
   const commands = {
     create: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pm:create",
@@ -143,6 +155,26 @@ export function createPmClient<R, ER>(
       label: "environment-data:pm:swarm-post",
       tag: PM_WS_METHODS.swarmPost,
     }),
+    roleSave: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:role-save",
+      tag: PM_WS_METHODS.roleSave,
+    }),
+    roleDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:role-delete",
+      tag: PM_WS_METHODS.roleDelete,
+    }),
+    pipelineSave: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:pipeline-save",
+      tag: PM_WS_METHODS.pipelineSave,
+    }),
+    pipelineDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:pipeline-delete",
+      tag: PM_WS_METHODS.pipelineDelete,
+    }),
+    threadHarnessSet: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pm:thread-harness-set",
+      tag: PM_WS_METHODS.threadHarnessSet,
+    }),
   };
 
   /** Every connected environment's PMs in one index: a thread list's single read. */
@@ -173,6 +205,8 @@ export function createPmClient<R, ER>(
     settingsQuery,
     t3StatusQuery,
     swarmBoard,
+    pipelinesSnapshot,
+    threadHarness,
     commands,
     indexAtom,
   };

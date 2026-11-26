@@ -3,6 +3,7 @@ import {
   AuthOrchestrationReadScope,
   type EnvironmentId,
   type PmThreadDetail,
+  type ProjectId,
   type ThreadId,
 } from "@t3tools/contracts";
 import { asPmIndex, createPmClient, type PmIndex, pmKey } from "@t3tools/pm/client";
@@ -24,6 +25,8 @@ export const {
 } = pmClient;
 const pmThreadDetail = pmClient.threadDetail;
 const pmSwarmBoardQuery = pmClient.swarmBoard;
+const pmPipelinesSnapshotQuery = pmClient.pipelinesSnapshot;
+const pmThreadHarnessQuery = pmClient.threadHarness;
 
 /** Upstream tests that mock `useAtomValue` hand back their own values; those read as no PMs. */
 export const usePmIndex = (): PmIndex => asPmIndex(useAtomValue(pmIndexAtom));
@@ -63,5 +66,33 @@ export function useSwarmBoard(
     environmentId === null || threadId === null || !enabled || !canRead
       ? null
       : pmSwarmBoardQuery({ environmentId, input: { threadId: threadId as ThreadId } }),
+  );
+}
+
+/** Project roles, pipelines, live providers and discovered skills for Pipelines Studio and composer picker. */
+export function usePipelinesSnapshot(
+  environmentId: EnvironmentId | null,
+  projectId: ProjectId | string | null,
+  enabled = true,
+) {
+  const canRead = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
+  return useEnvironmentQuery(
+    environmentId === null || projectId === null || !enabled || !canRead
+      ? null
+      : pmPipelinesSnapshotQuery({ environmentId, input: { projectId: projectId as ProjectId } }),
+  );
+}
+
+/** Active unified role/harness and live tracked skills/context files for a thread. */
+export function useThreadHarness(
+  environmentId: EnvironmentId | null,
+  threadId: ThreadId | string | null,
+  enabled = true,
+) {
+  const canRead = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
+  return useEnvironmentQuery(
+    environmentId === null || threadId === null || !enabled || !canRead
+      ? null
+      : pmThreadHarnessQuery({ environmentId, input: { threadId: threadId as ThreadId } }),
   );
 }

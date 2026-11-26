@@ -1,9 +1,12 @@
-import { OrchestratorMcpFailure, type PmError } from "@t3tools/contracts";
+import { OrchestratorMcpFailure, ThreadId, type PmError } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
+import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts"; // pipelines:
+import { PipelineService } from "../pipelines/PipelineService.ts"; // pipelines:
 import * as PmRouting from "../pipelines/PmRouting.ts"; // pipelines:
+import { ThreadHarnessService } from "../pipelines/ThreadHarnessService.ts"; // pipelines:
 import { PmToolkit } from "./PmMcpTools.ts";
 import { PmRemote } from "./PmRemote.ts";
 import { PmService } from "./PmService.ts";
@@ -216,5 +219,87 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
         Effect.flatMap((text) => service.toolResult(pm, () => Effect.succeed(text))),
       ),
     ),
+  ),
+  pm_role_save: McpToolAccess.writesWithCapability(({ role, previous_name }) =>
+    // pipelines:
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const caller = yield* McpInvocationContext.requireThreadScope(scope, "pm_role_save");
+      const threads = yield* ThreadManagement.ThreadManagementService;
+      const shell = yield* threads.getThreadShell(caller.thread.threadId).pipe(
+        Effect.mapError(
+          () =>
+            new OrchestratorMcpFailure({
+              code: "orchestration_error",
+              message: "Could not read caller thread.",
+            }),
+        ),
+      );
+      if (shell === null) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Caller thread not found.",
+        });
+      }
+      const pipelines = yield* PipelineService;
+      const snapshot = yield* pipelines
+        .saveRole({ projectId: shell.projectId, role, previousName: previous_name })
+        .pipe(Effect.mapError(toFailure));
+      const saved = snapshot.roles.find((entry) => entry.role.name === role.name.trim());
+      const modelLabel = saved?.resolvedModel
+        ? `${saved.resolvedModel.provider}/${saved.resolvedModel.model}${saved.resolvedModel.effort ? ` (${saved.resolvedModel.effort})` : ""}`
+        : (saved?.resolvedNote ?? "auto");
+      return {
+        result: `Saved role "${role.name.trim()}" to .pipelines/roles/${role.name.trim()}.yaml (resolved model: ${modelLabel}). Open the Pipelines tab to inspect or edit visually.`,
+      };
+    }),
+  ),
+  pm_pipeline_save: McpToolAccess.writesWithCapability(({ pipeline, previous_name }) =>
+    // pipelines:
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const caller = yield* McpInvocationContext.requireThreadScope(scope, "pm_pipeline_save");
+      const threads = yield* ThreadManagement.ThreadManagementService;
+      const shell = yield* threads.getThreadShell(caller.thread.threadId).pipe(
+        Effect.mapError(
+          () =>
+            new OrchestratorMcpFailure({
+              code: "orchestration_error",
+              message: "Could not read caller thread.",
+            }),
+        ),
+      );
+      if (shell === null) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Caller thread not found.",
+        });
+      }
+      const pipelines = yield* PipelineService;
+      yield* pipelines
+        .savePipeline({ projectId: shell.projectId, pipeline, previousName: previous_name })
+        .pipe(Effect.mapError(toFailure));
+      return {
+        result: `Saved pipeline "${pipeline.name.trim()}" (${pipeline.stages.length} stage${pipeline.stages.length === 1 ? "" : "s"}) to .pipelines/pipelines/${pipeline.name.trim()}.yaml. Open the Pipelines tab to view the visual workflow.`,
+      };
+    }),
+  ),
+  pm_thread_harness_get: McpToolAccess.reads(({ thread }) =>
+    // pipelines:
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const caller = yield* McpInvocationContext.requireThreadScope(scope, "pm_thread_harness_get");
+      const targetId = thread ? ThreadId.make(thread) : caller.thread.threadId;
+      const harness = yield* ThreadHarnessService;
+      const state = yield* harness.getState(targetId);
+      const lines = [
+        `Thread: ${state.threadId}`,
+        `Active role/harness: ${state.roleName ?? "(none)"}`,
+        `Tracked skills (${state.trackedSkills.length}): ${state.trackedSkills.length > 0 ? state.trackedSkills.join(", ") : "none"}`,
+        `Tracked context files (${state.trackedContextFiles.length}): ${state.trackedContextFiles.length > 0 ? state.trackedContextFiles.join(", ") : "none"}`,
+        `Revision: ${state.revision}`,
+      ];
+      return { result: lines.join("\n") };
+    }),
   ),
 });

@@ -344,6 +344,135 @@ export const PmSwarmBoard = Schema.Struct({
 });
 export type PmSwarmBoard = typeof PmSwarmBoard.Type;
 
+// pipelines: visual agent framework builder & unified cross-model thread harness.
+export const PmPipelineTier = Schema.Literals(["small", "mid", "frontier"]);
+export type PmPipelineTier = typeof PmPipelineTier.Type;
+
+export const PmPipelineAccess = Schema.Literals(["read-only", "write"]);
+export type PmPipelineAccess = typeof PmPipelineAccess.Type;
+
+export const PmPipelineWorkspaceMode = Schema.Literals(["shared", "worktree"]);
+export type PmPipelineWorkspaceMode = typeof PmPipelineWorkspaceMode.Type;
+
+export const PmPipelineCandidate = Schema.Struct({
+  provider: TrimmedNonEmptyString,
+  model: TrimmedNonEmptyString,
+  effort: Schema.optional(TrimmedNonEmptyString),
+});
+export type PmPipelineCandidate = typeof PmPipelineCandidate.Type;
+
+export const PmPipelineRole = Schema.Struct({
+  name: TrimmedNonEmptyString,
+  description: TrimmedNonEmptyString,
+  tier: PmPipelineTier,
+  maxTier: Schema.optional(PmPipelineTier),
+  access: PmPipelineAccess,
+  multimodal: Schema.optional(Schema.Boolean),
+  candidates: Schema.optional(Schema.Array(PmPipelineCandidate)),
+  skills: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  contextFiles: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  toolkits: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  outputContract: Schema.optional(TrimmedNonEmptyString),
+  instructions: Schema.optional(TrimmedNonEmptyString),
+});
+export type PmPipelineRole = typeof PmPipelineRole.Type;
+
+export const PmPipelineResolvedModel = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  effort: Schema.NullOr(Schema.String),
+});
+export type PmPipelineResolvedModel = typeof PmPipelineResolvedModel.Type;
+
+export const PmPipelineRoleEntry = Schema.Struct({
+  role: PmPipelineRole,
+  source: Schema.String,
+  isBuiltIn: Schema.Boolean,
+  isOverridden: Schema.Boolean,
+  resolvedModel: Schema.NullOr(PmPipelineResolvedModel),
+  resolvedNote: Schema.NullOr(Schema.String),
+});
+export type PmPipelineRoleEntry = typeof PmPipelineRoleEntry.Type;
+
+export const PmPipelineStage = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  role: Schema.optional(TrimmedNonEmptyString),
+  goal: TrimmedNonEmptyString,
+  reads: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  produces: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  workspace: Schema.optional(PmPipelineWorkspaceMode),
+  parallel: Schema.optional(Schema.Number),
+  foreach: Schema.optional(Schema.Literal("each-task")),
+  differentProviderFrom: Schema.optional(TrimmedNonEmptyString),
+  approval: Schema.optional(Schema.Boolean),
+  skipWhen: Schema.optional(TrimmedNonEmptyString),
+  onFail: Schema.optional(TrimmedNonEmptyString),
+  run: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+});
+export type PmPipelineStage = typeof PmPipelineStage.Type;
+
+export const PmPipelineDefinition = Schema.Struct({
+  name: TrimmedNonEmptyString,
+  description: TrimmedNonEmptyString,
+  when: Schema.optional(TrimmedNonEmptyString),
+  escalateAfter: Schema.optional(Schema.Number),
+  replanAfter: Schema.optional(Schema.Number),
+  stages: Schema.Array(PmPipelineStage),
+});
+export type PmPipelineDefinition = typeof PmPipelineDefinition.Type;
+
+export const PmPipelineEntry = Schema.Struct({
+  pipeline: PmPipelineDefinition,
+  source: Schema.String,
+  isBuiltIn: Schema.Boolean,
+  isOverridden: Schema.Boolean,
+});
+export type PmPipelineEntry = typeof PmPipelineEntry.Type;
+
+export const PmPipelineProviderModel = Schema.Struct({
+  slug: Schema.String,
+  name: Schema.String,
+  reasoningChoices: Schema.Array(Schema.String),
+});
+export type PmPipelineProviderModel = typeof PmPipelineProviderModel.Type;
+
+export const PmPipelineProvider = Schema.Struct({
+  instanceId: Schema.String,
+  driver: Schema.String,
+  displayName: Schema.NullOr(Schema.String),
+  enabled: Schema.Boolean,
+  models: Schema.Array(PmPipelineProviderModel),
+});
+export type PmPipelineProvider = typeof PmPipelineProvider.Type;
+
+export const PmDiscoveredSkill = Schema.Struct({
+  name: Schema.String,
+  path: Schema.String,
+  scope: Schema.Literals(["project", "user", "plugin"]),
+});
+export type PmDiscoveredSkill = typeof PmDiscoveredSkill.Type;
+
+export const PmWorkspacePipelinesSnapshot = Schema.Struct({
+  projectId: ProjectId,
+  workspaceRoot: Schema.NullOr(Schema.String),
+  roles: Schema.Array(PmPipelineRoleEntry),
+  pipelines: Schema.Array(PmPipelineEntry),
+  providers: Schema.Array(PmPipelineProvider),
+  discoveredSkills: Schema.Array(PmDiscoveredSkill),
+  problems: Schema.Array(Schema.String),
+});
+export type PmWorkspacePipelinesSnapshot = typeof PmWorkspacePipelinesSnapshot.Type;
+
+export const PmThreadHarnessState = Schema.Struct({
+  threadId: ThreadId,
+  roleName: Schema.NullOr(Schema.String),
+  trackedSkills: Schema.Array(Schema.String),
+  trackedContextFiles: Schema.Array(Schema.String),
+  revision: Schema.Number,
+  updatedAt: Schema.NullOr(Schema.String),
+});
+export type PmThreadHarnessState = typeof PmThreadHarnessState.Type;
+
 const PmRpcError = Schema.Union([PmError, EnvironmentAuthorizationError]);
 const PmTarget = { pm: ThreadId };
 const Ok = Schema.Struct({});
@@ -378,6 +507,13 @@ export const PM_WS_METHODS = {
   t3Import: "pm.t3.import",
   swarmGet: "pm.swarm.get",
   swarmPost: "pm.swarm.post",
+  pipelinesGet: "pm.pipelines.get",
+  roleSave: "pm.pipelines.roleSave",
+  roleDelete: "pm.pipelines.roleDelete",
+  pipelineSave: "pm.pipelines.pipelineSave",
+  pipelineDelete: "pm.pipelines.pipelineDelete",
+  threadHarnessGet: "pm.harness.get",
+  threadHarnessSet: "pm.harness.set",
 } as const;
 
 /** The streaming `pm.*` methods, for the client runtime's subscription factory. */
@@ -551,6 +687,60 @@ export const PmRpcGroup = RpcGroup.make(
     success: PmSwarmPost,
     error: PmRpcError,
   }),
+  Rpc.make(PM_WS_METHODS.pipelinesGet, {
+    payload: Schema.Struct({ projectId: ProjectId }),
+    success: PmWorkspacePipelinesSnapshot,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.roleSave, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      role: PmPipelineRole,
+      previousName: Schema.optional(TrimmedNonEmptyString),
+    }),
+    success: PmWorkspacePipelinesSnapshot,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.roleDelete, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      name: TrimmedNonEmptyString,
+    }),
+    success: PmWorkspacePipelinesSnapshot,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.pipelineSave, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      pipeline: PmPipelineDefinition,
+      previousName: Schema.optional(TrimmedNonEmptyString),
+    }),
+    success: PmWorkspacePipelinesSnapshot,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.pipelineDelete, {
+    payload: Schema.Struct({
+      projectId: ProjectId,
+      name: TrimmedNonEmptyString,
+    }),
+    success: PmWorkspacePipelinesSnapshot,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.threadHarnessGet, {
+    payload: Schema.Struct({ threadId: ThreadId }),
+    success: PmThreadHarnessState,
+    error: PmRpcError,
+  }),
+  Rpc.make(PM_WS_METHODS.threadHarnessSet, {
+    payload: Schema.Struct({
+      threadId: ThreadId,
+      roleName: Schema.NullOr(TrimmedNonEmptyString),
+      trackedSkills: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+      trackedContextFiles: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+    }),
+    success: PmThreadHarnessState,
+    error: PmRpcError,
+  }),
 );
 
 /** What a client needs before it offers a PM action; the server checks `PM_RPC_SCOPES`. */
@@ -578,6 +768,11 @@ export const PM_CLIENT_GUARDED_RPC_SCOPES = {
   [PM_WS_METHODS.t3SetSync]: AuthSettingsWriteScope,
   [PM_WS_METHODS.t3Import]: AuthSettingsWriteScope,
   [PM_WS_METHODS.swarmPost]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.roleSave]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.roleDelete]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pipelineSave]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.pipelineDelete]: AuthOrchestrationOperateScope,
+  [PM_WS_METHODS.threadHarnessSet]: AuthOrchestrationOperateScope,
 } as const;
 
 /** Read methods; with the guarded ones above, every `pm.*` method has exactly one scope. */
@@ -588,4 +783,6 @@ export const PM_READ_RPC_SCOPES = {
   [PM_WS_METHODS.settingsGet]: AuthOrchestrationReadScope,
   [PM_WS_METHODS.t3Status]: AuthSettingsWriteScope,
   [PM_WS_METHODS.swarmGet]: AuthOrchestrationReadScope,
+  [PM_WS_METHODS.pipelinesGet]: AuthOrchestrationReadScope,
+  [PM_WS_METHODS.threadHarnessGet]: AuthOrchestrationReadScope,
 } as const;
