@@ -159,7 +159,7 @@ export const make = Effect.gen(function* () {
   // t3code-pm: nothing is buffered, no install id is created and nothing is sent.
   if (yield* PmNoAnalytics) {
     return AnalyticsService.of({
-      record: Effect.fn("AnalyticsService.record")(() => Effect.void),
+      record: Effect.fn("AnalyticsService.record")(() => Effect.succeed(false)),
       flush: Effect.void,
       recordOwners: Effect.fn("AnalyticsService.recordOwners")(() => Effect.void),
     });

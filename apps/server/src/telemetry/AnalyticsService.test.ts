@@ -533,7 +533,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("PM3code analytic
       const anonymousIdPath = yield* Effect.gen(function* () {
         const analytics = yield* AnalyticsService.AnalyticsService;
         yield* analytics.record("test.pm", { index: 1 });
-        yield* analytics.recordOwners([{ source: "openai", ownerId: "owner" }], "client");
+        yield* analytics.recordOwners([{ source: "device", ownerId: "owner" }], "client");
         yield* analytics.flush;
         yield* TestClock.adjust("1 minute");
         return (yield* ServerConfig.ServerConfig).anonymousIdPath;

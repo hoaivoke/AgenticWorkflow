@@ -2509,7 +2509,7 @@ export const make = Effect.gen(function* () {
               return Option.some<AgentSessionRecentThread>({ _tag: "Skipped" });
             }
             const expandedCwd = expandHomePath(
-              projectCwd(parsedDb.cwd, transcript.projectRoots).trim(),
+              (yield* projectCwd(parsedDb.cwd, transcript.projectRoots)).trim(),
               homeDir,
             );
             if (
