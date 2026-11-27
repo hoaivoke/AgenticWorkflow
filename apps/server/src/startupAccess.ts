@@ -138,6 +138,15 @@ const isIpv4Family = (family: string | number): boolean => family === "IPv4" || 
 
 const isIpv6Family = (family: string | number): boolean => family === "IPv6" || family === 6;
 
+// A startup URL names the address the server bound; `localhost` can resolve to the other
+// address family, where this server is not listening.
+const loopbackAddressFor = (host: string | undefined): string =>
+  host !== undefined && normalizeHost(host) === "::" ? "::1" : "127.0.0.1";
+
+/** The origin a browser on this machine uses to reach a server bound to `host`. */
+export const resolveLocalOrigin = (host: string | undefined, port: number): string =>
+  `http://${formatHostForUrl(host && !isWildcardHost(host) ? normalizeHost(host) : loopbackAddressFor(host))}:${port}`;
+
 const resolveHeadlessConnectionHost = (
   host: string | undefined,
   interfaces: NetworkInterfacesMap,
@@ -145,7 +154,7 @@ const resolveHeadlessConnectionHost = (
   platform: NodeJS.Platform,
 ): string => {
   if (!host) {
-    return "localhost";
+    return loopbackAddressFor(host);
   }
 
   if (!isWildcardHost(host)) {
@@ -172,13 +181,13 @@ const resolveHeadlessConnectionHost = (
     return externalIpv4.address;
   }
   if (privateNetworkOnly) {
-    return "localhost";
+    return loopbackAddressFor(host);
   }
 
   const externalIpv6 = interfaceEntries.find(
     (entry) => !entry.internal && isIpv6Family(entry.family),
   );
-  return externalIpv6 ? normalizeHost(externalIpv6.address) : "localhost";
+  return externalIpv6 ? normalizeHost(externalIpv6.address) : loopbackAddressFor(host);
 };
 
 export const resolveHeadlessConnectionString = (
@@ -241,7 +250,7 @@ export const renderTerminalQrCode = (value: string, margin = 2): string => {
   return rows.join("\n");
 };
 
-export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): string =>
+const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): string =>
   [
     pmBundleAppName("T3 Code server is ready."),
     `Connection string: ${accessInfo.connectionString}`,
@@ -260,16 +269,20 @@ export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): 
     "",
   ].join("\n");
 
-export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessInfo")(function* () {
+const resolveServeConnectionString = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
   const httpServer = yield* HttpServer.HttpServer;
-  const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
   const platform = yield* HostProcess.Platform;
-  const connectionString = resolveHeadlessConnectionString(
+  return resolveHeadlessConnectionString(
     serverConfig.host,
     resolveListeningPort(httpServer.address, serverConfig.port),
     { privateNetworkOnly: serverConfig.privateNetworkOnly, platform },
   );
+});
+
+const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessInfo")(function* () {
+  const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
+  const connectionString = yield* resolveServeConnectionString;
   const issued = yield* serverAuth.issueStartupPairingCredential();
 
   return {
@@ -277,4 +290,22 @@ export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessI
     token: issued.credential,
     pairingUrl: buildPairingUrl(connectionString, issued.credential),
   } satisfies HeadlessServeAccessInfo;
+});
+
+/**
+ * What `t3 serve` prints once it is ready. A terminal gets pairing details. The background
+ * service's output is its log file, so it gets the address and the command that pairs a device.
+ */
+export const headlessServeOutput = Effect.fn("headlessServeOutput")(function* (options: {
+  readonly serviceManaged: boolean;
+}) {
+  if (!options.serviceManaged) {
+    return formatHeadlessServeOutput(yield* issueHeadlessServeAccessInfo());
+  }
+  return [
+    pmBundleAppName("T3 Code server is ready."), // t3code-pm:
+    `Connection string: ${yield* resolveServeConnectionString}`,
+    "Run `t3 pair` on this machine to connect a device.",
+    "",
+  ].join("\n");
 });
