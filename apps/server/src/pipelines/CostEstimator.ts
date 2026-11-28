@@ -25,14 +25,19 @@ export function classifyModelPriceTier(
   const normalized = (modelOrTier ?? "").toLowerCase();
   if (
     normalized.includes("haiku") ||
-    normalized.includes("mini") ||
+    normalized.includes("hydrogen") ||
+    normalized.includes("terra") ||
+    /(?:^|[-_/.\s])mini(?:$|[-_/.\s])/.test(normalized) ||
     normalized.includes("flash") ||
-    normalized.includes("nano")
+    /(?:^|[-_/.\s])nano(?:$|[-_/.\s])/.test(normalized)
   ) {
     return "small";
   }
   if (
     normalized.includes("opus") ||
+    normalized.includes("fable") ||
+    normalized.includes("astra") ||
+    normalized.includes("carbon") ||
     normalized.includes("pro-high") ||
     normalized.includes("gpt-5.4") ||
     normalized.includes("o1") ||

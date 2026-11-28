@@ -128,7 +128,7 @@ describe("ThreadHarnessService", () => {
           isNewNativeSession: true,
         });
         expect(claudeTurn).not.toBeNull();
-        expect(claudeTurn!.context).toContain("<thread_harness>");
+        expect(claudeTurn!.context).toContain("### Workspace Harness Context");
         expect(claudeTurn!.context).toContain("Your role: builder");
         yield* harness.markDelivered({
           threadId,

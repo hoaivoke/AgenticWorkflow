@@ -40,16 +40,18 @@ const shellOf = Effect.fn("PmRouting.shellOf")(function* (threadId: string) {
 });
 
 /**
- * Accounts this PM's workers have run into usage limits on, with the reset time. A worker that
- * failed on a limit that has since reset no longer counts.
+ * Accounts currently out of usage: live 100%-spent provider windows from the registry merged with
+ * accounts this PM's workers have stopped on with a usage limit that has not reset yet.
  */
 const limitedAccounts = Effect.fn("PmRouting.limitedAccounts")(function* (pm: string) {
+  const pipelines = yield* PipelineService;
   const store = yield* PmStore;
   const now = yield* DateTime.now;
+  const liveLimited = yield* pipelines.limitedProviders;
   const workers = yield* store
     .listWorkers(pm)
     .pipe(Effect.mapError(unavailable("Could not list workers.")));
-  const limited = new Map<string, string>();
+  const limited = new Map<string, string>(liveLimited);
   for (const worker of workers) {
     const shell = yield* shellOf(worker.workerThreadId).pipe(Effect.orElseSucceed(() => null));
     if (shell === null || shell.lastErrorClass !== "usage_limit") continue;
@@ -60,7 +62,9 @@ const limitedAccounts = Effect.fn("PmRouting.limitedAccounts")(function* (pm: st
     const instance = shell.modelSelection.instanceId;
     const known = limited.get(instance);
     const iso = DateTime.formatIso(resetAt);
-    if (known === undefined || iso > known) limited.set(instance, iso);
+    if (known === undefined || known === "usage limit resets" || iso > known) {
+      limited.set(instance, iso);
+    }
   }
   return limited as ReadonlyMap<string, string>;
 });

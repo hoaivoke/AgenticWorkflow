@@ -125,7 +125,7 @@ const PmComputersTool = pmToolWithoutParameters(
 );
 const PmWorkerStartTool = pmTool(
   "pm_worker_start",
-  "Start a worker thread in your project with a brief that stands alone. Agent Space adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Omit the model to use yours. `computer` starts it on another computer the user linked.",
+  "Start a worker thread in your project with a brief that stands alone. Agent Space adds your mission, instructions and the reporting rules. Its report arrives as a message: end your turn after it starts. Always pass `role` so the tier system picks an available model across vendors and automatically fails over when a provider is out of usage; omit both `role` and `modelSelection` only to inherit your own model. `computer` starts it on another computer the user linked.",
   {
     computer: Schema.optional(ComputerRef),
     clone_to: Schema.optional(
@@ -142,7 +142,7 @@ const PmWorkerStartTool = pmTool(
     role: Schema.optional(
       TrimmedNonEmptyString.annotate({
         description:
-          "Role from pm_roles, such as builder, reviewer or architect. Picks the model and adds the role's instructions. Prefer it to modelSelection.",
+          "Role from pm_roles (such as triage, builder, reviewer, or architect). Routes through the tier system (small/mid/frontier) across available vendors, skips accounts at usage limits, and adds the role's instructions. Always prefer this over pinning modelSelection.",
       }),
     ),
     escalate: Schema.optional(
@@ -189,7 +189,7 @@ const PmPipelinesTool = pmTool(
 const PmRolesTool = pmToolWithoutParameters(
   // pipelines:
   "pm_roles",
-  "Every worker role, its tier, and the model it would run on right now given the user's accounts and usage limits.",
+  "Every worker role, its tier (small/mid/frontier), the tier fallback chain across vendors, and the model it would run on right now given the user's accounts and usage limits.",
 );
 const PmWorkerLinkTool = pmTool(
   "pm_worker_link",

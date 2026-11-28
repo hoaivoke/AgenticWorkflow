@@ -2022,6 +2022,7 @@ export function threadShellFromProjection(
     pendingBackgroundTasks: [...pendingBackgroundTasks],
     providerInstanceHistory: providerInstanceHistoryForShell({
       threadId: projection.thread.id,
+      activeProviderThreadId: projection.thread.activeProviderThreadId,
       providerThreads: projection.providerThreads,
     }),
     goal: activeProviderGoalForShell(
@@ -2054,18 +2055,35 @@ export function threadShellFromProjection(
 
 function providerInstanceHistoryForShell(input: {
   readonly threadId: ThreadId;
+  readonly activeProviderThreadId?: ProviderThreadId | null | undefined;
   readonly providerThreads: ReadonlyArray<
     OrchestrationV2ThreadProjection["providerThreads"][number]
   >;
 }): ReadonlyArray<ProviderInstanceId> {
-  const history: Array<ProviderInstanceId> = [];
-  for (const providerThread of input.providerThreads
+  const candidates = input.providerThreads
     .filter((thread) => thread.appThreadId === input.threadId && thread.ownerNodeId === null)
     .toSorted(
       (left, right) =>
         DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
         left.id.localeCompare(right.id),
-    )) {
+    );
+  const anyExecuted = candidates.some(
+    (thread) =>
+      thread.firstRunOrdinal !== null ||
+      thread.lastRunOrdinal !== null ||
+      thread.nativeThreadRef !== null ||
+      thread.providerSessionId !== null,
+  );
+  const history: Array<ProviderInstanceId> = [];
+  for (const providerThread of candidates) {
+    // Skip inactive provider stubs that never actually ran a turn or established a session
+    // (for example, a thread created on a default provider and switched before doing work).
+    const ranOrEstablished =
+      (providerThread.firstRunOrdinal !== null || providerThread.lastRunOrdinal !== null) &&
+      (providerThread.nativeThreadRef !== null || providerThread.providerSessionId !== null);
+    if (anyExecuted && providerThread.id !== input.activeProviderThreadId && !ranOrEstablished) {
+      continue;
+    }
     if (!history.includes(providerThread.providerInstanceId)) {
       history.push(providerThread.providerInstanceId);
     }
@@ -9364,6 +9382,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           pendingBackgroundTasks,
           providerInstanceHistory: providerInstanceHistoryForShell({
             threadId: thread.id,
+            activeProviderThreadId: thread.activeProviderThreadId,
             providerThreads: providerThreadsByThreadId.get(thread.id) ?? [],
           }),
           goal: activeProviderGoalForShell(

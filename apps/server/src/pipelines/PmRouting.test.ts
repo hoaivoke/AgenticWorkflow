@@ -218,6 +218,49 @@ describe("pm_worker_start with a role", () => {
     }).pipe(Effect.provide(harness(world)));
   });
 
+  it.effect("skips providers reported as out of usage by live provider limits", () => {
+    const world = makeWorld();
+    const providersWithGemini: ReadonlyArray<ProviderSnapshot> = [
+      ...PROVIDERS,
+      {
+        instanceId: "antigravity",
+        driver: "antigravity",
+        enabled: true,
+        models: [
+          { slug: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" },
+          { slug: "gemini-4-neon", name: "Gemini 4 Neon" },
+          { slug: "gemini-4-carbon", name: "Gemini 4 Carbon" },
+        ],
+      },
+    ];
+    const liveLimited = new Map([
+      ["claudeAgent", "2099-01-01T00:00:00.000Z"],
+      ["codex", "2099-01-01T00:00:00.000Z"],
+    ]);
+    const customHarness = McpToolAccess.HandlersLayer.layer(PmMcpHandlers.layer).pipe(
+      Layer.provideMerge(layerPmRemoteHere),
+      Layer.provideMerge(layerPm(world)),
+      Layer.provideMerge(
+        PipelineService.layerTest({
+          providers: providersWithGemini,
+          limitedProviders: liveLimited,
+        }),
+      ),
+      Layer.provideMerge(layerScheduler),
+      Layer.provideMerge(SqlitePersistence.layerMemory),
+    );
+    return Effect.gen(function* () {
+      const pm = yield* createPm(world);
+      const started = yield* callAs(pm, "pm_worker_start", {
+        title: "Build with fallback",
+        brief: "Implement task.",
+        role: "builder",
+      });
+      expect(started.result).toContain("antigravity/gemini-4-neon");
+      expect((yield* callAs(pm, "pm_roles", {})).result).toContain("Tiers (fallback order):");
+    }).pipe(Effect.provide(customHarness));
+  });
+
   it.effect("keeps a model the PM chose, refuses unknown roles", () => {
     const world = makeWorld();
     return Effect.gen(function* () {
