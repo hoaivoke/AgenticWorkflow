@@ -601,6 +601,30 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
+  it.effect("runs fork Mac self-signing in afterSign after electronFuses", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.22.0",
+        false,
+        false,
+        undefined,
+        undefined,
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(ConfigProvider.fromEnv({ env: { PM_MAC_SIGN_IDENTITY: "TESTID" } })),
+        ),
+      );
+      assert.isTrue(String(config.afterPack).endsWith("scripts/prepare-server-compile-cache.cjs"));
+      assert.isTrue(String(config.afterSign).endsWith("scripts/pm-mac-self-sign-after-pack.ts"));
+      assert.deepEqual(config.electronFuses, {
+        enableNodeCliInspectArguments: false,
+        resetAdHocDarwinSignature: false,
+      });
+    }),
+  );
+
   it.effect("names updatable AppImages without a version and apart per channel", () =>
     Effect.gen(function* () {
       const appImageName = (version: string) =>

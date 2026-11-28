@@ -2855,14 +2855,15 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   arch?: typeof BuildArch.Type,
 ) {
   // pipelines: the fork's CI signs its Mac app with a self-signed identity for in-app updates.
+  // Self-signing must run in afterSign (after @electron/fuses flips fuses in the app bundle).
   const pmMacSignIdentity = yield* Config.String("PM_MAC_SIGN_IDENTITY").pipe(Config.option);
+  const repoRoot = yield* RepoRoot;
+  const path = yield* Path.Path;
   const buildConfig: Record<string, unknown> = {
-    afterPack: (yield* Path.Path).join(
-      yield* RepoRoot,
-      platform === "mac" && Option.isSome(pmMacSignIdentity)
-        ? "scripts/pm-mac-self-sign-after-pack.ts"
-        : "scripts/prepare-server-compile-cache.cjs",
-    ),
+    afterPack: path.join(repoRoot, "scripts/prepare-server-compile-cache.cjs"),
+    ...(platform === "mac" && Option.isSome(pmMacSignIdentity)
+      ? { afterSign: path.join(repoRoot, "scripts/pm-mac-self-sign-after-pack.ts") }
+      : {}),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
     artifactName: pmBuild(
@@ -2875,7 +2876,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     electronFuses: {
       enableNodeCliInspectArguments: false,
       // Nothing signs an unsigned macOS build after the flip, which voids its ad hoc signature.
-      resetAdHocDarwinSignature: platform === "mac" && !signed,
+      resetAdHocDarwinSignature: platform === "mac" && !signed && Option.isNone(pmMacSignIdentity),
     },
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
