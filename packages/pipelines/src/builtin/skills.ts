@@ -328,3 +328,44 @@ export function matchSkillsForRole(input: {
 
   return matched;
 }
+
+export interface GeminiOrchestratorUpgrade {
+  readonly slug: string;
+  readonly name: string;
+}
+
+const GEMINI_ORCHESTRATOR_CANDIDATES: ReadonlyArray<{
+  readonly match: string;
+  readonly slugs: ReadonlyArray<string>;
+}> = [
+  { match: "neon", slugs: ["gemini-pro-orchestrator-neon"] },
+  { match: "carbon", slugs: ["gemini-pro-orchestrator"] },
+  { match: "argon", slugs: ["gemini-pro-orchestrator-argon", "gemini-pro-orchestrator-g1-pro"] },
+  { match: "hydrogen", slugs: ["gemini-4-hydrogen-orchestrator"] },
+];
+
+/**
+ * When a user picks a standard Gemini model (`gemini-4-neon`, `gemini-4-carbon`, `gemini-4-argon`,
+ * `gemini-4-hydrogen`) as a PM or Swarm orchestrator, return the matching Antigravity Orchestrator
+ * variant if installed on the same provider.
+ */
+export function findGeminiOrchestratorUpgrade(
+  currentModel: string | null | undefined,
+  availableModels: ReadonlyArray<{ readonly slug: string; readonly name: string }>,
+): GeminiOrchestratorUpgrade | null {
+  const normalized = (currentModel ?? "").trim().toLowerCase();
+  if (!normalized || normalized.includes("orchestrator") || !normalized.includes("gemini")) {
+    return null;
+  }
+  const entry = GEMINI_ORCHESTRATOR_CANDIDATES.find((candidate) =>
+    normalized.includes(candidate.match),
+  );
+  if (entry === undefined) return null;
+  for (const targetSlug of entry.slugs) {
+    const found = availableModels.find((model) => model.slug.toLowerCase() === targetSlug);
+    if (found !== undefined) {
+      return { slug: found.slug, name: found.name };
+    }
+  }
+  return null;
+}

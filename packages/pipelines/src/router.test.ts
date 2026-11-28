@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { detectModelFamily, matchSkillsForRole } from "./builtin/skills.ts";
+import {
+  detectModelFamily,
+  findGeminiOrchestratorUpgrade,
+  matchSkillsForRole,
+} from "./builtin/skills.ts";
 import { loadPipelineConfig } from "./load.ts";
 import {
   renderPipeline,
@@ -298,6 +302,34 @@ describe("skill database", () => {
     expect(detectModelFamily("cursor")).toBeNull();
     expect(detectModelFamily("")).toBeNull();
     expect(detectModelFamily(null)).toBeNull();
+  });
+
+  it("finds the matching Antigravity Orchestrator upgrade for standard Gemini models", () => {
+    const models = [
+      { slug: "gemini-4-neon", name: "Gemini 4 Neon" },
+      { slug: "gemini-pro-orchestrator-neon", name: "Orchestrator (Neon)" },
+      { slug: "gemini-pro-orchestrator", name: "Orchestrator (Carbon)" },
+      { slug: "gemini-pro-orchestrator-argon", name: "Orchestrator (Argon)" },
+      { slug: "gemini-4-hydrogen-orchestrator", name: "Orchestrator (Hydrogen)" },
+    ];
+    expect(findGeminiOrchestratorUpgrade("gemini-4-neon-medium", models)).toEqual({
+      slug: "gemini-pro-orchestrator-neon",
+      name: "Orchestrator (Neon)",
+    });
+    expect(findGeminiOrchestratorUpgrade("gemini-4-carbon-high", models)).toEqual({
+      slug: "gemini-pro-orchestrator",
+      name: "Orchestrator (Carbon)",
+    });
+    expect(findGeminiOrchestratorUpgrade("gemini-4-argon-low", models)).toEqual({
+      slug: "gemini-pro-orchestrator-argon",
+      name: "Orchestrator (Argon)",
+    });
+    expect(findGeminiOrchestratorUpgrade("gemini-4-hydrogen-medium", models)).toEqual({
+      slug: "gemini-4-hydrogen-orchestrator",
+      name: "Orchestrator (Hydrogen)",
+    });
+    expect(findGeminiOrchestratorUpgrade("gemini-pro-orchestrator-neon", models)).toBeNull();
+    expect(findGeminiOrchestratorUpgrade("claude-opus-5-5", models)).toBeNull();
   });
 
   it("matches role skills first, then catalog skills for the role's family", () => {

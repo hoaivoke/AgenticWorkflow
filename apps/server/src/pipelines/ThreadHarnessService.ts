@@ -1,4 +1,5 @@
 // pipelines: unified cross-model thread harness & live skill/context provenance service.
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import {
   ThreadId,
   type OrchestrationV2DomainEvent,
@@ -478,7 +479,9 @@ const make = Effect.gen(function* () {
 
 /** Without the projection store, so tests can supply a thread shell. */
 export const layerWithoutProjectionStore = Layer.effect(ThreadHarnessService, make);
-export const layer = layerWithoutProjectionStore.pipe(Layer.provide(ProjectionStore.layer));
+export const layer = layerWithoutProjectionStore.pipe(
+  Layer.provide(ProjectionStore.layer.pipe(Layer.provide(NodeCrypto.layerDigest))),
+);
 
 /** Watches orchestration domain events to track skills and context files used by any model. */
 export const layerWatcher = Layer.effectDiscard(

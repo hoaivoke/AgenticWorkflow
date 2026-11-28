@@ -48,6 +48,7 @@ import {
   useAgeLabel,
 } from "./inboxRow";
 import { PmMissionDialog } from "./mission";
+import { GeminiOrchestratorPrompt } from "./GeminiOrchestratorPrompt";
 import { pmKey, usePmSummary, usePmThreadDetail } from "./state";
 import { setPmDockHidden, usePmDockHidden, usePmFold, usePmRecentArchived } from "./uiState";
 
@@ -69,7 +70,12 @@ export function PmComposerDock(props: DockProps) {
   return (
     <>
       <PmMissionDialog threadRef={props.threadRef} />
-      {props.hidden || props.longDraft ? null : <PmInboxCard target={props.threadRef} />}
+      {props.hidden || props.longDraft ? null : (
+        <>
+          <GeminiOrchestratorPrompt threadRef={props.threadRef} />
+          <PmInboxCard target={props.threadRef} />
+        </>
+      )}
     </>
   );
 }

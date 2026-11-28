@@ -15,6 +15,7 @@ import { cn } from "../lib/utils";
 import { buildThreadRouteParams } from "../threadRoutes";
 import { formatShortTimestamp } from "../timestampFormat";
 import { runPmCommand } from "./actions";
+import { GeminiOrchestratorPrompt } from "./GeminiOrchestratorPrompt";
 import { pmCommands, useSwarmBoard } from "./state";
 
 type ThreadRef = { readonly environmentId: EnvironmentId; readonly threadId: ThreadId };
@@ -133,6 +134,9 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
       }
     >
       <div className="flex flex-col gap-2.5 px-2.5 pb-1 text-xs">
+        {board.viewerRole === "coordinator" ? (
+          <GeminiOrchestratorPrompt threadRef={props.threadRef} />
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-muted-foreground">
           <span>
             {gt("{working} working · {waiting} waiting · {total} total", {

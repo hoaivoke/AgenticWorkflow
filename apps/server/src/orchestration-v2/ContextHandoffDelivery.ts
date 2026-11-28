@@ -78,6 +78,7 @@ export function expandSwarmCommandText(text: string): string | null {
     "  3. Coordinate on the shared message board with `post_message` (`@<name>`, `@all`, `@#<channel>`) and refer to prior messages by `#seq` rather than repeating them.",
     "  4. When waiting for workers to finish or report, call `swarm_wait(since)` right before ending your turn to park at zero token cost and auto-wake on `@coordinator` mentions.",
     '  5. Run `pm_run_gates` (or verify directly) before calling `swarm(action: "done")` and reporting the final result.',
+    '  5. If you (the Swarm coordinator) are running on a standard Gemini model (such as `gemini-4-neon`, `gemini-4-carbon`, `gemini-4-argon`, or `gemini-4-hydrogen`) and an Orchestrator variant of that model is listed by `swarm(action: "models")` (such as `gemini-pro-orchestrator-neon` or `gemini-pro-orchestrator`), ask the user once if they want to switch this coordinator thread to the Orchestrator variant of that model instead.',
     "",
     "User goal:",
     objective,

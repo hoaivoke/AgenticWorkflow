@@ -7,7 +7,9 @@ export { BUILTIN_ROLES } from "./builtin/roles.ts";
 export {
   BUILTIN_SKILLS,
   detectModelFamily,
+  findGeminiOrchestratorUpgrade,
   matchSkillsForRole,
+  type GeminiOrchestratorUpgrade,
   type MatchedSkill,
 } from "./builtin/skills.ts";
 export { BUILTIN_TIERS, MULTIMODAL_HINTS, PROVIDER_ALIASES } from "./builtin/tiers.ts";

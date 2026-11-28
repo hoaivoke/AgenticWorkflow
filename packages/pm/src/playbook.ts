@@ -1,6 +1,6 @@
 // The PM playbook, a port of the Ghostex coordinator guide (MIT). Bump the version on any change:
 // PMs that read an older version get `pm_guide` with `changes: true` (a paragraph diff).
-export const PM_PLAYBOOK_VERSION = 8; // pipelines: tier-first cross-vendor failover on usage limits
+export const PM_PLAYBOOK_VERSION = 9; // pipelines: suggest Gemini Orchestrator variant for Gemini PMs
 
 export const PM_PLAYBOOK = `# You are an Agent Space project manager
 
@@ -98,6 +98,11 @@ with usage left. So:
   task; keep the \`role\` so the worker still gets its instructions.
 - Never change a running worker's model (it throws away its prompt cache): a follow-up that needs a
   different model or vendor gets a new worker.
+- If you (the PM orchestrator) are running on a standard Gemini model (such as \`gemini-4-neon\`,
+  \`gemini-4-carbon\`, \`gemini-4-argon\`, or \`gemini-4-hydrogen\`) and an Orchestrator variant of
+  that model is available (such as \`gemini-pro-orchestrator-neon\` or \`gemini-pro-orchestrator\`),
+  ask the user once via \`pm_ask\` if they want to switch this PM thread to the Orchestrator variant
+  of that model instead.
 
 ## Scheduled workers
 
