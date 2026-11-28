@@ -269,6 +269,62 @@ export function useComposerMenuItems({
           label: "/swarm",
           description: gt("Coordinate parallel worker agents on a shared Swarm board"),
         },
+        {
+          id: "slash:scorched-earth",
+          type: "slash-command",
+          command: "scorched-earth",
+          label: "/scorched-earth",
+          description: gt("Exhaustive playtesting, surface inventory, and auto-fix loop"),
+        },
+        {
+          id: "slash:smart",
+          type: "slash-command",
+          command: "smart",
+          label: "/smart",
+          description: gt("Auto-attach skills and ask before high-stakes Swarm or Scorched Earth"),
+        },
+        {
+          id: "slash:plan",
+          type: "slash-command",
+          command: "plan",
+          label: "/plan",
+          description: gt("Research first and draft a step-by-step plan before editing"),
+        },
+        {
+          id: "slash:goal",
+          type: "slash-command",
+          command: "goal",
+          label: "/goal",
+          description: gt("Autonomous loop that keeps verifying until the goal is achieved"),
+        },
+        {
+          id: "slash:boost",
+          type: "slash-command",
+          command: "boost",
+          label: "/boost",
+          description: gt("Deep reasoning, multi-perspective planning, and rigorous checks"),
+        },
+        {
+          id: "slash:grill-me",
+          type: "slash-command",
+          command: "grill-me",
+          label: "/grill-me",
+          description: gt("Interactive interview to resolve requirements and design choices"),
+        },
+        {
+          id: "slash:teamwork",
+          type: "slash-command",
+          command: "teamwork",
+          label: "/teamwork",
+          description: gt("Split a large project across a team of parallel agents"),
+        },
+        {
+          id: "slash:learn",
+          type: "slash-command",
+          command: "learn",
+          label: "/learn",
+          description: gt("Save a correction, setup, or workflow as a persistent skill"),
+        },
         ...(sideChatAvailable
           ? ([
               {

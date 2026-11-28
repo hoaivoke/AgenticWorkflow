@@ -15,6 +15,14 @@ import {
 // A first word with a second slash is a path, not a command.
 const SLASH_COMMAND = /^\s*\/[^\s/]+(?:\s|$)/u;
 const SWARM_COMMAND = /^\s*\/swarm(?:\s+([\s\S]*))?$/iu;
+const SCORCHED_EARTH_COMMAND = /^\s*\/scorched-earth(?:\s+([\s\S]*))?$/iu;
+const PLAN_COMMAND = /^\s*\/plan(?:\s+([\s\S]*))?$/iu;
+const BOOST_COMMAND = /^\s*\/boost(?:\s+([\s\S]*))?$/iu;
+const GRILL_ME_COMMAND = /^\s*\/grill-me(?:\s+([\s\S]*))?$/iu;
+const TEAMWORK_COMMAND = /^\s*\/teamwork(?:\s+([\s\S]*))?$/iu;
+const LEARN_COMMAND = /^\s*\/learn(?:\s+([\s\S]*))?$/iu;
+const SMART_COMMAND = /^\s*\/smart(?:\s+([\s\S]*))?$/iu;
+const SMART_SKILLS_FLAG = /^--skills=([a-z0-9_,.-]+)(?:\s+([\s\S]*))?$/iu;
 const SWARM_PIPELINE_FLAG = /^--pipeline(?:=|\s+)([a-z0-9][a-z0-9_-]*)(?:\s+([\s\S]*))?$/iu;
 // `/swarm --scorched-earth [goal]` is shorthand for `/swarm --pipeline scorched-earth [goal]`.
 const SWARM_SCORCHED_EARTH_FLAG = /^--scorched-earth(?:\s+([\s\S]*))?$/iu;
@@ -85,6 +93,114 @@ export function expandSwarmCommandText(text: string): string | null {
   ].join("\n");
 }
 
+/**
+ * Expands Agent Space workflow slash commands (`/swarm`, `/scorched-earth`, `/plan`, `/goal`,
+ * `/boost`, `/grill-me`, `/teamwork`, `/learn`, `/smart`) into structured briefs that work across
+ * every provider (Claude, Codex, Gemini, Antigravity).
+ */
+export function expandAgentSpaceCommandText(
+  text: string,
+  options?: { readonly capabilitiesMarkdown?: string },
+): string | null {
+  const trimmed = text.trim();
+  const swarmExpanded = expandSwarmCommandText(trimmed);
+  if (swarmExpanded !== null) return swarmExpanded;
+
+  const scorchedMatch = SCORCHED_EARTH_COMMAND.exec(trimmed);
+  if (scorchedMatch) {
+    const rest = (scorchedMatch[1] ?? "").trim();
+    return expandSwarmCommandText(
+      rest.length > 0 ? `/swarm --scorched-earth ${rest}` : "/swarm --scorched-earth",
+    );
+  }
+
+  const teamworkMatch = TEAMWORK_COMMAND.exec(trimmed);
+  if (teamworkMatch) {
+    const rest = (teamworkMatch[1] ?? "").trim();
+    return expandSwarmCommandText(rest.length > 0 ? `/swarm ${rest}` : "/swarm");
+  }
+
+  const planMatch = PLAN_COMMAND.exec(trimmed);
+  if (planMatch) {
+    const goal = (planMatch[1] ?? "").trim();
+    return [
+      "[Plan Mode]",
+      "Do NOT edit code yet. First inspect the relevant files, architecture, and constraints, then present a concise, step-by-step implementation plan covering affected surfaces, risks, and verification steps. Wait for user confirmation before making edits.",
+      "",
+      "User request:",
+      goal.length > 0 ? goal : "Inspect the current task and propose a step-by-step plan.",
+    ].join("\n");
+  }
+
+  const boostMatch = BOOST_COMMAND.exec(trimmed);
+  if (boostMatch) {
+    const goal = (boostMatch[1] ?? "").trim();
+    return [
+      "[Boost Mode]",
+      "Apply maximum rigor: think through architecture from multiple angles, challenge your own assumptions, identify edge cases and failure modes upfront, and verify every change thoroughly before finishing.",
+      "",
+      "User request:",
+      goal.length > 0
+        ? goal
+        : "Analyze and execute this task with deep reasoning and verification.",
+    ].join("\n");
+  }
+
+  const grillMatch = GRILL_ME_COMMAND.exec(trimmed);
+  if (grillMatch) {
+    const topic = (grillMatch[1] ?? "").trim();
+    return [
+      "[Grill Me Mode]",
+      "Do NOT implement yet. Interview the user with focused, high-leverage questions (using `pm_ask` when available) to resolve ambiguities, hidden assumptions, edge cases, and design trade-offs. Ask 2-4 crisp questions at a time until the specification is airtight.",
+      "",
+      "Topic:",
+      topic.length > 0 ? topic : "Interview me to clarify requirements and design decisions.",
+    ].join("\n");
+  }
+
+  const learnMatch = LEARN_COMMAND.exec(trimmed);
+  if (learnMatch) {
+    const lesson = (learnMatch[1] ?? "").trim();
+    return [
+      "[Learn Mode]",
+      "Distill the user's correction, preference, or reusable workflow into a concise persistent rule or skill (e.g. under `.agents/skills/` or project rules) so future sessions follow it automatically. Summarize what you saved and where.",
+      "",
+      "What to persist:",
+      lesson.length > 0 ? lesson : "Capture the key lesson from this session for future reuse.",
+    ].join("\n");
+  }
+
+  const smartMatch = SMART_COMMAND.exec(trimmed);
+  if (smartMatch) {
+    const rawArgs = (smartMatch[1] ?? "").trim();
+    const skillsFlagMatch = SMART_SKILLS_FLAG.exec(rawArgs);
+    const attachedSkills = skillsFlagMatch
+      ? (skillsFlagMatch[1] ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    const goal = skillsFlagMatch ? (skillsFlagMatch[2] ?? "").trim() : rawArgs;
+    return [
+      "[Smart Mode Router Brief]",
+      "Smart Mode is active. Review the Agent Space Capabilities Manifest below to pick the best tools, skills, and execution mode for the user's request:",
+      "- If any listed skills match the task (including attached skills below), read their `SKILL.md` instructions before acting.",
+      "- If the request is high-stakes ('make no mistake', 'zero bugs', production-critical, or multi-component) and the user has not already approved extra token spend, ask the user (via `pm_ask` or a concise confirmation) whether they want to spend extra tokens on **Scorched Earth** verification or **Swarm Mode** before launching workers.",
+      ...(attachedSkills.length > 0
+        ? [
+            `- Pre-matched skills for this request: ${attachedSkills.map((s) => `\`${s}\``).join(", ")}`,
+          ]
+        : []),
+      ...(options?.capabilitiesMarkdown ? ["", "---", options.capabilitiesMarkdown, "---"] : []),
+      "",
+      "User request:",
+      goal.length > 0 ? goal : "Analyze my request, attach the right skills, and proceed.",
+    ].join("\n");
+  }
+
+  return null;
+}
+
 /** Providers only run a native command that opens the prompt, so its turn defers inline context to the next one. */
 export const isSlashCommandMessage = (message: {
   readonly role: string;
@@ -92,7 +208,7 @@ export const isSlashCommandMessage = (message: {
 }): boolean =>
   message.role === "user" &&
   SLASH_COMMAND.test(message.text) &&
-  expandSwarmCommandText(message.text) === null;
+  expandAgentSpaceCommandText(message.text) === null;
 
 /** The provider prompt for a turn that carries inline context ahead of the user's text. */
 export const withInlineContext = (context: string, userText: string): string =>

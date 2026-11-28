@@ -5,6 +5,12 @@ export * from "./render.ts";
 export { BUILTIN_PIPELINES } from "./builtin/pipelines.ts";
 export { BUILTIN_ROLES } from "./builtin/roles.ts";
 export {
+  AGENT_SPACE_SLASH_COMMANDS,
+  AGENT_SPACE_TOOL_CATALOG,
+  renderCapabilitiesManifestMarkdown,
+  type ManifestSkillSummary,
+} from "./builtin/capabilitiesManifest.ts";
+export {
   BUILTIN_SKILLS,
   detectModelFamily,
   findGeminiOrchestratorUpgrade,

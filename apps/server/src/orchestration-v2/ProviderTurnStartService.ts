@@ -70,10 +70,12 @@ import {
 } from "@t3tools/provider-core/server/handoffBudget";
 import {
   deliverContextHandoffs,
-  expandSwarmCommandText,
+  expandAgentSpaceCommandText,
   isSlashCommandMessage,
   withInlineContext,
 } from "./ContextHandoffDelivery.ts";
+import { renderCapabilitiesManifestMarkdown } from "@t3tools/pipelines";
+import { discoverAvailableSkills } from "../pipelines/HarnessResolver.ts";
 import { isProviderCommand, outputInstructions } from "./runOutput.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -1330,7 +1332,23 @@ export const layer: Layer.Layer<
         text: providerMessage.text,
         records: providerMessage.context?.records ?? [],
       });
-      const expandedPrompt = expandSwarmCommandText(projectedPrompt) ?? projectedPrompt;
+      const isSmartPrompt = /^\s*\/smart(?:\s|$)/iu.test(projectedPrompt);
+      const capabilitiesMarkdown = isSmartPrompt
+        ? renderCapabilitiesManifestMarkdown({
+            discoveredSkills: yield* discoverAvailableSkills(
+              projection.thread.worktreePath ?? null,
+            ).pipe(
+              Effect.provideService(FileSystem.FileSystem, fileSystem),
+              Effect.provideService(Path.Path, path),
+              Effect.orElseSucceed(() => []),
+            ),
+          })
+        : undefined;
+      const expandedPrompt =
+        expandAgentSpaceCommandText(
+          projectedPrompt,
+          capabilitiesMarkdown ? { capabilitiesMarkdown } : undefined,
+        ) ?? projectedPrompt;
       const messageText = withMessageSenderNote(providerMessage, expandedPrompt);
       const slashCommand = isSlashCommandMessage(providerMessage);
       const goalDriver =

@@ -318,6 +318,14 @@ import {
 } from "./preparingComposerImages";
 import { HELD_COMPOSER_SEND_BANNER_ID } from "./ComposerHeldSendBanner";
 import { ComposerControlsBar } from "./ComposerControlsBar";
+import { ComposerModeMenu } from "../../pm/ComposerModeMenu"; // pipelines:
+import { SmartModeConfirmBanner } from "../../pm/ComposerSmartModeButton"; // pipelines:
+import {
+  analyzePromptForSmartMode,
+  buildSmartRoutedPrompt,
+  type SmartModeAnalysis,
+  type SmartRecommendedMode,
+} from "../../pm/smartMode"; // pipelines:
 import { composerCommandKeyHandler } from "./composerCommandKey";
 import { promptSuggestionToAccept, usePromptSuggestion } from "./usePromptSuggestion";
 import { useFreshSessionArmed } from "./freshSessionArms";
@@ -2166,10 +2174,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (applied) setComposerHighlightedItemId(null);
         return;
       }
-      if (item.command === "swarm") {
-        const applied = applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "/swarm ", {
-          expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
-        });
+      if (
+        item.command === "swarm" ||
+        item.command === "scorched-earth" ||
+        item.command === "plan" ||
+        item.command === "goal" ||
+        item.command === "boost" ||
+        item.command === "grill-me" ||
+        item.command === "teamwork" ||
+        item.command === "learn" ||
+        item.command === "smart"
+      ) {
+        const applied = applyPromptReplacement(
+          trigger.rangeStart,
+          trigger.rangeEnd,
+          `/${item.command} `,
+          {
+            expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
+          },
+        );
         if (applied) setComposerHighlightedItemId(null);
         return;
       }
@@ -2347,18 +2370,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return hasMessageToSend;
   };
 
+  const [smartModeEnabled, setSmartModeEnabled] = useState(false);
+  const [smartModePending, setSmartModePending] = useState<{
+    readonly analysis: SmartModeAnalysis;
+    readonly prompt: string;
+    readonly dispatchMode: ComposerDispatchMode | undefined;
+    readonly submissionIntent: ComposerSubmissionIntent | undefined;
+  } | null>(null);
   const submitComposerRef = useRef<
     (
       dispatchMode?: ComposerDispatchMode,
       submissionIntent?: ComposerSubmissionIntent,
-      options?: { readonly afterDictation?: boolean },
+      options?: { readonly afterDictation?: boolean; readonly skipSmartMode?: boolean },
     ) => void
   >(() => {});
   const submitComposer = (
     event?: { preventDefault: () => void },
     dispatchMode?: ComposerDispatchMode,
     submissionIntent?: ComposerSubmissionIntent,
-    options?: { readonly afterDictation?: boolean },
+    options?: { readonly afterDictation?: boolean; readonly skipSmartMode?: boolean },
   ) => {
     if (voiceInputActive && !options?.afterDictation) {
       event?.preventDefault();
@@ -2458,6 +2488,31 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (isSendBusy || environmentUnavailable !== null) return false;
       onResume();
       return true;
+    }
+    if (smartModeEnabled && !options?.skipSmartMode) {
+      const analysis = analyzePromptForSmartMode(
+        promptRef.current,
+        selectedProviderSkills.map((skill) => skill.name),
+      );
+      if (analysis.needsExtraTokensPrompt) {
+        event?.preventDefault();
+        setSmartModePending({
+          analysis,
+          prompt: promptRef.current,
+          dispatchMode,
+          submissionIntent,
+        });
+        return false;
+      }
+      if (analysis.shouldIntercept) {
+        const routed = buildSmartRoutedPrompt(
+          promptRef.current,
+          "standard",
+          analysis.matchedSkills,
+        );
+        promptRef.current = routed;
+        editPromptFromTraitsStable(() => routed);
+      }
     }
     const submission = submitComposerDraft({
       prompt: promptRef.current,
@@ -2793,6 +2848,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onModelPickerOpenChange={setIsComposerModelPickerOpen}
         modelPickerIconClassName={composerProviderState.modelPickerIconClassName}
         getModelDisabledReason={getModelDisabledReason}
+        smartModeEnabled={smartModeEnabled}
+        onToggleSmartMode={() => {
+          setSmartModeEnabled((prev) => !prev);
+          setSmartModePending(null);
+        }}
       />
     </RuntimeModeLimitsTargetContext>
   );
@@ -4130,6 +4190,27 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </div>
             ) : null}
 
+            {smartModePending ? (
+              <SmartModeConfirmBanner
+                analysis={smartModePending.analysis}
+                onCancel={() => setSmartModePending(null)}
+                onChoose={(mode: SmartRecommendedMode) => {
+                  const pending = smartModePending;
+                  setSmartModePending(null);
+                  const routed = buildSmartRoutedPrompt(
+                    pending.prompt,
+                    mode,
+                    pending.analysis.matchedSkills,
+                  );
+                  promptRef.current = routed;
+                  editPromptFromTraitsStable(() => routed);
+                  submitComposerRef.current(pending.dispatchMode, pending.submissionIntent, {
+                    skipSmartMode: true,
+                  });
+                }}
+              />
+            ) : null}
+
             {isComposerCollapsedMobile && speechInput.state.phase === "idle" ? null : (
               <div
                 data-chat-composer-footer="true"
@@ -4141,8 +4222,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     "hidden sm:flex",
                 )}
               >
-                {composerAttachButton && !dictationTakesFooter ? (
-                  <div className="me-2">{composerAttachButton}</div>
+                {!dictationTakesFooter ? (
+                  <div className="me-2 flex items-center gap-0.5">
+                    {composerAttachButton}
+                    <ComposerModeMenu
+                      prompt={prompt}
+                      disabled={isSendBusy}
+                      onPromptEdit={editPromptFromTraitsStable}
+                    />
+                  </div>
                 ) : null}
                 <div
                   data-chat-composer-actions="right"

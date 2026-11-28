@@ -12,7 +12,22 @@ type SlashSearchItem = Extract<
   { type: "slash-command" | "provider-slash-command" | "skill" }
 >;
 
-/** Provider commands, `/side`, `/btw`, `/clear` and `/swarm` work only at the message start. */
+const PROMPT_START_ONLY_SLASH_COMMANDS = new Set([
+  "side",
+  "btw",
+  "clear",
+  "swarm",
+  "scorched-earth",
+  "plan",
+  "goal",
+  "boost",
+  "grill-me",
+  "teamwork",
+  "learn",
+  "smart",
+]);
+
+/** Provider commands and workflow mode slash commands work only at the message start. */
 export function slashCommandItemsForPromptPosition(
   items: ReadonlyArray<SlashSearchItem>,
   isAtPromptStart: boolean,
@@ -23,11 +38,7 @@ export function slashCommandItemsForPromptPosition(
   return items.filter(
     (item) =>
       item.type === "skill" ||
-      (item.type === "slash-command" &&
-        item.command !== "side" &&
-        item.command !== "btw" &&
-        item.command !== "clear" &&
-        item.command !== "swarm"),
+      (item.type === "slash-command" && !PROMPT_START_ONLY_SLASH_COMMANDS.has(item.command)),
   );
 }
 

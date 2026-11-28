@@ -26,7 +26,20 @@ import {
 } from "./keybindings";
 
 export type ComposerTriggerKind = "path" | "pull-request" | "slash-command" | "skill";
-export type ComposerSlashCommand = "model" | "side" | "btw" | "clear" | "swarm";
+export type ComposerSlashCommand =
+  | "model"
+  | "side"
+  | "btw"
+  | "clear"
+  | "swarm"
+  | "scorched-earth"
+  | "plan"
+  | "goal"
+  | "boost"
+  | "grill-me"
+  | "teamwork"
+  | "learn"
+  | "smart";
 export type ComposerSubmissionIntent = "foreground" | "background" | "alternate";
 
 export interface ComposerTrigger {

@@ -61,6 +61,7 @@ const collectSkillRoots = Effect.fn("HarnessResolver.collectSkillRoots")(functio
   }
   roots.push(
     { dir: path.join(homeDir, ".gemini", "antigravity", "skills"), scope: "user" },
+    { dir: path.join(homeDir, ".gemini", "antigravity", "builtin", "skills"), scope: "plugin" },
     { dir: path.join(homeDir, ".gemini", "antigravity-cli", "skills"), scope: "user" },
     { dir: path.join(homeDir, ".gemini", "config", "skills"), scope: "user" },
     { dir: path.join(homeDir, ".gemini", "skills"), scope: "user" },

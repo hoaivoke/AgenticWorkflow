@@ -21,6 +21,7 @@ import {
   type ServerProvider,
 } from "@t3tools/contracts";
 import { ComposerHarnessPicker } from "../../pm/ComposerHarnessPicker"; // pipelines:
+import { ComposerSmartModeButton } from "../../pm/ComposerSmartModeButton"; // pipelines:
 import type { EffortDisplay } from "@t3tools/contracts/settings";
 import { cn } from "~/lib/utils";
 import { resolveComposerTraitsInput } from "./composerProviderState";
@@ -90,6 +91,8 @@ export function ComposerControlsBar(props: {
   onModelPickerOpenChange: (open: boolean) => void;
   modelPickerIconClassName: string | undefined;
   getModelDisabledReason: ChatComposerProps["getModelDisabledReason"];
+  smartModeEnabled?: boolean;
+  onToggleSmartMode?: () => void;
 }) {
   const {
     environmentId,
@@ -274,6 +277,14 @@ export function ComposerControlsBar(props: {
           environmentId={environmentId}
           projectId={props.projectId}
           threadId={routeThreadRef?.threadId ?? null}
+          size={controlSize}
+          disabled={isSendBusy}
+        />
+      ) : null}
+      {!composerControlsHidden && props.onToggleSmartMode ? (
+        <ComposerSmartModeButton
+          enabled={props.smartModeEnabled ?? false}
+          onToggle={props.onToggleSmartMode}
           size={controlSize}
           disabled={isSendBusy}
         />
