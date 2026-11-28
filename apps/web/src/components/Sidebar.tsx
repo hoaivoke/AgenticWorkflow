@@ -3692,6 +3692,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           );
                           for (const thread of folder.threads) {
                             items.push(renderThreadRow(thread, "active", folderRow));
+                            items.push(Pm.pmWorkerRows(thread)); // t3code-pm:
                           }
                           if (showMore || folder.canShowLess) {
                             items.push(
@@ -3721,7 +3722,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 </button>
                               </li>,
                             );
-                            items.push(Pm.pmWorkerRows(thread)); // t3code-pm:
                           }
                         }
                         continue;

@@ -1,4 +1,5 @@
 // pipelines: live sync over a real Claude Code transcript file, a real event sink and projections.
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import {
@@ -42,7 +43,7 @@ const createdAt = "2026-11-25T07:00:00.000Z";
 
 const stores = Layer.mergeAll(
   EventStore.layer,
-  ProjectionStore.layer,
+  ProjectionStore.layer.pipe(Layer.provide(NodeCrypto.layerDigest)),
   TurnItemPositionStore.layer,
 ).pipe(Layer.provideMerge(SqlitePersistence.layerMemory));
 const persistence = Layer.mergeAll(
