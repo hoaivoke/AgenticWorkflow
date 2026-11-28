@@ -14,6 +14,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 
+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as PipelineService from "./PipelineService.ts";
@@ -76,7 +77,104 @@ describe("ThreadHarnessService", () => {
       skills: ["ui-polish"],
       contextFiles: ["CLAUDE.md"],
     });
+
+    // Skill Database slugs named in commands/tool inputs count as usage; look-alikes do not.
+    const slugItem: OrchestrationV2TurnItem = {
+      ...baseTurnItem,
+      type: "dynamic_tool",
+      toolName: "activate_skill",
+      input: { skill: "TDD-Verification", note: "skip a11y-debugging-extra and team-rust-safety" },
+    };
+    expect(
+      ThreadHarnessService.extractProvenanceFromTurnItem(slugItem, "/repo", [
+        "tdd-verification",
+        "a11y-debugging",
+        "rust-safety",
+        "docs",
+      ]).skills,
+    ).toEqual(["tdd-verification"]);
+    const builtinCmd: OrchestrationV2TurnItem = {
+      ...baseTurnItem,
+      type: "command_execution",
+      input: "agy skills run gemini-frontend-design --docs",
+      exitCode: 0,
+    };
+    expect(ThreadHarnessService.extractProvenanceFromTurnItem(builtinCmd, "/repo").skills).toEqual([
+      "gemini-frontend-design",
+    ]);
   });
+
+  it.effect("resolves model family, required and missing skills from the thread's model", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const workspace = yield* fs.makeTempDirectoryScoped({ prefix: "agent-space-family-" });
+      const projectId = ProjectId.make("project-family");
+      const threadId = ThreadId.make("thread-family");
+
+      const projectLayer = Layer.mock(ProjectService.ProjectService)({
+        getById: () => Effect.succeedSome({ id: projectId, workspaceRoot: workspace } as never),
+      });
+      const projectionLayer = Layer.mock(ProjectionStore.ProjectionStoreV2)({
+        getThreadShell: () =>
+          Effect.succeed({
+            id: threadId,
+            projectId,
+            modelSelection: { instanceId: "antigravity", model: "gemini-4-neon" },
+          } as never),
+      });
+      const serviceLayer = ThreadHarnessService.layerWithoutProjectionStore.pipe(
+        Layer.provide(ThreadHarnessStore.layer),
+        Layer.provide(projectionLayer),
+        Layer.provideMerge(PipelineService.layer.pipe(Layer.provide(projectLayer))),
+        Layer.provide(SqlitePersistence.layerMemory),
+      );
+
+      yield* Effect.gen(function* () {
+        const harness = yield* ThreadHarnessService.ThreadHarnessService;
+        yield* harness.setHarness({ threadId, roleName: "ui-builder" });
+
+        const initial = yield* harness.getState(threadId);
+        expect(initial.modelFamily).toBe("gemini");
+        expect(initial.requiredSkills?.slice(0, 2)).toEqual([
+          "modern-web-guidance",
+          "a11y-debugging",
+        ]);
+        expect(initial.requiredSkills).toContain("gemini-frontend-design");
+        expect(initial.missingSkills).toEqual(initial.requiredSkills);
+
+        const recorded = yield* harness.recordTurnItem({
+          threadId,
+          workspaceRoot: workspace,
+          item: {
+            ...baseTurnItem,
+            threadId,
+            type: "command_execution",
+            input: "agy skills run gemini-frontend-design",
+            exitCode: 0,
+          },
+        });
+        expect(recorded).toBe(true);
+
+        const after = yield* harness.getState(threadId);
+        expect(after.trackedSkills).toEqual(["gemini-frontend-design"]);
+        expect(after.missingSkills).not.toContain("gemini-frontend-design");
+        expect(after.missingSkills).toHaveLength(after.requiredSkills!.length - 1);
+
+        const turn = yield* harness.prepareTurnContext({
+          threadId,
+          projectId,
+          providerThreadId: "pt-gemini",
+          isNewNativeSession: true,
+        });
+        expect(turn).not.toBeNull();
+        expect(turn!.context).toContain("gemini harness)");
+        expect(turn!.context).toContain("Required skills for this role: modern-web-guidance");
+        expect(turn!.context).toContain("Model-family guidance (gemini):");
+        expect(turn!.context).toContain("Skills used in this thread: gemini-frontend-design");
+        expect(turn!.context).toContain("Required skills not yet used: modern-web-guidance");
+      }).pipe(Effect.provide(serviceLayer));
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
 
   it.effect("carries selected role harness and live tracked skills/context across providers", () =>
     Effect.gen(function* () {

@@ -1,7 +1,13 @@
 // pipelines: resolve per-role skills and repository context files into bounded harness packets.
 import * as NodeOS from "node:os";
 
-import { type ResolvedRoleHarness, type Role } from "@t3tools/pipelines";
+import {
+  matchSkillsForRole,
+  type ModelFamily,
+  type ResolvedRoleHarness,
+  type Role,
+  type SkillEntry,
+} from "@t3tools/pipelines";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -114,6 +120,8 @@ export const resolveHarnessInputs = Effect.fn("HarnessResolver.resolveHarnessInp
     readonly skillRequests: ReadonlyArray<string>;
     readonly contextRequests: ReadonlyArray<string>;
     readonly workspaceRoot: string | null;
+    readonly skillCatalog?: ReadonlyMap<string, SkillEntry> | undefined;
+    readonly modelFamily?: ModelFamily | null | undefined;
   }): Effect.fn.Return<ResolvedRoleHarness, never, FileSystem.FileSystem | Path.Path> {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -175,19 +183,33 @@ export const resolveHarnessInputs = Effect.fn("HarnessResolver.resolveHarnessInp
           }
         }
       }
+      let resolvedContent: string | null = null;
       for (const candidate of candidates) {
         const raw = yield* fs.readFileString(candidate).pipe(Effect.orElseSucceed(() => null));
         if (raw === null) continue;
         const cleaned = stripYamlFrontmatter(raw);
         if (!cleaned) continue;
-        const sliced = truncateUtf8(cleaned, Math.min(MAX_SKILL_BYTES, budget));
-        budget -= sliced.length;
-        skillContents.push({ name: skillName, content: sliced });
+        resolvedContent = cleaned;
         break;
       }
+      const catalogEntry = input.skillCatalog?.get(skillName) ?? null;
+      if (resolvedContent === null && catalogEntry !== null) {
+        resolvedContent = catalogEntry.instructions;
+      }
+      if (resolvedContent === null) continue;
+      const familyNote =
+        input.modelFamily && catalogEntry?.familyGuidance?.[input.modelFamily]
+          ? `\n\nModel-family guidance (${input.modelFamily}): ${catalogEntry.familyGuidance[input.modelFamily]}`
+          : "";
+      const combined = `${resolvedContent}${familyNote}`;
+      const sliced = truncateUtf8(combined, Math.min(MAX_SKILL_BYTES, budget));
+      budget -= sliced.length;
+      skillContents.push({ name: skillName, content: sliced });
     }
 
     return {
+      ...(input.modelFamily ? { modelFamily: input.modelFamily } : {}),
+      ...(skillRequests.length === 0 ? {} : { matchedSkills: skillRequests }),
       ...(contextContents.length === 0 ? {} : { contextFiles: contextContents }),
       ...(skillContents.length === 0 ? {} : { skills: skillContents }),
     };
@@ -198,11 +220,23 @@ export const resolveRoleHarness = Effect.fn("HarnessResolver.resolveRoleHarness"
   function* (input: {
     readonly role: Role;
     readonly workspaceRoot: string | null;
+    readonly skillCatalog?: ReadonlyMap<string, SkillEntry> | undefined;
+    readonly modelFamily?: ModelFamily | null | undefined;
   }): Effect.fn.Return<ResolvedRoleHarness, never, FileSystem.FileSystem | Path.Path> {
+    const matched =
+      input.skillCatalog !== undefined
+        ? matchSkillsForRole({
+            config: { skills: input.skillCatalog },
+            role: input.role,
+            modelFamily: input.modelFamily,
+          }).map((entry) => entry.name)
+        : (input.role.skills ?? []);
     return yield* resolveHarnessInputs({
-      skillRequests: input.role.skills ?? [],
+      skillRequests: matched,
       contextRequests: input.role.contextFiles ?? [],
       workspaceRoot: input.workspaceRoot,
+      skillCatalog: input.skillCatalog,
+      modelFamily: input.modelFamily,
     });
   },
 );

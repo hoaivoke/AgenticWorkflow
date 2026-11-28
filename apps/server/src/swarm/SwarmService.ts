@@ -20,12 +20,20 @@ import {
   type RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
-import { renderRoleBrief, resolveRole } from "@t3tools/pipelines";
+import {
+  detectModelFamily,
+  matchSkillsForRole,
+  renderPipeline,
+  renderRoleBrief,
+  resolveRole,
+  type ModelFamily,
+} from "@t3tools/pipelines";
 
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ThreadLaunch from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import { PipelineService } from "../pipelines/PipelineService.ts";
+import * as Scheduler from "../scheduling/Scheduler.ts";
 import { forkParked } from "../serverActivation.ts";
 import {
   SwarmStore,
@@ -40,6 +48,8 @@ const WORKER_NAME_RE = /^(?!all$|coordinator$|coordinator-)[a-z0-9][a-z0-9_-]{0,
 const CHANNEL_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,23}$/;
 const RUNNING_STATUSES = new Set(["preparing", "queued", "starting", "running"]);
 const STOPPED_STATUSES = new Set(["interrupted", "failed", "cancelled"]);
+const SWARM_STALL_AFTER_MS = 8 * 60_000;
+const FORK_CONTEXT_CHAR_LIMIT = 6_000;
 
 const decodeModelSelection = Schema.decodeUnknownSync(ModelSelection);
 const invalid = (message: string) => new PmError({ code: "invalid_request", message });
@@ -58,9 +68,21 @@ export interface SwarmBoardSnapshot {
 }
 
 export interface SwarmManageInput {
-  readonly action: "status" | "models" | "add" | "kill" | "title" | "channel" | "done";
+  readonly action:
+    | "status"
+    | "models"
+    | "pipeline"
+    | "model"
+    | "add"
+    | "kill"
+    | "title"
+    | "channel"
+    | "done";
   readonly title?: string | undefined;
+  readonly pipeline?: string | undefined;
+  readonly goal?: string | undefined;
   readonly name?: string | undefined;
+  readonly fork?: string | undefined;
   readonly brief?: string | undefined;
   readonly role?: string | undefined;
   readonly workspace?: "inherit" | "worktree" | undefined;
@@ -72,6 +94,15 @@ export interface SwarmManageInput {
   readonly tasks?: ReadonlyArray<string> | undefined;
   readonly modelSelection?: ModelSelection | undefined;
   readonly escalate?: number | undefined;
+}
+
+const BIG_THREE_FAMILIES: ReadonlyArray<ModelFamily> = ["claude", "codex", "gemini"];
+
+function extractBoundPipeline(channels: ReadonlyArray<SwarmChannelRow>): string | null {
+  const main = channels.find((c) => c.name === "main");
+  if (!main) return null;
+  const match = /^pipeline:([a-z0-9][a-z0-9_-]*)/i.exec(main.topic.trim());
+  return match?.[1] ?? null;
 }
 
 function parseMentions(text: string): ReadonlyArray<string> {
@@ -417,6 +448,7 @@ const make = Effect.gen(function* () {
       const members = yield* store.listMembers(swarm.swarmId);
       const channels = yield* store.listChannels(swarm.swarmId);
       const headSeq = Math.max(0, swarm.nextSeq - 1);
+      const boundPipeline = extractBoundPipeline(channels);
       const memberLines =
         members.length === 0
           ? ["(no workers added yet)"]
@@ -430,10 +462,207 @@ const make = Effect.gen(function* () {
       return {
         result: [
           `Swarm: ${swarm.title || swarm.swarmId} (${swarm.status}, head #${headSeq})`,
+          ...(boundPipeline ? [`Pipeline: ${boundPipeline}`] : []),
           `Channels: ${channelLines.join(", ")}`,
           "Members:",
           ...memberLines,
         ].join("\n"),
+      };
+    }
+
+    if (input.action === "pipeline") {
+      if (memberName !== "coordinator") {
+        return yield* invalid("Only the swarm coordinator can bind a pipeline.");
+      }
+      const { config, problems } = yield* pipelines.configFor(swarm.projectId);
+      const pipelineName = input.pipeline?.trim() ?? "";
+      if (!pipelineName) {
+        return yield* invalid(
+          `Pass \`pipeline\` when calling action \`pipeline\`. Available: ${[...config.pipelines.keys()].join(", ")}.`,
+        );
+      }
+      const pipeline = config.pipelines.get(pipelineName);
+      if (pipeline === undefined) {
+        return yield* notFound(
+          `Unknown pipeline "${pipelineName}". Available: ${[...config.pipelines.keys()].join(", ")}.`,
+        );
+      }
+      const goalText = input.goal?.trim() ?? "";
+      const at = yield* nowIso;
+      if (!swarm.title.trim() || swarm.title.trim() === "Swarm") {
+        const nextTitle = goalText
+          ? `${pipeline.name}: ${goalText.slice(0, 60)}`
+          : `Pipeline: ${pipeline.name}`;
+        yield* store.setSwarmTitle(swarm.swarmId, nextTitle, at);
+      }
+      yield* store.upsertChannel({
+        swarmId: swarm.swarmId,
+        name: "main",
+        topic: goalText ? `pipeline:${pipeline.name}: ${goalText}` : `pipeline:${pipeline.name}`,
+        archived: false,
+        createdBy: "coordinator",
+        createdAt: at,
+      });
+      const rendered =
+        renderPipeline(config, pipeline.name, problems) ??
+        `Pipeline ${pipeline.name}: ${pipeline.description}`;
+      const boardText = goalText ? `Goal: ${goalText}\n\n${rendered}` : rendered;
+      const post = yield* store.appendPost({
+        swarmId: swarm.swarmId,
+        channel: "main",
+        sender: memberName,
+        text: boardText,
+        mentions: [],
+        at,
+      });
+      const checklistLines = pipeline.stages.map((stage, index) => {
+        const roleName = stage.role ?? "gatekeeper";
+        const role = config.roles.get(roleName);
+        const tier = role?.tier ?? "?";
+        const workspace = stage.workspace ?? "inherit";
+        const attrs = [
+          `role=${roleName}`,
+          `tier=${tier}`,
+          `workspace=${workspace}`,
+          ...(stage.parallel !== undefined ? [`parallel=${stage.parallel}`] : []),
+          ...(stage.differentProviderFrom !== undefined
+            ? [`differentProviderFrom=${stage.differentProviderFrom}`]
+            : []),
+        ];
+        const familySkills =
+          role === undefined
+            ? []
+            : BIG_THREE_FAMILIES.map((family) => {
+                const matched = matchSkillsForRole({ config, role, modelFamily: family }).map(
+                  (s) => s.name,
+                );
+                return `${family}: ${matched.length > 0 ? matched.join(", ") : "none"}`;
+              });
+        return [
+          `${index + 1}. [${stage.id}] ${attrs.join(" | ")}`,
+          `   Goal: ${stage.goal}`,
+          ...(familySkills.length > 0 ? [`   Skills (${familySkills.join("; ")})`] : []),
+        ].join("\n");
+      });
+      yield* changed(swarm.swarmId);
+      return {
+        result: [
+          `Bound pipeline "${pipeline.name}" to swarm (posted blueprint as #${post.seq} in #main).`,
+          "",
+          "Stage checklist:",
+          ...checklistLines,
+          "",
+          rendered,
+        ].join("\n"),
+      };
+    }
+
+    if (input.action === "model") {
+      const targetName = input.name?.trim().toLowerCase() ?? "";
+      if (!targetName) {
+        return yield* invalid("Pass `name` when calling action `model`.");
+      }
+      const target = yield* store.getMember(swarm.swarmId, targetName);
+      if (target === null || target.state === "killed") {
+        return yield* notFound(`No active swarm member @${targetName}.`);
+      }
+      if (
+        memberName !== "coordinator" &&
+        target.addedBy !== memberName &&
+        target.name !== memberName
+      ) {
+        return yield* invalid(
+          `@${memberName} may only switch models for itself or workers it added (@${target.name} was added by @${target.addedBy}).`,
+        );
+      }
+      const targetShell = yield* shellOf(target.threadId);
+      if (targetShell === null) {
+        return yield* notFound(`Thread ${target.threadId} for @${target.name} is gone.`);
+      }
+
+      let nextModelSelection = input.modelSelection;
+      if (nextModelSelection === undefined) {
+        const { config } = yield* pipelines.configFor(swarm.projectId);
+        const roleName =
+          target.role && config.roles.has(target.role)
+            ? target.role
+            : config.roles.has("builder")
+              ? "builder"
+              : [...config.roles.keys()][0];
+        if (!roleName) {
+          return yield* invalid("No pipeline roles available to resolve a failover model.");
+        }
+        const providers = yield* pipelines.providers;
+        const limited = yield* pipelines.limitedProviders;
+        const currentInstanceId = targetShell.modelSelection.instanceId;
+        const currentDriver = providers.find((p) => p.instanceId === currentInstanceId)?.driver;
+        const preferDifferentDriver =
+          input.escalate === undefined &&
+          currentDriver !== undefined &&
+          !limited.has(currentInstanceId);
+        let resolution = resolveRole({
+          config,
+          role: roleName,
+          providers,
+          limited,
+          escalate: input.escalate,
+          ...(preferDifferentDriver ? { avoidDrivers: [currentDriver] } : {}),
+        });
+        if (!resolution.ok && preferDifferentDriver) {
+          resolution = resolveRole({
+            config,
+            role: roleName,
+            providers,
+            limited,
+            escalate: input.escalate,
+          });
+        }
+        if (!resolution.ok) {
+          return yield* new PmError({
+            code: "unavailable",
+            message: `Could not resolve a failover model for @${target.name}: ${resolution.reason}`,
+          });
+        }
+        nextModelSelection = decodeModelSelection({
+          instanceId: ProviderInstanceId.make(resolution.selection.instanceId),
+          model: resolution.selection.model,
+          ...(resolution.selection.options.length === 0
+            ? {}
+            : { options: resolution.selection.options }),
+        });
+      }
+
+      yield* threads
+        .dispatch({
+          type: "thread.model-selection.set",
+          commandId: CommandId.make(`command:swarm-model:${yield* newId}`),
+          threadId: ThreadId.make(target.threadId),
+          modelSelection: nextModelSelection,
+        })
+        .pipe(Effect.mapError(unavailable(`Could not switch model for @${target.name}.`)));
+
+      const nextFamily =
+        detectModelFamily(nextModelSelection.model) ??
+        detectModelFamily(nextModelSelection.instanceId);
+      const at = yield* nowIso;
+      const post = yield* store.appendPost({
+        swarmId: swarm.swarmId,
+        channel: target.primaryChannel,
+        sender: memberName,
+        text: `@${target.name} model switched to ${nextModelSelection.instanceId}/${nextModelSelection.model}${nextFamily ? ` (${nextFamily} family)` : ""}. Continue your current work without restarting.`,
+        mentions: [target.name],
+        at,
+      });
+      const members = yield* store.listMembers(swarm.swarmId);
+      yield* deliverBoardWakeups({
+        swarm,
+        post,
+        members,
+        senderThreadId: callerThreadId,
+      });
+      yield* changed(swarm.swarmId);
+      return {
+        result: `Switched @${target.name} to ${nextModelSelection.instanceId}/${nextModelSelection.model} (post #${post.seq}).`,
       };
     }
 
@@ -574,9 +803,8 @@ const make = Effect.gen(function* () {
           `Unknown role "${input.role}". Available: ${[...config.roles.keys()].join(", ")}.`,
         );
       }
-      const harness = yield* pipelines
-        .resolveHarness(role, root)
-        .pipe(Effect.orElseSucceed(() => undefined));
+      let resolvedRole = role;
+      let resolvedTier: string = role.tier;
       if (routedModel === undefined) {
         const providers = yield* pipelines.providers;
         const limited = yield* pipelines.limitedProviders;
@@ -595,13 +823,20 @@ const make = Effect.gen(function* () {
               ? {}
               : { options: resolution.selection.options }),
           });
-          rolePreamble = renderRoleBrief(resolution.role, resolution.tier, harness);
-        } else {
-          rolePreamble = renderRoleBrief(role, role.tier, harness);
+          resolvedRole = resolution.role;
+          resolvedTier = resolution.tier;
         }
-      } else {
-        rolePreamble = renderRoleBrief(role, role.tier, harness);
       }
+      const effectiveModel = routedModel ?? callerShell.modelSelection;
+      const modelFamily =
+        detectModelFamily(effectiveModel.model) ?? detectModelFamily(effectiveModel.instanceId);
+      const harness = yield* pipelines
+        .resolveHarness(resolvedRole, root, {
+          skillCatalog: config.skills,
+          modelFamily,
+        })
+        .pipe(Effect.orElseSucceed(() => undefined));
+      rolePreamble = renderRoleBrief(resolvedRole, resolvedTier, harness);
     }
 
     const memberChannels =
@@ -634,6 +869,36 @@ const make = Effect.gen(function* () {
       workspaceMode === "worktree"
         ? { type: "worktree", baseRef: callerShell.branch ?? "main" }
         : { type: "root" };
+
+    let forkContextBlock = "";
+    if (input.fork !== undefined) {
+      const forkName = input.fork.trim().replace(/^@/, "").toLowerCase();
+      let sourceThreadId: string | null = null;
+      if (forkName === "coordinator") {
+        sourceThreadId = swarm.coordinatorThreadId;
+      } else {
+        const sourceMember = yield* store.getMember(swarm.swarmId, forkName);
+        if (sourceMember === null) {
+          return yield* notFound(`Cannot fork from unknown swarm member @${forkName}.`);
+        }
+        sourceThreadId = sourceMember.threadId;
+      }
+      const records = yield* threads
+        .getThreadRecords(ThreadId.make(sourceThreadId), ["messages"])
+        .pipe(Effect.orElseSucceed(() => null));
+      const recent = (records?.messages ?? [])
+        .filter((msg) => msg.text.trim().length > 0)
+        .slice(-12)
+        .map((msg) => `[${msg.role}] ${msg.text.trim()}`);
+      if (recent.length > 0) {
+        const joined = recent.join("\n\n");
+        const trimmed =
+          joined.length > FORK_CONTEXT_CHAR_LIMIT
+            ? `…${joined.slice(-FORK_CONTEXT_CHAR_LIMIT)}`
+            : joined;
+        forkContextBlock = `## Forked Context (from @${forkName})\n${trimmed}\n\n`;
+      }
+    }
 
     const spawned: Array<{
       readonly name: string;
@@ -685,7 +950,7 @@ const make = Effect.gen(function* () {
               coordinatorThreadId: swarm.coordinatorThreadId,
               primaryChannel,
               rolePreamble,
-              brief: slice.sliceBrief,
+              brief: `${forkContextBlock}${slice.sliceBrief}`,
             }),
             attachments: [],
           },
@@ -769,6 +1034,81 @@ const make = Effect.gen(function* () {
     }
   });
 
+  const stallNudges = new Set<string>();
+
+  /** Built-in stall monitor: wakes quiet working members or a stalled coordinator after 8 minutes. */
+  const checkStalls = Effect.fn("SwarmService.checkStalls")(function* () {
+    const activeSwarms = yield* store.listActiveSwarms().pipe(Effect.orElseSucceed(() => []));
+    if (activeSwarms.length === 0) return;
+    const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+    const at = DateTime.formatIso(DateTime.makeUnsafe(nowMs));
+
+    for (const swarm of activeSwarms) {
+      const members = yield* store.listMembers(swarm.swarmId).pipe(Effect.orElseSucceed(() => []));
+      const alive = members.filter((m) => m.state !== "killed");
+      if (alive.length === 0) continue;
+
+      const working = alive.filter((m) => m.state === "working");
+      if (working.length > 0) {
+        for (const member of working) {
+          const shell = yield* threads
+            .getThreadShell(ThreadId.make(member.threadId))
+            .pipe(Effect.orElseSucceed(() => null));
+          if (shell === null) continue;
+          const lastActivityMs = Math.max(
+            DateTime.toEpochMillis(shell.updatedAt),
+            shell.activityRunStartedAt ? DateTime.toEpochMillis(shell.activityRunStartedAt) : 0,
+          );
+          if (nowMs - lastActivityMs < SWARM_STALL_AFTER_MS) continue;
+          const streakKey = `${swarm.swarmId}:${member.name}@${lastActivityMs}`;
+          if (stallNudges.has(streakKey)) continue;
+          stallNudges.add(streakKey);
+          const post = yield* store
+            .appendPost({
+              swarmId: swarm.swarmId,
+              channel: "main",
+              sender: "monitor",
+              text: `@${member.name} [stall] No activity for 8+ minutes; report progress, hand off, or call swarm_wait.`,
+              mentions: [member.name],
+              at,
+            })
+            .pipe(Effect.orElseSucceed(() => null));
+          if (post !== null) {
+            yield* deliverBoardWakeups({ swarm, post, members }).pipe(Effect.ignore);
+            yield* changed(swarm.swarmId);
+          }
+        }
+        continue;
+      }
+
+      const posts = yield* store
+        .listPosts({ swarmId: swarm.swarmId, since: Math.max(0, swarm.nextSeq - 2), limit: 5 })
+        .pipe(Effect.orElseSucceed(() => []));
+      const latest = posts.at(-1);
+      if (!latest) continue;
+      if (latest.sender === "monitor" || latest.text.includes("[done]")) continue;
+      const latestMs = Date.parse(latest.createdAt);
+      if (!Number.isFinite(latestMs) || nowMs - latestMs < SWARM_STALL_AFTER_MS) continue;
+      const streakKey = `${swarm.swarmId}:coordinator@${latest.seq}`;
+      if (stallNudges.has(streakKey)) continue;
+      stallNudges.add(streakKey);
+      const post = yield* store
+        .appendPost({
+          swarmId: swarm.swarmId,
+          channel: "main",
+          sender: "monitor",
+          text: `@coordinator [stall] All workers are waiting and no post since #${latest.seq}; assign the next step or mark the swarm done.`,
+          mentions: ["coordinator"],
+          at,
+        })
+        .pipe(Effect.orElseSucceed(() => null));
+      if (post !== null) {
+        yield* deliverBoardWakeups({ swarm, post, members }).pipe(Effect.ignore);
+        yield* changed(swarm.swarmId);
+      }
+    }
+  });
+
   return {
     swarmAction,
     postMessage,
@@ -777,6 +1117,7 @@ const make = Effect.gen(function* () {
     getBoardForThread,
     postFromUser,
     syncMemberOnThreadShell,
+    checkStalls,
     changes: Stream.fromPubSub(changes),
   };
 });
@@ -792,6 +1133,7 @@ export const layerWatcher = Layer.effectDiscard(
     const swarm = yield* SwarmService;
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const threads = yield* ThreadManagement.ThreadManagementService;
+    const scheduler = yield* Scheduler.Scheduler;
     yield* forkParked(
       Stream.runForEach(orchestrator.streamDomainEvents, (event) => {
         if (event.type !== "run.updated") {
@@ -803,5 +1145,6 @@ export const layerWatcher = Layer.effectDiscard(
         );
       }),
     );
+    yield* scheduler.register("swarm-stall-monitor", swarm.checkStalls().pipe(Effect.ignore));
   }),
 );

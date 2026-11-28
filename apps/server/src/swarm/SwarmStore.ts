@@ -127,6 +127,7 @@ export class SwarmStore extends Context.Service<
   SwarmStore,
   {
     readonly getSwarm: (swarmId: string) => Effect.Effect<SwarmRow | null, PmError>;
+    readonly listActiveSwarms: () => Effect.Effect<ReadonlyArray<SwarmRow>, PmError>;
     readonly findSwarmByCoordinator: (threadId: string) => Effect.Effect<SwarmRow | null, PmError>;
     readonly getMemberByThread: (threadId: string) => Effect.Effect<SwarmMemberRow | null, PmError>;
     readonly findSwarmForThread: (threadId: string) => Effect.Effect<
@@ -205,6 +206,13 @@ const make = Effect.gen(function* () {
     wrapSql(
       sql`SELECT * FROM pm_swarms WHERE swarm_id = ${swarmId} LIMIT 1`.pipe(
         Effect.map((rows) => (rows[0] ? toSwarmRow(rows[0] as Row) : null)),
+      ),
+    );
+
+  const listActiveSwarms = () =>
+    wrapSql(
+      sql`SELECT * FROM pm_swarms WHERE status = 'active' ORDER BY updated_at DESC`.pipe(
+        Effect.map((rows) => rows.map((row) => toSwarmRow(row as Row))),
       ),
     );
 
@@ -450,6 +458,7 @@ const make = Effect.gen(function* () {
 
   return {
     getSwarm,
+    listActiveSwarms,
     findSwarmByCoordinator,
     getMemberByThread,
     findSwarmForThread,

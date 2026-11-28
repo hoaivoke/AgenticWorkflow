@@ -66,7 +66,7 @@ export function renderPipeline(
     "Start each stage's workers with pm_worker_start and role set to the stage's role (never pin a single vendor unless the user asked). Tier routing picks from available accounts across vendors (small: haiku/hydrogen/terra; mid: sonnet/sol/neon; frontier: opus/fable/astra/carbon/neon) and skips accounts at their usage limit. Role harnesses (skills, context files, toolkits) load automatically in prompt-cache-stable order; put only the stage goal, artifact paths, and task card in the brief.",
     "If any worker pauses at a usage limit, do not halt the pipeline while another provider has usage: immediately start a fresh worker with the same `role` and brief (plus any partial progress) so tier routing fails over to another provider with usage, then resolve the paused worker.",
     "For deterministic checks and app/website verification stages, call `pm_run_gates` or `pm_verify_app` directly at zero LLM cost before spawning an agent.",
-    `A failed card goes back to its stage with the failure attached. After ${pipeline.escalateAfter ?? 2} failed attempts on one card, start the next attempt with escalate: 1 (one tier up)${pipeline.replanAfter === undefined ? "" : `; after ${pipeline.replanAfter}, send it back to planning`}.`,
+    `A failed card or onFail loop goes back to its stage with the failure attached. After ${pipeline.escalateAfter ?? 2} failed attempts, start the next attempt with escalate: 1 (one tier up)${pipeline.replanAfter === undefined ? "" : `; after ${pipeline.replanAfter} failed cycles, stop looping and ask the user whether to replan, cut scope, or stop. Never start another cycle on your own`}.`,
     "Never let a worker review or QA its own work. Read gates.json, verify-report.md, review.md and validated.json yourself; do not take a worker's word that checks passed.",
     "When a review or failure uncovers a reusable lesson for this repository, call `pm_learning_propose` so the user can promote it into the role's `.pipelines/roles/<role>.yaml` harness for future runs.",
   ];
@@ -145,6 +145,8 @@ export function renderScheduledWorkerPrompt(
 }
 
 export interface ResolvedRoleHarness {
+  readonly modelFamily?: string | null | undefined;
+  readonly matchedSkills?: ReadonlyArray<string> | undefined;
   readonly skills?: ReadonlyArray<{ readonly name: string; readonly content: string }>;
   readonly contextFiles?: ReadonlyArray<{ readonly path: string; readonly content: string }>;
 }
@@ -155,9 +157,19 @@ export function renderRoleBrief(role: Role, tier: string, harness?: ResolvedRole
     role.access === "read-only"
       ? "You are read-only: never edit, create or delete project files, except the run-folder files your role writes."
       : "You may edit files in your workspace.";
-  const lines = [`## Your role: ${role.name} (${tier} tier)`, role.description, access];
+  const familyNote = harness?.modelFamily ? `, ${harness.modelFamily} harness` : "";
+  const lines = [
+    `## Your role: ${role.name} (${tier} tier${familyNote})`,
+    role.description,
+    access,
+  ];
   if (role.toolkits && role.toolkits.length > 0) {
     lines.push(`Recommended toolkits/scope: ${role.toolkits.join(", ")}.`);
+  }
+  if (harness?.matchedSkills && harness.matchedSkills.length > 0) {
+    lines.push(
+      `Required skills for this role: ${harness.matchedSkills.join(", ")}. Apply them and note which skills you used in your report.`,
+    );
   }
   if (role.outputContract) {
     lines.push(`Output contract: ${role.outputContract}`);

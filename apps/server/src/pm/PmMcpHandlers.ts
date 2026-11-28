@@ -293,10 +293,17 @@ export const layer = McpToolAccess.toLayer(PmToolkit, {
       const targetId = thread ? ThreadId.make(thread) : caller.thread.threadId;
       const harness = yield* ThreadHarnessService;
       const state = yield* harness.getState(targetId);
+      const requiredSkills = state.requiredSkills ?? [];
+      const missingSkills = state.missingSkills ?? [];
+      const listOrNone = (items: ReadonlyArray<string>) =>
+        items.length > 0 ? items.join(", ") : "none";
       const lines = [
         `Thread: ${state.threadId}`,
         `Active role/harness: ${state.roleName ?? "(none)"}`,
-        `Tracked skills (${state.trackedSkills.length}): ${state.trackedSkills.length > 0 ? state.trackedSkills.join(", ") : "none"}`,
+        `Model family: ${state.modelFamily ?? "unknown"}`,
+        `Required skills (${requiredSkills.length}): ${listOrNone(requiredSkills)}`,
+        `Tracked/used skills (${state.trackedSkills.length}): ${listOrNone(state.trackedSkills)}`,
+        `Missing skills (${missingSkills.length}): ${listOrNone(missingSkills)}`,
         `Tracked context files (${state.trackedContextFiles.length}): ${state.trackedContextFiles.length > 0 ? state.trackedContextFiles.join(", ") : "none"}`,
         `Revision: ${state.revision}`,
       ];

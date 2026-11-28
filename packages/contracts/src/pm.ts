@@ -452,6 +452,37 @@ export const PmDiscoveredSkill = Schema.Struct({
 });
 export type PmDiscoveredSkill = typeof PmDiscoveredSkill.Type;
 
+export const PmModelFamily = Schema.Literals(["claude", "codex", "gemini"]);
+export type PmModelFamily = typeof PmModelFamily.Type;
+
+export const PmSkillCatalogEntry = Schema.Struct({
+  name: Schema.String,
+  title: Schema.String,
+  description: Schema.String,
+  category: Schema.Literals([
+    "frontend",
+    "backend",
+    "architecture",
+    "testing",
+    "security",
+    "review",
+    "docs",
+    "workflow",
+  ]),
+  roles: Schema.Array(Schema.String),
+  families: Schema.Array(PmModelFamily),
+  familyGuidance: Schema.optional(
+    Schema.Struct({
+      claude: Schema.optional(Schema.String),
+      codex: Schema.optional(Schema.String),
+      gemini: Schema.optional(Schema.String),
+    }),
+  ),
+  source: Schema.String,
+  hasDiskSkill: Schema.Boolean,
+});
+export type PmSkillCatalogEntry = typeof PmSkillCatalogEntry.Type;
+
 export const PmWorkspacePipelinesSnapshot = Schema.Struct({
   projectId: ProjectId,
   workspaceRoot: Schema.NullOr(Schema.String),
@@ -459,6 +490,7 @@ export const PmWorkspacePipelinesSnapshot = Schema.Struct({
   pipelines: Schema.Array(PmPipelineEntry),
   providers: Schema.Array(PmPipelineProvider),
   discoveredSkills: Schema.Array(PmDiscoveredSkill),
+  skillCatalog: Schema.optional(Schema.Array(PmSkillCatalogEntry)),
   problems: Schema.Array(Schema.String),
 });
 export type PmWorkspacePipelinesSnapshot = typeof PmWorkspacePipelinesSnapshot.Type;
@@ -466,6 +498,9 @@ export type PmWorkspacePipelinesSnapshot = typeof PmWorkspacePipelinesSnapshot.T
 export const PmThreadHarnessState = Schema.Struct({
   threadId: ThreadId,
   roleName: Schema.NullOr(Schema.String),
+  modelFamily: Schema.optional(Schema.NullOr(PmModelFamily)),
+  requiredSkills: Schema.optional(Schema.Array(Schema.String)),
+  missingSkills: Schema.optional(Schema.Array(Schema.String)),
   trackedSkills: Schema.Array(Schema.String),
   trackedContextFiles: Schema.Array(Schema.String),
   revision: Schema.Number,

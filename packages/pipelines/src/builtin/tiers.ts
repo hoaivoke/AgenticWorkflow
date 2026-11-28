@@ -14,12 +14,14 @@ export const BUILTIN_TIERS: TierMap = {
   ],
   mid: [
     { provider: "claude", model: "sonnet", effort: "high" },
+    { provider: "antigravity", model: "sonnet", effort: "high" },
     { provider: "codex", model: "sol", effort: "high" },
     { provider: "antigravity", model: "neon", effort: "high" },
   ],
   frontier: [
     { provider: "claude", model: "opus", effort: "high" },
     { provider: "claude", model: "fable", effort: "high" },
+    { provider: "antigravity", model: "opus", effort: "high" },
     { provider: "codex", model: "astra", effort: "high" },
     { provider: "antigravity", model: "carbon", effort: "high" },
     { provider: "antigravity", model: "neon", effort: "high" },

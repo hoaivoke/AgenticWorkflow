@@ -9,6 +9,7 @@ import {
   type ScheduledTaskUpsertSchedule,
 } from "@t3tools/contracts";
 import {
+  detectModelFamily,
   renderPipeline,
   renderPipelineList,
   renderRoleBrief,
@@ -105,11 +106,14 @@ export const routeWorker = Effect.fn("PmRouting.routeWorker")(function* (input: 
     );
   }
   const problemNote = problems.length === 0 ? "" : ` Ignored config: ${problems.join(" ")}`;
-  const harness = yield* pipelines
-    .resolveHarness(role, root)
-    .pipe(Effect.orElseSucceed(() => undefined));
 
   if (input.modelSelection !== undefined) {
+    const modelFamily = detectModelFamily(
+      `${input.modelSelection.instanceId} ${input.modelSelection.model}`,
+    );
+    const harness = yield* pipelines
+      .resolveHarness(role, root, { skillCatalog: config.skills, modelFamily })
+      .pipe(Effect.orElseSucceed(() => undefined));
     return {
       modelSelection: input.modelSelection,
       preamble: renderRoleBrief(role, role.tier, harness),
@@ -141,6 +145,10 @@ export const routeWorker = Effect.fn("PmRouting.routeWorker")(function* (input: 
     );
   }
   const selection = resolution.selection;
+  const modelFamily = detectModelFamily(`${selection.driver} ${selection.model}`);
+  const harness = yield* pipelines
+    .resolveHarness(resolution.role, root, { skillCatalog: config.skills, modelFamily })
+    .pipe(Effect.orElseSucceed(() => undefined));
   const modelSelection = decodeSelection({
     instanceId: ProviderInstanceId.make(selection.instanceId),
     model: selection.model,

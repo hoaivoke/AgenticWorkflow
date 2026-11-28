@@ -6,7 +6,15 @@ import {
   type PmThreadHarnessState,
   type ProjectId,
 } from "@t3tools/contracts";
-import { renderRoleBrief } from "@t3tools/pipelines";
+import {
+  BUILTIN_SKILLS,
+  detectModelFamily,
+  matchSkillsForRole,
+  renderRoleBrief,
+  type ModelFamily,
+  type PipelineConfig,
+  type Role,
+} from "@t3tools/pipelines";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -16,6 +24,7 @@ import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import { forkParked } from "../serverActivation.ts";
@@ -61,6 +70,9 @@ const IGNORED_PATH_SEGMENTS = [
   ".turbo/",
   "coverage/",
 ];
+
+const BUILTIN_SKILL_SLUGS: ReadonlyArray<string> = BUILTIN_SKILLS.map((skill) => skill.name);
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const FILE_TOKEN_RE = /([^\s"'`()=:,;]+?\.(?:md|json|ya?ml))(?=$|[\s"'`),;:])/gi;
 
@@ -109,10 +121,14 @@ function collectStringsFromUnknown(value: unknown, out: Array<string>, depth = 0
   }
 }
 
-/** Pure provenance extractor: finds skills (`SKILL.md`) and key repo context files touched in a turn item. */
+/**
+ * Pure provenance extractor: finds skills (`SKILL.md` paths or Skill Database slugs named in
+ * commands/tool inputs) and key repo context files touched in a turn item.
+ */
 export function extractProvenanceFromTurnItem(
   item: OrchestrationV2TurnItem,
   workspaceRoot: string | null,
+  knownSkillSlugs: ReadonlyArray<string> = BUILTIN_SKILL_SLUGS,
 ): { readonly skills: ReadonlyArray<string>; readonly contextFiles: ReadonlyArray<string> } {
   const texts: Array<string> = [];
   const directPaths: Array<string> = [];
@@ -141,7 +157,18 @@ export function extractProvenanceFromTurnItem(
   const skills = new Set<string>();
   const contextFiles = new Set<string>();
 
+  // Only compound slugs (e.g. `tdd-verification`) count as a mention; bare words like `docs` are too noisy.
+  const slugMatchers = knownSkillSlugs
+    .filter((slug) => /[-_]/.test(slug))
+    .map((slug) => ({
+      slug,
+      re: new RegExp(`(?<![A-Za-z0-9_-])${escapeRegExp(slug)}(?![A-Za-z0-9_-])`, "i"),
+    }));
+
   const inspectText = (text: string) => {
+    for (const { slug, re } of slugMatchers) {
+      if (re.test(text)) skills.add(slug);
+    }
     for (const match of text.matchAll(SKILL_PATH_RE)) {
       const skillName = match[2]?.trim();
       if (skillName && !skillName.startsWith(".")) skills.add(skillName);
@@ -175,9 +202,57 @@ export function extractProvenanceFromTurnItem(
   };
 }
 
-const toState = (threadId: ThreadId, row: ThreadHarnessRow | null): PmThreadHarnessState => ({
+/** Map a thread's model selection to a Big-3 family, preferring the model slug over the instance id. */
+function modelFamilyForSelection(
+  selection: { readonly instanceId: string; readonly model: string } | null | undefined,
+): ModelFamily | null {
+  if (!selection) return null;
+  return detectModelFamily(selection.model) ?? detectModelFamily(selection.instanceId);
+}
+
+/** Skills the role should use on this family, and those not yet observed in the thread. */
+function computeSkillRequirements(input: {
+  readonly config: Pick<PipelineConfig, "skills">;
+  readonly role: Role | null;
+  readonly modelFamily: ModelFamily | null;
+  readonly trackedSkills: ReadonlyArray<string>;
+}): {
+  readonly requiredSkills: ReadonlyArray<string>;
+  readonly missingSkills: ReadonlyArray<string>;
+} {
+  if (input.role === null) return { requiredSkills: [], missingSkills: [] };
+  const requiredSkills = matchSkillsForRole({
+    config: input.config,
+    role: input.role,
+    modelFamily: input.modelFamily,
+  }).map((entry) => entry.name);
+  const tracked = new Set(input.trackedSkills.map((skill) => skill.toLowerCase()));
+  return {
+    requiredSkills,
+    missingSkills: requiredSkills.filter((skill) => !tracked.has(skill.toLowerCase())),
+  };
+}
+
+interface SkillRequirements {
+  readonly modelFamily: ModelFamily | null;
+  readonly requiredSkills: ReadonlyArray<string>;
+  readonly missingSkills: ReadonlyArray<string>;
+}
+
+const toState = (
+  threadId: ThreadId,
+  row: ThreadHarnessRow | null,
+  requirements?: SkillRequirements,
+): PmThreadHarnessState => ({
   threadId,
   roleName: row?.roleName ?? null,
+  ...(requirements === undefined
+    ? {}
+    : {
+        modelFamily: requirements.modelFamily,
+        requiredSkills: [...requirements.requiredSkills],
+        missingSkills: [...requirements.missingSkills],
+      }),
   trackedSkills: row?.trackedSkills ?? [],
   trackedContextFiles: row?.trackedContextFiles ?? [],
   revision: row?.revision ?? 0,
@@ -224,14 +299,33 @@ export class ThreadHarnessService extends Context.Service<
 const make = Effect.gen(function* () {
   const store = yield* ThreadHarnessStore;
   const pipelines = yield* PipelineService;
+  const projections = yield* ProjectionStore.ProjectionStoreV2;
   const fs = Option.getOrUndefined(yield* Effect.serviceOption(FileSystem.FileSystem));
   const path = Option.getOrUndefined(yield* Effect.serviceOption(Path.Path));
+
+  const readShell = (threadId: ThreadId) =>
+    projections.getThreadShell(threadId).pipe(Effect.orElseSucceed(() => null));
 
   const getState: ThreadHarnessServiceShape["getState"] = Effect.fn(
     "ThreadHarnessService.getState",
   )(function* (threadId: ThreadId) {
     const row = yield* store.get(threadId);
-    return toState(threadId, row);
+    const shell = yield* readShell(threadId);
+    if (shell === null) return toState(threadId, row);
+    const modelFamily = modelFamilyForSelection(shell.modelSelection);
+    const loaded = yield* pipelines.configFor(shell.projectId).pipe(Effect.option);
+    const config = Option.getOrNull(loaded)?.config ?? null;
+    const role = row?.roleName && config ? (config.roles.get(row.roleName) ?? null) : null;
+    const requirements =
+      config === null
+        ? { requiredSkills: [], missingSkills: [] }
+        : computeSkillRequirements({
+            config,
+            role,
+            modelFamily,
+            trackedSkills: row?.trackedSkills ?? [],
+          });
+    return toState(threadId, row, { modelFamily, ...requirements });
   });
 
   const setHarness: ThreadHarnessServiceShape["setHarness"] = Effect.fn(
@@ -279,20 +373,36 @@ const make = Effect.gen(function* () {
 
     const loaded = yield* pipelines.configFor(input.projectId);
     const role = row.roleName ? (loaded.config.roles.get(row.roleName) ?? null) : null;
+    const shell = yield* readShell(input.threadId);
+    const modelFamily = modelFamilyForSelection(shell?.modelSelection);
+    const { requiredSkills, missingSkills } = computeSkillRequirements({
+      config: loaded.config,
+      role,
+      modelFamily,
+      trackedSkills: row.trackedSkills,
+    });
 
-    const mergedSkills = [...(role?.skills ?? []), ...row.trackedSkills];
+    const mergedSkills = [...requiredSkills, ...row.trackedSkills];
     const mergedContextFiles = [...(role?.contextFiles ?? []), ...row.trackedContextFiles];
-    const resolvedHarness =
+    const resolvedInputs =
       fs !== undefined && path !== undefined
         ? yield* resolveHarnessInputs({
             skillRequests: mergedSkills,
             contextRequests: mergedContextFiles,
             workspaceRoot: loaded.root,
+            skillCatalog: loaded.config.skills,
+            modelFamily,
           }).pipe(
             Effect.provideService(FileSystem.FileSystem, fs),
             Effect.provideService(Path.Path, path),
           )
         : {};
+    // The brief lists the role's required skills; tracked skills are reported in provenance below.
+    const resolvedHarness = {
+      ...resolvedInputs,
+      ...(modelFamily ? { modelFamily } : {}),
+      matchedSkills: requiredSkills,
+    };
 
     const sections: Array<string> = [
       "### Workspace Harness Context (configured by the user in Agent Space)",
@@ -323,6 +433,9 @@ const make = Effect.gen(function* () {
       const provenanceLines: Array<string> = ["Tracked thread provenance:"];
       if (row.trackedSkills.length > 0) {
         provenanceLines.push(`- Skills used in this thread: ${row.trackedSkills.join(", ")}`);
+      }
+      if (missingSkills.length > 0) {
+        provenanceLines.push(`- Required skills not yet used: ${missingSkills.join(", ")}`);
       }
       if (row.trackedContextFiles.length > 0) {
         provenanceLines.push(
@@ -363,7 +476,9 @@ const make = Effect.gen(function* () {
   } satisfies ThreadHarnessServiceShape;
 });
 
-export const layer = Layer.effect(ThreadHarnessService, make);
+/** Without the projection store, so tests can supply a thread shell. */
+export const layerWithoutProjectionStore = Layer.effect(ThreadHarnessService, make);
+export const layer = layerWithoutProjectionStore.pipe(Layer.provide(ProjectionStore.layer));
 
 /** Watches orchestration domain events to track skills and context files used by any model. */
 export const layerWatcher = Layer.effectDiscard(

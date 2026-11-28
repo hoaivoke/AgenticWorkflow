@@ -1,5 +1,6 @@
 import type {
   EnvironmentId,
+  PmModelFamily,
   PmPipelineAccess,
   PmPipelineCandidate,
   PmPipelineDefinition,
@@ -266,6 +267,7 @@ export function PipelinesStudioPage() {
   const [roleDraft, setRoleDraft] = useState<RoleDraft | null>(null);
   const [customSkillInput, setCustomSkillInput] = useState<string>("");
   const [skillFilter, setSkillFilter] = useState<string>("");
+  const [skillFamilyFilter, setSkillFamilyFilter] = useState<"all" | PmModelFamily>("all");
 
   const [saving, setSaving] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -583,7 +585,7 @@ export function PipelinesStudioPage() {
     }
   };
 
-  const openAgentDesignThread = async (mode: "design" | "run") => {
+  const openAgentDesignThread = async (mode: "design" | "run" | "swarm" | "scorched-earth") => {
     if (!activeEnvironmentId || !activeProjectId || launching) return;
     setLaunching(true);
     const created = await runPmCommand(
@@ -599,16 +601,20 @@ export function PipelinesStudioPage() {
 
     const targetRef = scopeThreadRef(activeEnvironmentId, created.threadId);
     const targetName =
-      mode === "run"
+      mode === "run" || mode === "swarm"
         ? (currentPipelineDraft?.name ?? effectivePipelineEntry?.pipeline.name ?? "feature")
         : activeTab === "roles"
           ? (currentRoleDraft?.name ?? effectiveRoleEntry?.role.name ?? "builder")
           : (currentPipelineDraft?.name ?? effectivePipelineEntry?.pipeline.name ?? "feature");
 
     const draftPrompt =
-      mode === "run"
-        ? `Run the "${targetName}" pipeline on this project. Call pm_pipelines(name: "${targetName}") and pm_roles() first, then coordinate the stages and report progress.`
-        : `Inspect our current roles (pm_roles) and pipelines (pm_pipelines). Suggest improvements to our agent roles, model assignments, harnesses (skills, contextFiles, instructions), and pipeline "${targetName}", and save any approved changes directly using pm_role_save and pm_pipeline_save.`;
+      mode === "scorched-earth"
+        ? "/swarm --pipeline scorched-earth "
+        : mode === "swarm"
+          ? `/swarm --pipeline ${targetName} `
+          : mode === "run"
+            ? `Run the "${targetName}" pipeline on this project. Call pm_pipelines(name: "${targetName}") and pm_roles() first, then coordinate the stages and report progress.`
+            : `Inspect our current roles (pm_roles) and pipelines (pm_pipelines). Suggest improvements to our agent roles, model assignments, harnesses (skills, contextFiles, instructions), and pipeline "${targetName}", and save any approved changes directly using pm_role_save and pm_pipeline_save.`;
 
     useComposerDraftStore.getState().setPrompt(targetRef, draftPrompt);
     await navigate({
@@ -616,6 +622,24 @@ export function PipelinesStudioPage() {
       params: buildThreadRouteParams(targetRef),
     });
   };
+
+  const catalogSkills = snapshot?.skillCatalog ?? [];
+  const hasSkillCatalog = catalogSkills.length > 0;
+
+  const filteredCatalogSkills = catalogSkills.filter((skill) => {
+    if (skillFamilyFilter !== "all" && !skill.families.includes(skillFamilyFilter)) {
+      return false;
+    }
+    const query = skillFilter.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      skill.name.toLowerCase().includes(query) ||
+      skill.title.toLowerCase().includes(query) ||
+      skill.description.toLowerCase().includes(query) ||
+      skill.category.toLowerCase().includes(query) ||
+      skill.roles.some((role) => role.toLowerCase().includes(query))
+    );
+  });
 
   const filteredSkills = (snapshot?.discoveredSkills ?? []).filter((skill) => {
     const query = skillFilter.trim().toLowerCase();
@@ -718,6 +742,28 @@ export function PipelinesStudioPage() {
             >
               <BotIcon className="size-3.5" aria-hidden />
               <T>Ask Agent to Suggest</T>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!activeProject || launching}
+              onClick={() => void openAgentDesignThread("swarm")}
+            >
+              <LayersIcon className="size-3.5" aria-hidden />
+              <T>Run in Swarm</T>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!activeProject || launching}
+              onClick={() => void openAgentDesignThread("scorched-earth")}
+            >
+              <ShieldCheckIcon className="size-3.5" aria-hidden />
+              <T>Scorched Earth</T>
             </Button>
 
             <Button
@@ -863,10 +909,10 @@ export function PipelinesStudioPage() {
                 onClick={() => setActiveTab("skills")}
               >
                 <WrenchIcon className="size-3.5" aria-hidden />
-                <T>Discovered Skills</T>
+                <T>Skill Database</T>
                 {snapshot ? (
                   <Badge variant="outline" size="sm" className="ml-1">
-                    {snapshot.discoveredSkills.length}
+                    {hasSkillCatalog ? catalogSkills.length : snapshot.discoveredSkills.length}
                   </Badge>
                 ) : null}
               </Button>
@@ -2120,28 +2166,155 @@ export function PipelinesStudioPage() {
             {activeTab === "skills" ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="w-full max-w-sm">
-                    <label htmlFor="skills-search" className="sr-only">
-                      <T>Filter discovered skills</T>
-                    </label>
-                    <input
-                      id="skills-search"
-                      type="search"
-                      value={skillFilter}
-                      onChange={(event) => setSkillFilter(event.target.value)}
-                      placeholder={gt("Filter skills by name, scope, or path...")}
-                      className={INPUT_CLASS}
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="w-full max-w-sm sm:w-72">
+                      <label htmlFor="skills-search" className="sr-only">
+                        <T>Filter skills</T>
+                      </label>
+                      <input
+                        id="skills-search"
+                        type="search"
+                        value={skillFilter}
+                        onChange={(event) => setSkillFilter(event.target.value)}
+                        placeholder={gt("Filter skills by name, role, category, or path...")}
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    {hasSkillCatalog ? (
+                      <div
+                        role="group"
+                        aria-label={gt("Filter by model family")}
+                        className="flex flex-wrap items-center gap-1"
+                      >
+                        {(
+                          [
+                            { id: "all", label: gt("All") },
+                            { id: "claude", label: gt("Claude") },
+                            { id: "codex", label: gt("Codex") },
+                            { id: "gemini", label: gt("Gemini") },
+                          ] as const
+                        ).map((family) => (
+                          <Button
+                            key={family.id}
+                            type="button"
+                            size="xs"
+                            variant={skillFamilyFilter === family.id ? "secondary" : "outline"}
+                            aria-pressed={skillFamilyFilter === family.id}
+                            onClick={() => setSkillFamilyFilter(family.id)}
+                          >
+                            {family.label}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     <T>
-                      Scanned from .pipelines/skills, .agents/skills, .claude/skills, ~/.gemini, and
-                      installed plugins.
+                      Skill Database matched by role &amp; Big-3 model family (Claude, Codex,
+                      Gemini), enriched with SKILL.md files from .pipelines/skills, .agents/skills,
+                      and .claude/skills.
                     </T>
                   </p>
                 </div>
 
-                {filteredSkills.length === 0 ? (
+                {hasSkillCatalog ? (
+                  filteredCatalogSkills.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                      <T>No matching skills in the Skill Database.</T>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredCatalogSkills.map((skill) => {
+                        const matchedRoles = [
+                          ...new Set([
+                            ...skill.roles,
+                            ...(snapshot?.roles ?? [])
+                              .filter((entry) => entry.role.skills?.includes(skill.name))
+                              .map((entry) => entry.role.name),
+                          ]),
+                        ];
+                        const guidanceFamilies: ReadonlyArray<{
+                          readonly id: PmModelFamily;
+                          readonly label: string;
+                        }> = [
+                          { id: "claude", label: gt("Claude") },
+                          { id: "codex", label: gt("Codex") },
+                          { id: "gemini", label: gt("Gemini") },
+                        ];
+                        const visibleGuidance = guidanceFamilies.filter(
+                          (f) =>
+                            (skillFamilyFilter === "all" || skillFamilyFilter === f.id) &&
+                            Boolean(skill.familyGuidance?.[f.id]),
+                        );
+                        return (
+                          <div
+                            key={skill.name}
+                            className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <h3 className="truncate text-sm font-medium text-foreground">
+                                  {skill.title}
+                                </h3>
+                                <p className="truncate font-mono text-2xs text-muted-foreground">
+                                  {skill.name}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <Badge variant="outline" size="sm">
+                                  {skill.category}
+                                </Badge>
+                                <Badge
+                                  variant={skill.hasDiskSkill ? "secondary" : "outline"}
+                                  size="sm"
+                                >
+                                  {skill.hasDiskSkill ? <T>SKILL.md</T> : <T>Built-in</T>}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-muted-foreground">{skill.description}</p>
+
+                            <div className="flex flex-wrap items-center gap-1">
+                              {guidanceFamilies
+                                .filter((f) => skill.families.includes(f.id))
+                                .map((f) => (
+                                  <Badge key={f.id} variant="secondary" size="sm">
+                                    {f.label}
+                                  </Badge>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1">
+                              {matchedRoles.length > 0 ? (
+                                matchedRoles.map((roleName) => (
+                                  <Badge key={roleName} variant="outline" size="sm">
+                                    {roleName}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-2xs text-muted-foreground">
+                                  <T>Available to attach to any role or thread</T>
+                                </span>
+                              )}
+                            </div>
+
+                            {visibleGuidance.length > 0 ? (
+                              <div className="mt-auto space-y-1 border-t border-border/60 pt-2">
+                                {visibleGuidance.map((f) => (
+                                  <p key={f.id} className="text-2xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">{f.label}:</span>{" "}
+                                    {skill.familyGuidance?.[f.id]}
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : filteredSkills.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
                     <T>No matching SKILL.md files found.</T>
                   </div>

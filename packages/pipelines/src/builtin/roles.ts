@@ -167,6 +167,57 @@ export const BUILTIN_ROLES: ReadonlyArray<Role> = [
     ].join("\n"),
   },
   {
+    name: "scenario-generator",
+    description:
+      "Turns the spec, the builder's surface inventory and the real diff into seeded, state-matrix scenarios.",
+    tier: "frontier",
+    access: "read-only",
+    toolkits: ["read-only"],
+    outputContract:
+      "scenarios.json with concrete user journeys, edge cases, state-matrix fixtures, and expected outcomes.",
+    instructions: [
+      RUN_FOLDER_RULE,
+      "Read BOTH surface-inventory.json (every UI element, label, counter, tooltip, route, RPC and function the builder says it touched) AND the actual git diff. The builder's list is a claim: cover every side effect and regression the diff shows that the inventory leaves out, and name those gaps.",
+      "Cover a realistic state matrix for every touched surface: empty, in-progress, completed, and error or limited. Never assume an empty database is a fair test.",
+      'Write scenarios.json: an array of { "id", "surface", "state", "seed" (exact fixture or setup steps to reach that state), "steps", "expected" (exact visible copy, counts, badges, tooltips, or function outputs) }.',
+      "Every acceptance criterion in spec.md maps to at least one scenario. Do not write code or edit project files.",
+    ].join("\n"),
+  },
+  {
+    name: "playtester",
+    description:
+      "Runs every scenario against the real running app with seeded state and reports observed vs expected.",
+    tier: "mid",
+    access: "read-only",
+    multimodal: true,
+    toolkits: ["preview", "previewControls", "device", "read-only"],
+    outputContract:
+      "playtest-report.json and playtest-report.md with PASS/FAIL per scenario, observed vs expected, console errors, and screenshots.",
+    instructions: [
+      RUN_FOLDER_RULE,
+      "Run every scenario in scenarios.json against the real running app or runtime. Seed each scenario's state first; never pass a scenario by reading code or by running against an empty database.",
+      "Trust nothing you did not see. Record the exact observed copy, counts, badges, tooltips and outputs next to the expected ones, plus console and network errors and a screenshot per scenario in the run folder.",
+      'Write playtest-report.json: [{ "id", "verdict" ("PASS" or "FAIL"), "observed", "expected", "errors", "screenshots" }] and a short playtest-report.md. Your report starts with PASS only if every scenario passed, else FAIL.',
+      "Never edit implementation files, tests or scenarios.json.",
+    ].join("\n"),
+  },
+  {
+    name: "troubleshooter",
+    description:
+      "Finds the root cause of each failing scenario and hands the fixer a surgical plan. Never edits.",
+    tier: "frontier",
+    access: "read-only",
+    toolkits: ["read-only"],
+    outputContract:
+      "diagnosis.md with root cause (file:line), reproduction evidence, and minimal fix plan for each failing scenario.",
+    instructions: [
+      RUN_FOLDER_RULE,
+      "For each FAIL in playtest-report.json, trace the observed behavior through logs and source to its root cause. Fix causes, not symptoms: a stale label usually means stale data upstream.",
+      "Write diagnosis.md: per failing scenario, the root cause with file:line, the evidence that reproduces it, and the smallest fix plan that makes it pass without breaking the other scenarios.",
+      "Do not edit any file except diagnosis.md.",
+    ].join("\n"),
+  },
+  {
     name: "reviewer",
     description: "Reviews a diff against the spec and plan. Never reviews its own work.",
     tier: "mid",

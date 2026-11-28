@@ -50,7 +50,30 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
   }, [swarmStatus, refresh]);
 
   const channels = (board?.channels ?? []).filter((channel) => !channel.archived);
+  const mainChannel = channels.find((channel) => channel.name === "main");
+  const boundPipelineMatch = mainChannel?.topic.match(/^pipeline:([a-z0-9_-]+)/i);
+  const boundPipelineName = boundPipelineMatch?.[1] ?? null;
   const allPosts = board?.posts ?? [];
+  const flaggedScreenshots = allPosts.flatMap((post) => {
+    const found: Array<{
+      readonly seq: number;
+      readonly sender: string;
+      readonly path: string;
+      readonly caption: string;
+    }> = [];
+    for (const line of post.text.split("\n")) {
+      const match = /^\s*Screenshot:\s*([^|]+?)\s*\|\s*(.+)$/i.exec(line);
+      if (match?.[1] && match[2]) {
+        found.push({
+          seq: post.seq,
+          sender: post.sender,
+          path: match[1].trim(),
+          caption: match[2].trim(),
+        });
+      }
+    }
+    return found;
+  });
   const posts = (
     selectedChannel === "all"
       ? allPosts
@@ -58,6 +81,9 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
   ).slice(-60);
 
   if (!board) return null;
+
+  const workingCount = board.members.filter((member) => member.state === "working").length;
+  const waitingCount = board.members.filter((member) => member.state === "waiting").length;
 
   const activeComposeChannel =
     selectedChannel !== "all" && channels.some((c) => c.name === selectedChannel)
@@ -94,6 +120,11 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
       separated={false}
       actions={
         <div className="flex items-center gap-1.5">
+          {boundPipelineName ? (
+            <Badge variant="secondary" size="sm">
+              {boundPipelineName}
+            </Badge>
+          ) : null}
           <UsersIcon className="size-3.5 text-muted-foreground" aria-hidden />
           <Badge variant={board.swarm.status === "active" ? "info" : "outline"} size="sm">
             {board.swarm.status === "active" ? gt("Active") : gt("Done")}
@@ -102,6 +133,16 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
       }
     >
       <div className="flex flex-col gap-2.5 px-2.5 pb-1 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-muted-foreground">
+          <span>
+            {gt("{working} working · {waiting} waiting · {total} total", {
+              working: workingCount,
+              waiting: waitingCount,
+              total: board.members.length,
+            })}
+          </span>
+        </div>
+
         <div className="flex flex-wrap items-center gap-1">
           {board.members.map((member) => (
             <Tooltip key={member.name}>
@@ -166,6 +207,27 @@ export function SwarmBoardSection(props: { readonly threadRef: ThreadRef }) {
                 {channelName === "all" ? gt("All") : `#${channelName}`}
               </button>
             ))}
+          </div>
+        ) : null}
+
+        {flaggedScreenshots.length > 0 ? (
+          <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-background/50 p-2">
+            <div className="text-3xs font-medium text-muted-foreground">
+              {gt("Screenshots ({count})", { count: flaggedScreenshots.length })}
+            </div>
+            <div className="flex flex-col gap-1">
+              {flaggedScreenshots.slice(-6).map((shot) => (
+                <div
+                  key={`${shot.seq}:${shot.path}`}
+                  className="flex items-center justify-between gap-2 text-2xs"
+                >
+                  <span className="min-w-0 truncate text-foreground/90">{shot.caption}</span>
+                  <span className="shrink-0 font-mono text-3xs text-muted-foreground">
+                    @{shot.sender} #{shot.seq}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 
+import { detectModelFamily, matchSkillsForRole } from "./builtin/skills.ts";
 import { loadPipelineConfig } from "./load.ts";
 import {
   renderPipeline,
@@ -140,6 +141,43 @@ describe("resolveRole", () => {
     expect(heavyFable.ok && heavyFable.selection.model).toBe("claude-fable-5-2");
   });
 
+  it("falls over from direct Claude to Antigravity-hosted Sonnet and Opus before other vendors, never gpt-oss", () => {
+    const agWithClaude: ProviderSnapshot = {
+      ...antigravity,
+      models: [
+        ...antigravity.models,
+        { slug: "claude-sonnet-5-5-high", name: "Claude Sonnet 5.5 (High)" },
+        { slug: "claude-opus-5-5-high", name: "Claude Opus 5.5 (High)" },
+        { slug: "gpt-oss-120b-medium", name: "GPT-OSS 120B (Medium)" },
+      ],
+    };
+    const claudeLimited = new Map([["claudeAgent", "2026-11-25T03:00:00Z"]]);
+    const mid = resolveRole({
+      config,
+      role: "builder",
+      providers: [claude, codex, agWithClaude],
+      limited: claudeLimited,
+    });
+    expect(mid.ok && mid.selection.instanceId).toBe("antigravity");
+    expect(mid.ok && mid.selection.model).toBe("claude-sonnet-5-5-high");
+
+    const heavy = resolveRole({
+      config,
+      role: "architect",
+      providers: [claude, codex, agWithClaude],
+      limited: claudeLimited,
+    });
+    expect(heavy.ok && heavy.selection.instanceId).toBe("antigravity");
+    expect(heavy.ok && heavy.selection.model).toBe("claude-opus-5-5-high");
+
+    const onlyGptOss: ProviderSnapshot = {
+      ...antigravity,
+      models: [{ slug: "gpt-oss-120b-medium", name: "GPT-OSS 120B (Medium)" }],
+    };
+    const none = resolveRole({ config, role: "builder", providers: [onlyGptOss] });
+    expect(none.ok).toBe(false);
+  });
+
   it("tries a second account of the same vendor first", () => {
     const limited = new Map([["claudeAgent", "2026-11-25T03:00:00Z"]]);
     const result = resolveRole({
@@ -249,6 +287,90 @@ describe("loadPipelineConfig", () => {
   });
 });
 
+describe("skill database", () => {
+  it("maps drivers, instance ids and model slugs to Big-3 families", () => {
+    expect(detectModelFamily("claudeAgent")).toBe("claude");
+    expect(detectModelFamily("claude-haiku-5-5")).toBe("claude");
+    expect(detectModelFamily("codex")).toBe("codex");
+    expect(detectModelFamily("gpt-6.2-sol")).toBe("codex");
+    expect(detectModelFamily("antigravity")).toBe("gemini");
+    expect(detectModelFamily("gemini-4-neon")).toBe("gemini");
+    expect(detectModelFamily("cursor")).toBeNull();
+    expect(detectModelFamily("")).toBeNull();
+    expect(detectModelFamily(null)).toBeNull();
+  });
+
+  it("matches role skills first, then catalog skills for the role's family", () => {
+    const uiBuilder = config.roles.get("ui-builder")!;
+    const names = (family: "claude" | "codex" | "gemini" | null) =>
+      matchSkillsForRole({ config, role: uiBuilder, modelFamily: family }).map((s) => s.name);
+
+    const gemini = names("gemini");
+    expect(gemini.slice(0, 2)).toEqual(["modern-web-guidance", "a11y-debugging"]);
+    expect(gemini).toContain("gemini-frontend-design");
+    expect(gemini).toContain("browser-e2e-qa");
+    expect(names("claude")).not.toContain("gemini-frontend-design");
+    expect(names("codex")).not.toContain("gemini-frontend-design");
+    // Unknown family includes every family's skills.
+    expect(names(null)).toContain("gemini-frontend-design");
+
+    const [first] = matchSkillsForRole({ config, role: uiBuilder, modelFamily: "codex" });
+    expect(first?.source).toBe("role");
+    expect(first?.familyGuidance).toContain("1440px");
+
+    const builder = matchSkillsForRole({
+      config,
+      role: config.roles.get("builder")!,
+      modelFamily: "claude",
+    });
+    expect(builder.map((s) => s.name)).toEqual(["tdd-verification", "diff-discipline"]);
+    expect(builder.every((s) => s.source === "catalog")).toBe(true);
+  });
+
+  it("lets .pipelines/skills.yaml and skills/*.yaml override and extend the catalog", () => {
+    const { config: custom, problems } = loadPipelineConfig([
+      {
+        path: "skills.yaml",
+        text: [
+          "- name: tdd-verification",
+          "  title: Project TDD",
+          "  description: Our TDD rules",
+          "  category: testing",
+          "  roles: [builder]",
+          "  families: [codex]",
+          "  instructions: Run vp test run.",
+        ].join("\n"),
+      },
+      {
+        path: "skills/rust-safety.yaml",
+        text: [
+          "title: Rust safety",
+          "description: Unsafe audit",
+          "category: backend",
+          "roles: [builder]",
+          "families: [claude, gemini]",
+          "familyGuidance: { claude: Check every unsafe block. }",
+          "instructions: Audit unsafe code.",
+        ].join("\n"),
+      },
+      { path: "skills/broken.yaml", text: "title: Broken\n" },
+    ]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("skills/broken.yaml");
+    expect(custom.skills.get("tdd-verification")?.instructions).toBe("Run vp test run.");
+    expect(custom.sources.get("skill:tdd-verification")).toBe(".pipelines/skills.yaml");
+    expect(custom.sources.get("skill:rust-safety")).toBe(".pipelines/skills/rust-safety.yaml");
+    expect(custom.sources.get("skill:diff-discipline")).toBe("built-in");
+
+    const builder = custom.roles.get("builder")!;
+    const forClaude = matchSkillsForRole({ config: custom, role: builder, modelFamily: "claude" });
+    expect(forClaude.map((s) => s.name)).toEqual(["diff-discipline", "rust-safety"]);
+    expect(forClaude[1]?.familyGuidance).toBe("Check every unsafe block.");
+    const forCodex = matchSkillsForRole({ config: custom, role: builder, modelFamily: "codex" });
+    expect(forCodex.map((s) => s.name)).toEqual(["tdd-verification", "diff-discipline"]);
+  });
+});
+
 describe("render", () => {
   it("lists pipelines and renders a plan with the routing rules", () => {
     expect(renderPipelineList(config)).toContain("- feature:");
@@ -282,5 +404,50 @@ describe("render", () => {
     const brief = renderRoleBrief(config.roles.get("reviewer")!, "mid");
     expect(brief).toContain("## Your role: reviewer (mid tier)");
     expect(brief).toContain("read-only");
+  });
+
+  it("loads scorched-earth cleanly with 9 stages, resolvable roles, Big-3 QA skill, and capped loops", () => {
+    const { config: loaded, problems } = loadPipelineConfig([]);
+    expect(problems).toEqual([]);
+
+    const pipeline = loaded.pipelines.get("scorched-earth");
+    expect(pipeline).toBeDefined();
+    expect(pipeline?.escalateAfter).toBe(2);
+    expect(pipeline?.replanAfter).toBe(3);
+    expect(pipeline?.stages.map((stage) => stage.id)).toEqual([
+      "spec",
+      "plan",
+      "build",
+      "verify-gates",
+      "scenarios",
+      "playtest",
+      "troubleshoot",
+      "fix",
+      "review",
+    ]);
+
+    for (const stage of pipeline?.stages ?? []) {
+      const roleName = stage.role ?? "gatekeeper";
+      const resolution = resolveRole({ config: loaded, role: roleName, providers: all });
+      expect(resolution.ok).toBe(true);
+    }
+
+    const playtester = resolveRole({ config: loaded, role: "playtester", providers: all });
+    expect(playtester.ok && playtester.selection.model).toBe("gemini-4-neon");
+    expect(loaded.roles.get("scenario-generator")?.tier).toBe("frontier");
+    expect(loaded.roles.get("troubleshooter")?.tier).toBe("frontier");
+
+    for (const roleName of ["scenario-generator", "playtester", "troubleshooter"] as const) {
+      const role = loaded.roles.get(roleName)!;
+      for (const family of ["claude", "codex", "gemini"] as const) {
+        const matched = matchSkillsForRole({ config: loaded, role, modelFamily: family });
+        const qaSkill = matched.find((skill) => skill.name === "scorched-earth-qa");
+        expect(qaSkill).toBeDefined();
+        expect(qaSkill?.familyGuidance).toBeTruthy();
+      }
+    }
+
+    const rendered = renderPipeline(loaded, "scorched-earth") ?? "";
+    expect(rendered).toContain("after 3 failed cycles, stop looping and ask the user");
   });
 });

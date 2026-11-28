@@ -14,6 +14,53 @@ export type Effort = typeof Effort.Type;
 
 export const EFFORT_ORDER: ReadonlyArray<Effort> = ["low", "medium", "high", "xhigh", "max"];
 
+/** Big-3 model families for harness engineering and skill matching. */
+export const ModelFamily = Schema.Literals(["claude", "codex", "gemini"]);
+export type ModelFamily = typeof ModelFamily.Type;
+
+export const MODEL_FAMILIES: ReadonlyArray<ModelFamily> = ["claude", "codex", "gemini"];
+
+export const SkillCategory = Schema.Literals([
+  "frontend",
+  "backend",
+  "architecture",
+  "testing",
+  "security",
+  "review",
+  "docs",
+  "workflow",
+]);
+export type SkillCategory = typeof SkillCategory.Type;
+
+/**
+ * One skill in the Agent Space Skill Database. Matches roles and Big-3 model families
+ * (Claude, ChatGPT/Codex, Gemini) so each worker automatically receives the skills and
+ * model-family-specific harness rules required for its task.
+ */
+export const SkillEntry = Schema.Struct({
+  name: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String.check(Schema.isMinLength(1)),
+  description: Schema.String.check(Schema.isMinLength(1)),
+  category: SkillCategory,
+  /** Roles that automatically include this skill when running on a matching model family. */
+  roles: Schema.Array(Schema.String.check(Schema.isMinLength(1))),
+  /** Big-3 model families this skill applies to. */
+  families: Schema.Array(ModelFamily),
+  /** Optional per-family harness notes appended when a worker runs on that family. */
+  familyGuidance: Schema.optional(
+    Schema.Struct({
+      claude: Schema.optional(Schema.String),
+      codex: Schema.optional(Schema.String),
+      gemini: Schema.optional(Schema.String),
+    }),
+  ),
+  /** Built-in skill instructions used when no local SKILL.md overrides it on disk. */
+  instructions: Schema.String.check(Schema.isMinLength(1)),
+});
+export type SkillEntry = typeof SkillEntry.Type;
+
+export const SkillCatalogFile = Schema.Array(SkillEntry);
+
 const NonEmpty = Schema.String.check(Schema.isMinLength(1));
 
 /**
@@ -128,6 +175,7 @@ export interface PipelineConfig {
   readonly tiers: TierMap;
   readonly roles: ReadonlyMap<string, Role>;
   readonly pipelines: ReadonlyMap<string, Pipeline>;
+  readonly skills: ReadonlyMap<string, SkillEntry>;
   /** Where each entry came from, for `pm_roles` and error messages. */
   readonly sources: ReadonlyMap<string, string>;
 }

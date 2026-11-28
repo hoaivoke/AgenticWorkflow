@@ -56,33 +56,36 @@ can pause or delete them; the PM can do the same.
 
 Default tiers (November 2026):
 
-| Tier     | Effort | Claude       | Codex         | Antigravity            | Order tried                      |
-| -------- | ------ | ------------ | ------------- | ---------------------- | -------------------------------- |
-| small    | medium | Haiku        | GPT-6.1 Terra | Gemini 4 Hydrogen      | Haiku, Hydrogen, Terra           |
-| mid      | high   | Sonnet       | GPT Sol       | Gemini 4 Neon          | Sonnet, Sol, Neon                |
-| frontier | high   | Opus / Fable | GPT Astra     | Gemini 4 Carbon / Neon | Opus, Fable, Astra, Carbon, Neon |
+| Tier     | Effort | Claude       | Codex         | Antigravity                          | Order tried                                          |
+| -------- | ------ | ------------ | ------------- | ------------------------------------ | ---------------------------------------------------- |
+| small    | medium | Haiku        | GPT-6.1 Terra | Gemini 4 Hydrogen                    | Haiku, Hydrogen, Terra                               |
+| mid      | high   | Sonnet       | GPT Sol       | Claude Sonnet / Gemini 4 Neon        | Sonnet (Claude, Antigravity), Sol, Neon              |
+| frontier | high   | Opus / Fable | GPT Astra     | Claude Opus / Gemini 4 Carbon / Neon | Opus, Fable, Opus (Antigravity), Astra, Carbon, Neon |
 
-Roles marked `multimodal` (`ui-builder`, `qa`) try Neon and Terra first within a tier, because
-those vendors lead with image understanding.
+Roles marked `multimodal` (`ui-builder`, `qa`, `playtester`) try Neon and Terra first within a tier,
+because those vendors lead with image understanding.
 
 ## Built-in roles
 
-| Role               | Tier              | Access                | Job                                            |
-| ------------------ | ----------------- | --------------------- | ---------------------------------------------- |
-| triage             | small (up to mid) | read-only             | Size a request and pick a pipeline.            |
-| product            | mid               | read-only             | Spec, acceptance criteria and `features.json`. |
-| researcher         | small (up to mid) | read-only             | Answer one question with citations.            |
-| architect          | frontier          | read-only             | Plan, task cards and threat model.             |
-| plan-reviewer      | frontier          | read-only             | Challenge the plan before code.                |
-| builder            | mid               | write                 | Implement one task card with tests.            |
-| ui-builder         | mid, multimodal   | write                 | Build UI and check it in a browser.            |
-| gatekeeper         | small only        | read-only             | Run check commands, report exit codes.         |
-| qa                 | mid, multimodal   | write (only `passes`) | Test features end to end.                      |
-| reviewer           | mid               | read-only             | Review a diff against spec and plan.           |
-| security-scout     | small             | read-only             | Choose which security reviewers a diff needs.  |
-| security-reviewer  | mid               | read-only             | Hunt one vulnerability class.                  |
-| security-validator | frontier          | read-only             | Re-prove or reject every finding.              |
-| writer             | small             | write                 | PR description and doc fixes.                  |
+| Role               | Tier              | Access                | Job                                                                        |
+| ------------------ | ----------------- | --------------------- | -------------------------------------------------------------------------- |
+| triage             | small (up to mid) | read-only             | Size a request and pick a pipeline.                                        |
+| product            | mid               | read-only             | Spec, acceptance criteria and `features.json`.                             |
+| researcher         | small (up to mid) | read-only             | Answer one question with citations.                                        |
+| architect          | frontier          | read-only             | Plan, task cards and threat model.                                         |
+| plan-reviewer      | frontier          | read-only             | Challenge the plan before code.                                            |
+| builder            | mid               | write                 | Implement one task card with tests.                                        |
+| ui-builder         | mid, multimodal   | write                 | Build UI and check it in a browser.                                        |
+| gatekeeper         | small only        | read-only             | Run check commands, report exit codes.                                     |
+| qa                 | mid, multimodal   | write (only `passes`) | Test features end to end.                                                  |
+| scenario-generator | frontier          | read-only             | Build seeded state-matrix scenarios from `surface-inventory.json` + diff.  |
+| playtester         | mid, multimodal   | read-only             | Run seeded scenarios against the live app and record observed vs expected. |
+| troubleshooter     | frontier          | read-only             | Diagnose failing scenarios to `file:line` root causes and a minimal fix.   |
+| reviewer           | mid               | read-only             | Review a diff against spec and plan.                                       |
+| security-scout     | small             | read-only             | Choose which security reviewers a diff needs.                              |
+| security-reviewer  | mid               | read-only             | Hunt one vulnerability class.                                              |
+| security-validator | frontier          | read-only             | Re-prove or reject every finding.                                          |
+| writer             | small             | write                 | PR description and doc fixes.                                              |
 
 `read-only` is an instruction in the brief, not a sandbox: the PM still chooses the runtime mode.
 
@@ -98,6 +101,9 @@ those vendors lead with image understanding.
 | ui             | spec → build → gates → qa → review                                                                                               |
 | security-audit | shard → security-review (per shard) → security-validate                                                                          |
 | code-review    | review-a → review-b (other vendor) → security                                                                                    |
+| scorched-earth | spec → plan → build → verify-gates → scenarios → playtest → troubleshoot → fix → review                                          |
+
+`scorched-earth` runs deterministic gates first, generates scenarios from both `surface-inventory.json` and the real `git diff` across a seeded state matrix (`empty`, `in-progress`, `completed`, `error/limited`), playtests them live on another vendor, and caps the diagnose-and-fix loop at 3 cycles (escalating on cycle 2 and stopping to ask the user after cycle 3).
 
 A run keeps its files (spec, plan, task cards, findings, verdicts) in `.pipelines/runs/<name>/`
 under the project root. Add `.pipelines/runs/` to `.gitignore`.

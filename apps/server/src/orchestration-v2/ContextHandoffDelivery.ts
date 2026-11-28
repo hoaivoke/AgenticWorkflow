@@ -15,11 +15,55 @@ import {
 // A first word with a second slash is a path, not a command.
 const SLASH_COMMAND = /^\s*\/[^\s/]+(?:\s|$)/u;
 const SWARM_COMMAND = /^\s*\/swarm(?:\s+([\s\S]*))?$/iu;
+const SWARM_PIPELINE_FLAG = /^--pipeline(?:=|\s+)([a-z0-9][a-z0-9_-]*)(?:\s+([\s\S]*))?$/iu;
+// `/swarm --scorched-earth [goal]` is shorthand for `/swarm --pipeline scorched-earth [goal]`.
+const SWARM_SCORCHED_EARTH_FLAG = /^--scorched-earth(?:\s+([\s\S]*))?$/iu;
+const SCORCHED_EARTH_PIPELINE = "scorched-earth";
+const SCORCHED_EARTH_RULE =
+  "  6. Scorched Earth loop: builders must emit `surface-inventory.json`; run zero-cost `pm_verify_app` / `pm_run_gates` first; feed both `surface-inventory.json` and the actual `git diff` to `scenario-generator` across seeded states (`empty`, `in-progress`, `completed`, `error/limited`); playtest with `playtester`; cap Troubleshooter -> Fixer -> Playtester retries at 3 cycles (escalate the tier on retry 2, stop and ask the user on retry 3).";
+
+const parseSwarmArgs = (
+  rawArgs: string,
+): { readonly pipelineName: string | null; readonly goal: string } => {
+  const scorched = SWARM_SCORCHED_EARTH_FLAG.exec(rawArgs);
+  if (scorched) return { pipelineName: SCORCHED_EARTH_PIPELINE, goal: (scorched[1] ?? "").trim() };
+  const pipelineMatch = SWARM_PIPELINE_FLAG.exec(rawArgs);
+  if (pipelineMatch) {
+    return {
+      pipelineName: pipelineMatch[1]?.trim() ?? null,
+      goal: (pipelineMatch[2] ?? "").trim(),
+    };
+  }
+  return { pipelineName: null, goal: rawArgs };
+};
 
 export function expandSwarmCommandText(text: string): string | null {
   const match = SWARM_COMMAND.exec(text.trim());
   if (!match) return null;
-  const goal = (match[1] ?? "").trim();
+  const { pipelineName, goal } = parseSwarmArgs((match[1] ?? "").trim());
+
+  if (pipelineName !== null) {
+    const objective =
+      goal.length > 0
+        ? goal
+        : `Execute the "${pipelineName}" pipeline in Swarm mode for this repository.`;
+    return [
+      `[Swarm Mode Coordinator Brief: Pipeline ${pipelineName}]`,
+      `You are coordinating a pipeline-backed multi-agent Swarm in this thread using the customizable "${pipelineName}" pipeline.`,
+      "- Swarm tools: `swarm` (actions: `pipeline`, `model`, `title`, `status`, `models`, `add`, `channel`, `kill`, `done`), `post_message`, `read_board`, `swarm_wait`, plus `pm_pipelines` / `pm_roles` / `pm_run_gates` when available. If using deferred tool discovery, call `tool_search` with `swarm` first.",
+      "- Workflow:",
+      `  1. Immediately call \`swarm(action: "pipeline", pipeline: "${pipelineName}"${goal.length > 0 ? `, goal: ${JSON.stringify(goal)}` : ""})\` to bind the pipeline, post its stage blueprint to #main, and inspect every stage's role, workspace, parallel/provider constraints, and Big-3 model-family skills.`,
+      '  2. Execute the pipeline stages in order by spawning role-routed workers with `swarm(action: "add", name, role, brief, workspace: "worktree" | "inherit", tasks?, n?)`. Always pass the stage\'s `role` so tier routing picks an available model across vendors and automatically injects the role\'s matched skills & Big-3 family guidance. Honor each stage\'s `workspace`, `parallel`, and `differentProviderFrom` requirements.',
+      '  3. If any worker hits a usage limit or needs tier escalation, call `swarm(action: "model", name, escalate?)` to hot-switch its model without killing its conversation.',
+      "  4. Coordinate on `#main` with `post_message` (`@<name>`, `@all`, `@#<channel>`), refer to prior messages by `#seq`, and call `swarm_wait(since)` before ending your turn when waiting for workers.",
+      '  5. Run `pm_run_gates` (or verify directly) before calling `swarm(action: "done")` and reporting the final result.',
+      ...(pipelineName === SCORCHED_EARTH_PIPELINE ? [SCORCHED_EARTH_RULE] : []),
+      "",
+      "User goal:",
+      objective,
+    ].join("\n");
+  }
+
   const objective =
     goal.length > 0
       ? goal
@@ -27,12 +71,13 @@ export function expandSwarmCommandText(text: string): string | null {
   return [
     "[Swarm Mode Coordinator Brief]",
     "You are coordinating a multi-agent Swarm in this thread using the Swarm board tools.",
-    "- Swarm tools: `swarm` (actions: `title`, `status`, `models`, `add`, `channel`, `kill`, `done`), `post_message`, `read_board`, `swarm_wait`, plus `pm_pipelines` / `pm_roles` / `pm_run_gates` when available. If using deferred tool discovery, call `tool_search` with `swarm` first.",
+    "- Swarm tools: `swarm` (actions: `title`, `status`, `models`, `pipeline`, `model`, `add`, `channel`, `kill`, `done`), `post_message`, `read_board`, `swarm_wait`, plus `pm_pipelines` / `pm_roles` / `pm_run_gates` when available. If using deferred tool discovery, call `tool_search` with `swarm` first.",
     "- Workflow:",
-    '  1. Set a concise swarm `title`, inspect `swarm(action: "models")`, and spawn specialized workers with `swarm(action: "add", name, role, brief, workspace: "worktree" | "inherit", tasks?, n?)`. Always pass `role` (tier system: small = haiku/hydrogen/terra for light/brute work; mid = sonnet/sol/neon for standard build/review; frontier = opus/fable/astra/carbon/neon for heavy-duty work) instead of pinning one vendor so workers automatically fail over to another provider with available usage instead of halting. Use `workspace: "worktree"` for parallel writers editing files; keep readers/reviewers/verifiers on `inherit`.',
-    "  2. Coordinate on the shared message board with `post_message` (`@<name>`, `@all`, `@#<channel>`) and refer to prior messages by `#seq` rather than repeating them.",
-    "  3. When waiting for workers to finish or report, call `swarm_wait(since)` right before ending your turn to park at zero token cost and auto-wake on `@coordinator` mentions.",
-    '  4. Run `pm_run_gates` (or verify directly) before calling `swarm(action: "done")` and reporting the final result.',
+    '  1. Set a concise swarm `title` (or bind a customizable workflow with `swarm(action: "pipeline", pipeline)`), inspect `swarm(action: "models")`, and spawn specialized workers with `swarm(action: "add", name, role, brief, workspace: "worktree" | "inherit", tasks?, n?)`. Always pass `role` (tier system: small = haiku/hydrogen/terra for light/brute work; mid = sonnet/sol/neon for standard build/review; frontier = opus/fable/astra/carbon/neon for heavy-duty work) instead of pinning one vendor so workers automatically get matched skills & fail over to another provider with available usage instead of halting. Use `workspace: "worktree"` for parallel writers editing files; keep readers/reviewers/verifiers on `inherit`.',
+    '  2. If a worker hits a usage limit or needs escalation, call `swarm(action: "model", name, escalate?)` to hot-switch its model without killing its conversation.',
+    "  3. Coordinate on the shared message board with `post_message` (`@<name>`, `@all`, `@#<channel>`) and refer to prior messages by `#seq` rather than repeating them.",
+    "  4. When waiting for workers to finish or report, call `swarm_wait(since)` right before ending your turn to park at zero token cost and auto-wake on `@coordinator` mentions.",
+    '  5. Run `pm_run_gates` (or verify directly) before calling `swarm(action: "done")` and reporting the final result.',
     "",
     "User goal:",
     objective,

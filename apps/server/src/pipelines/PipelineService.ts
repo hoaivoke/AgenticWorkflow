@@ -19,10 +19,12 @@ import {
   serializeRoleYaml,
   type ConfigFile,
   type LoadResult,
+  type ModelFamily,
   type Pipeline,
   type ProviderSnapshot,
   type ResolvedRoleHarness,
   type Role,
+  type SkillEntry,
 } from "@t3tools/pipelines";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -138,6 +140,10 @@ export interface PipelineServiceShape {
   readonly resolveHarness: (
     role: Role,
     workspaceRoot: string | null,
+    options?: {
+      readonly skillCatalog?: ReadonlyMap<string, SkillEntry> | undefined;
+      readonly modelFamily?: ModelFamily | null | undefined;
+    },
   ) => Effect.Effect<ResolvedRoleHarness>;
   /** Run deterministic shell checks for a gatekeeper stage without spawning an LLM worker. */
   readonly runGates: (input: {
@@ -271,6 +277,21 @@ const buildSnapshot = (input: {
     })),
   })),
   discoveredSkills: input.discoveredSkills,
+  skillCatalog: [...input.loaded.config.skills.values()]
+    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .map((skill) => ({
+      name: skill.name,
+      title: skill.title,
+      description: skill.description,
+      category: skill.category,
+      roles: [...skill.roles],
+      families: [...skill.families],
+      ...(skill.familyGuidance ? { familyGuidance: skill.familyGuidance } : {}),
+      source: input.loaded.config.sources.get(`skill:${skill.name}`) ?? "built-in",
+      hasDiskSkill: input.discoveredSkills.some(
+        (entry) => entry.name.toLowerCase() === skill.name.toLowerCase(),
+      ),
+    })),
   problems: [...input.loaded.problems],
 });
 
@@ -304,8 +325,8 @@ const make = Effect.gen(function* () {
     const base = path.join(root, CONFIG_DIR);
     const files: Array<ConfigFile> = [];
     const read = (relative: string) => readFile(base, relative, files).pipe(Effect.ignore);
-    for (const name of ["tiers.yaml", "tiers.yml"]) yield* read(name);
-    for (const folder of ["roles", "pipelines"]) {
+    for (const name of ["tiers.yaml", "tiers.yml", "skills.yaml", "skills.yml"]) yield* read(name);
+    for (const folder of ["roles", "pipelines", "skills"]) {
       const names = yield* fs
         .readDirectory(path.join(base, folder))
         .pipe(Effect.orElseSucceed(() => [] as Array<string>));
@@ -529,8 +550,13 @@ const make = Effect.gen(function* () {
     return yield* snapshotFor(input.projectId);
   });
 
-  const resolveHarness: PipelineServiceShape["resolveHarness"] = (role, workspaceRoot) =>
-    resolveRoleHarness({ role, workspaceRoot }).pipe(
+  const resolveHarness: PipelineServiceShape["resolveHarness"] = (role, workspaceRoot, options) =>
+    resolveRoleHarness({
+      role,
+      workspaceRoot,
+      skillCatalog: options?.skillCatalog,
+      modelFamily: options?.modelFamily,
+    }).pipe(
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.provideService(Path.Path, path),
     );

@@ -61,7 +61,7 @@ export const layerWatcher = Layer.mergeAll(
     Layer.provide(layer),
     Layer.provide(Scheduler.layer),
   ),
-  SwarmService.layerWatcher.pipe(Layer.provide(layer)),
+  SwarmService.layerWatcher.pipe(Layer.provide(layer), Layer.provide(Scheduler.layer)),
   ThreadHarnessService.layerWatcher.pipe(
     Layer.provide(layer),
     Layer.provide(RuntimeLayer.layerProjectService),

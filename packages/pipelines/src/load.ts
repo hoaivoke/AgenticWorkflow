@@ -5,15 +5,19 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { BUILTIN_PIPELINES } from "./builtin/pipelines.ts";
 import { BUILTIN_ROLES } from "./builtin/roles.ts";
+import { BUILTIN_SKILLS } from "./builtin/skills.ts";
 import { BUILTIN_TIERS } from "./builtin/tiers.ts";
 import {
   Pipeline,
   Role,
+  SkillCatalogFile,
+  SkillEntry,
   TIER_ORDER,
   TierMapPatch,
   type TierMap,
   type PipelineConfig,
   type Role as RoleType,
+  type SkillEntry as SkillEntryType,
 } from "./schema.ts";
 
 /** The folder in a project that holds overrides: tiers.yaml, roles/*.yaml, pipelines/*.yaml. */
@@ -37,6 +41,8 @@ const options = { onExcessProperty: "error" } as const;
 const decodeRole = Schema.decodeUnknownExit(Role, options);
 const decodePipeline = Schema.decodeUnknownExit(Pipeline, options);
 const decodeTiers = Schema.decodeUnknownExit(TierMapPatch, options);
+const decodeSkill = Schema.decodeUnknownExit(SkillEntry, options);
+const decodeSkillCatalog = Schema.decodeUnknownExit(SkillCatalogFile, options);
 
 const describe = <A>(exit: Exit.Exit<A, unknown>): string => {
   if (Exit.isSuccess(exit)) return "";
@@ -58,6 +64,7 @@ export function loadPipelineConfig(files: ReadonlyArray<ConfigFile>): LoadResult
   const sources = new Map<string, string>();
   const roles = new Map<string, RoleType>();
   const pipelines = new Map<string, Pipeline>();
+  const skills = new Map<string, SkillEntryType>();
   let tiers: TierMap = BUILTIN_TIERS;
 
   for (const role of BUILTIN_ROLES) {
@@ -67,6 +74,10 @@ export function loadPipelineConfig(files: ReadonlyArray<ConfigFile>): LoadResult
   for (const pipeline of BUILTIN_PIPELINES) {
     pipelines.set(pipeline.name, pipeline);
     sources.set(`pipeline:${pipeline.name}`, "built-in");
+  }
+  for (const skill of BUILTIN_SKILLS) {
+    skills.set(skill.name, skill);
+    sources.set(`skill:${skill.name}`, "built-in");
   }
   sources.set("tiers", "built-in");
 
@@ -98,6 +109,34 @@ export function loadPipelineConfig(files: ReadonlyArray<ConfigFile>): LoadResult
         frontier: patch.frontier ?? tiers.frontier,
       };
       sources.set("tiers", where);
+      continue;
+    }
+
+    if (file.path === "skills.yaml" || file.path === "skills.yml") {
+      const exit = decodeSkillCatalog(raw);
+      if (Exit.isFailure(exit)) {
+        problems.push(`${where}: ${describe(exit)}`);
+        continue;
+      }
+      for (const entry of exit.value) {
+        skills.set(entry.name, entry);
+        sources.set(`skill:${entry.name}`, where);
+      }
+      continue;
+    }
+
+    if (file.path.startsWith("skills/")) {
+      const withName =
+        typeof raw === "object" && !Array.isArray(raw) && !("name" in raw)
+          ? { ...raw, name: stem(file.path) }
+          : raw;
+      const exit = decodeSkill(withName);
+      if (Exit.isFailure(exit)) {
+        problems.push(`${where}: ${describe(exit)}`);
+        continue;
+      }
+      skills.set(exit.value.name, exit.value);
+      sources.set(`skill:${exit.value.name}`, where);
       continue;
     }
 
@@ -176,7 +215,7 @@ export function loadPipelineConfig(files: ReadonlyArray<ConfigFile>): LoadResult
     }
   }
 
-  return { config: { tiers, roles, pipelines, sources }, problems };
+  return { config: { tiers, roles, pipelines, skills, sources }, problems };
 }
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-_]{0,63}$/;
