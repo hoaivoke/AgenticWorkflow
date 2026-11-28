@@ -63,7 +63,8 @@ export function renderPipeline(
   const rules = [
     `Run folder: ${RUNS_DIR}/<short-run-name>/ under the project root. Create it, give every worker its absolute path, and keep ${RUNS_DIR}/ out of git.`,
     "Call `pm_pipeline_run_start` when starting this pipeline and `pm_pipeline_stage_update` as each stage starts, waits for approval, passes, or fails so the Live Runs graph tracks progress, cost, and budget guardrails.",
-    "Start each stage's workers with pm_worker_start and role set to the stage's role. Role harnesses (skills, context files, toolkits) load automatically in prompt-cache-stable order; put only the stage goal, artifact paths, and task card in the brief.",
+    "Start each stage's workers with pm_worker_start and role set to the stage's role (never pin a single vendor unless the user asked). Tier routing picks from available accounts across vendors (small: haiku/hydrogen/terra; mid: sonnet/sol/neon; frontier: opus/fable/astra/carbon/neon) and skips accounts at their usage limit. Role harnesses (skills, context files, toolkits) load automatically in prompt-cache-stable order; put only the stage goal, artifact paths, and task card in the brief.",
+    "If any worker pauses at a usage limit, do not halt the pipeline while another provider has usage: immediately start a fresh worker with the same `role` and brief (plus any partial progress) so tier routing fails over to another provider with usage, then resolve the paused worker.",
     "For deterministic checks and app/website verification stages, call `pm_run_gates` or `pm_verify_app` directly at zero LLM cost before spawning an agent.",
     `A failed card goes back to its stage with the failure attached. After ${pipeline.escalateAfter ?? 2} failed attempts on one card, start the next attempt with escalate: 1 (one tier up)${pipeline.replanAfter === undefined ? "" : `; after ${pipeline.replanAfter}, send it back to planning`}.`,
     "Never let a worker review or QA its own work. Read gates.json, verify-report.md, review.md and validated.json yourself; do not take a worker's word that checks passed.",
@@ -104,9 +105,16 @@ export function renderRoles(
           "At usage limits:",
           ...[...limited].map(([instance, until]) => `- ${instance} until ${until}`),
         ];
+  const tierSummary = (["small", "mid", "frontier"] as const).map(
+    (tier) =>
+      `- ${tier}: ${config.tiers[tier].map((candidate) => `${candidate.provider}/${candidate.model}`).join(" → ")}`,
+  );
   return [
-    `Roles (override any in ${CONFIG_DIR}/roles/<name>.yaml; tiers in ${CONFIG_DIR}/tiers.yaml):`,
+    `Roles (override any in ${CONFIG_DIR}/roles/<name>.yaml; tiers in ${CONFIG_DIR}/tiers.yaml; tier routing automatically fails over across vendors when an account hits a usage limit):`,
     ...lines,
+    "",
+    "Tiers (fallback order):",
+    ...tierSummary,
     ...limits,
     ...renderProblems(problems),
   ].join("\n");

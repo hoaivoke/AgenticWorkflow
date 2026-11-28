@@ -35,7 +35,7 @@ const SwarmWorkspace = Schema.Literals(["inherit", "worktree"]);
 const SwarmManageTool = Tool.make("swarm", {
   ...shared,
   description:
-    "Manage a multi-agent swarm collaborating on a shared message board: `title`, `status`, `models`, `add` (spawn worker(s) with optional `role` harness, `worktree` isolation, `tasks` sharding or `n` copies), `channel` (`create`/`subscribe`/`unsubscribe`/`list`/`archive`), `kill`, or `done`.",
+    "Manage a multi-agent swarm collaborating on a shared message board: `title`, `status`, `models`, `add` (spawn worker(s) with `role` tier routing so workers automatically pick an available model across vendors and fail over on usage limits, `worktree` isolation, `tasks` sharding or `n` copies), `channel` (`create`/`subscribe`/`unsubscribe`/`list`/`archive`), `kill`, or `done`.",
   parameters: Schema.Struct({
     action: SwarmAction,
     title: Schema.optional(TrimmedNonEmptyString),

@@ -148,7 +148,7 @@ const make = Effect.gen(function* () {
         shell,
         kind: "stopped",
         dedupeKey: `run:${runId}`,
-        body: `It paused at a usage limit, which resets at ${at}. It is not stuck: Agent Space carries it on after the reset. Do nothing unless a later report says it could not.`,
+        body: `It paused at a usage limit, which resets at ${at}. It is not stuck: Agent Space carries it on after the reset, or you can immediately fail over to another provider with available usage by starting a fresh worker with the same role and brief (tier routing skips limited accounts) and resolving this one.`,
         line: "Paused at a usage limit",
       });
     }

@@ -466,4 +466,30 @@ describe("make this a PM, and back", () => {
       }).pipe(Effect.provide(harness(world)));
     },
   );
+
+  it.effect(
+    "keeps resolved local workers nested under their PM summary until explicitly unlinked",
+    () => {
+      const world = makeWorld();
+      world.shells.set(THREAD, shellFor(THREAD, { projectId: PROJECT }));
+      world.shells.set("thread:worker-1", shellFor("thread:worker-1", { projectId: PROJECT }));
+      return Effect.gen(function* () {
+        const service = yield* PmService;
+        yield* service.convert(ThreadId.make(THREAD));
+        yield* service.guide(THREAD, false);
+        yield* service.linkWorker(THREAD, { thread: "thread:worker-1" });
+        yield* service.resolveWorker(THREAD, "thread:worker-1");
+
+        const afterResolve = (yield* service.summaries()).pms[0]!;
+        expect(afterResolve.workers).toBe(1);
+        expect(afterResolve.runningWorkers).toBe(0);
+        expect(afterResolve.workerThreadIds).toEqual([ThreadId.make("thread:worker-1")]);
+
+        yield* service.unlinkWorker(THREAD, "thread:worker-1");
+        const afterUnlink = (yield* service.summaries()).pms[0]!;
+        expect(afterUnlink.workers).toBe(0);
+        expect(afterUnlink.workerThreadIds).toEqual([]);
+      }).pipe(Effect.provide(harness(world)));
+    },
+  );
 });

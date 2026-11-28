@@ -25,6 +25,7 @@ import {
   type Role,
 } from "@t3tools/pipelines";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -71,6 +72,35 @@ const toSnapshot = (provider: ServerProvider): ProviderSnapshot => ({
     }),
 });
 
+const toLimitedProviders = (
+  providers: ReadonlyArray<ServerProvider>,
+  nowMs: number,
+): ReadonlyMap<string, string> => {
+  const limited = new Map<string, string>();
+  for (const provider of providers) {
+    const windows = (provider.usageLimits?.windows ?? []).filter(
+      (window) => window.modelIds === undefined,
+    );
+    let latestReset: string | undefined;
+    let spent = false;
+    for (const window of windows) {
+      if (window.usedPercent < 100) continue;
+      if (window.resetsAt !== undefined) {
+        const resetMs = Date.parse(window.resetsAt);
+        if (Number.isFinite(resetMs) && resetMs <= nowMs) continue;
+        if (latestReset === undefined || window.resetsAt > latestReset) {
+          latestReset = window.resetsAt;
+        }
+      }
+      spent = true;
+    }
+    if (spent) {
+      limited.set(provider.instanceId, latestReset ?? "usage limit resets");
+    }
+  }
+  return limited;
+};
+
 export interface PipelineServiceShape {
   /** Built-ins merged with the project's `.pipelines/` files. Never fails: problems are listed. */
   readonly configFor: (
@@ -102,6 +132,8 @@ export interface PipelineServiceShape {
   }) => Effect.Effect<PmWorkspacePipelinesSnapshot, PmError>;
   /** Every provider account the server knows, as the router sees it. */
   readonly providers: Effect.Effect<ReadonlyArray<ProviderSnapshot>>;
+  /** Provider accounts currently at 100% usage in their live usage-limit windows. */
+  readonly limitedProviders: Effect.Effect<ReadonlyMap<string, string>>;
   /** Resolve role skills and context files into a bounded harness packet. */
   readonly resolveHarness: (
     role: Role,
@@ -175,6 +207,7 @@ const buildSnapshot = (input: {
   readonly root: string | null;
   readonly loaded: LoadResult;
   readonly providers: ReadonlyArray<ProviderSnapshot>;
+  readonly limited?: ReadonlyMap<string, string> | undefined;
   readonly discoveredSkills: PmWorkspacePipelinesSnapshot["discoveredSkills"];
 }): PmWorkspacePipelinesSnapshot => ({
   projectId: ProjectId.make(input.projectId),
@@ -189,6 +222,7 @@ const buildSnapshot = (input: {
         config: input.loaded.config,
         role: role.name,
         providers: input.providers,
+        limited: input.limited,
       });
       if (resolution.ok) {
         const effortOption = resolution.selection.options[0];
@@ -302,10 +336,19 @@ const make = Effect.gen(function* () {
       ? Effect.succeed([] as ReadonlyArray<ProviderSnapshot>)
       : registry.getProviders.pipe(Effect.map((list) => list.map(toSnapshot)));
 
+  const limitedProviders: PipelineServiceShape["limitedProviders"] =
+    registry === undefined
+      ? Effect.succeed(new Map<string, string>() as ReadonlyMap<string, string>)
+      : Effect.gen(function* () {
+          const [list, now] = yield* Effect.all([registry.getProviders, DateTime.now]);
+          return toLimitedProviders(list, DateTime.toEpochMillis(now));
+        });
+
   const snapshotFor: PipelineServiceShape["snapshotFor"] = Effect.fn("PipelineService.snapshotFor")(
     function* (projectId: string) {
       const { config, problems, root } = yield* configFor(projectId);
       const currentProviders = yield* providers;
+      const currentLimited = yield* limitedProviders;
       const discoveredSkills = yield* discoverAvailableSkills(root).pipe(
         Effect.provideService(FileSystem.FileSystem, fs),
         Effect.provideService(Path.Path, path),
@@ -315,6 +358,7 @@ const make = Effect.gen(function* () {
         root,
         loaded: { config, problems },
         providers: currentProviders,
+        limited: currentLimited,
         discoveredSkills,
       });
     },
@@ -505,6 +549,7 @@ const make = Effect.gen(function* () {
     savePipeline,
     deletePipeline,
     providers,
+    limitedProviders,
     resolveHarness,
     runGates,
   } satisfies PipelineServiceShape;
@@ -517,9 +562,11 @@ export type TestFiles = ReadonlyArray<ConfigFile>;
 /** For tests: fixed providers and project files, no disk or registry. */
 export const layerTest = (input: {
   readonly providers?: ReadonlyArray<ProviderSnapshot>;
+  readonly limitedProviders?: ReadonlyMap<string, string>;
   readonly files?: TestFiles;
 }) => {
   const testProviders = input.providers ?? [];
+  const testLimited = input.limitedProviders ?? new Map<string, string>();
   const testSnapshot = (projectId: string) =>
     Effect.sync(() =>
       buildSnapshot({
@@ -527,6 +574,7 @@ export const layerTest = (input: {
         root: null,
         loaded: loadPipelineConfig(input.files ?? []),
         providers: testProviders,
+        limited: testLimited,
         discoveredSkills: [],
       }),
     );
@@ -548,6 +596,7 @@ export const layerTest = (input: {
       testSnapshot(projectId),
     ),
     providers: Effect.succeed(testProviders),
+    limitedProviders: Effect.succeed(testLimited),
     resolveHarness: Effect.fn("PipelineService.test.resolveHarness")(() => Effect.succeed({})),
     runGates: Effect.fn("PipelineService.test.runGates")(
       ({ commands }: Parameters<PipelineServiceShape["runGates"]>[0]) =>

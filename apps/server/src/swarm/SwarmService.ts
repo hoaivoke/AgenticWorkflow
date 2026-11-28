@@ -579,10 +579,12 @@ const make = Effect.gen(function* () {
         .pipe(Effect.orElseSucceed(() => undefined));
       if (routedModel === undefined) {
         const providers = yield* pipelines.providers;
+        const limited = yield* pipelines.limitedProviders;
         const resolution = resolveRole({
           config,
           role: role.name,
           providers,
+          limited,
           escalate: input.escalate,
         });
         if (resolution.ok) {

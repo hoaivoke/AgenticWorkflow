@@ -295,7 +295,8 @@ const make = Effect.gen(function* () {
         : {};
 
     const sections: Array<string> = [
-      "Unified Agent Space harness (shared across Claude, Codex, and Antigravity/Gemini on this thread):",
+      "### Workspace Harness Context (configured by the user in Agent Space)",
+      "The user selected this role and workspace context in Agent Space so it carries across turns and providers.",
     ];
 
     if (role !== null) {
@@ -335,7 +336,7 @@ const make = Effect.gen(function* () {
     if (body.trim().length === 0) return null;
 
     return {
-      context: `<thread_harness>\n${body}\n</thread_harness>`,
+      context: body,
       revision: row.revision,
     };
   });

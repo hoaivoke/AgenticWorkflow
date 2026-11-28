@@ -26,8 +26,14 @@ import * as PipelineService from "./PipelineService.ts";
 describe("CostEstimator", () => {
   it("classifies models and computes routing savings + cache discount accurately", () => {
     expect(classifyModelPriceTier("claude-opus-5-5")).toBe("frontier");
+    expect(classifyModelPriceTier("claude-fable-5-2")).toBe("frontier");
+    expect(classifyModelPriceTier("gpt-6.2-astra")).toBe("frontier");
+    expect(classifyModelPriceTier("gemini-4-carbon")).toBe("frontier");
     expect(classifyModelPriceTier("claude-sonnet-4-6")).toBe("mid");
+    expect(classifyModelPriceTier("gemini-4-neon")).toBe("mid");
     expect(classifyModelPriceTier("gemini-2.5-flash")).toBe("small");
+    expect(classifyModelPriceTier("gemini-4-hydrogen")).toBe("small");
+    expect(classifyModelPriceTier("gpt-6.1-terra")).toBe("small");
 
     const midCost = estimateUsageCost({
       model: "claude-sonnet-4-6",

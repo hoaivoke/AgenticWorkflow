@@ -56,11 +56,11 @@ can pause or delete them; the PM can do the same.
 
 Default tiers (November 2026):
 
-| Tier     | Effort | Claude | Codex         | Antigravity       | Order tried            |
-| -------- | ------ | ------ | ------------- | ----------------- | ---------------------- |
-| small    | medium | Haiku  | GPT-6.1 Terra | Gemini 4 Hydrogen | Haiku, Hydrogen, Terra |
-| mid      | high   | Sonnet | GPT Sol       | Gemini 4 Neon     | Sonnet, Sol, Neon      |
-| frontier | high   | Opus   | GPT Astra     | Gemini 4 Carbon   | Opus, Astra, Carbon    |
+| Tier     | Effort | Claude       | Codex         | Antigravity            | Order tried                      |
+| -------- | ------ | ------------ | ------------- | ---------------------- | -------------------------------- |
+| small    | medium | Haiku        | GPT-6.1 Terra | Gemini 4 Hydrogen      | Haiku, Hydrogen, Terra           |
+| mid      | high   | Sonnet       | GPT Sol       | Gemini 4 Neon          | Sonnet, Sol, Neon                |
+| frontier | high   | Opus / Fable | GPT Astra     | Gemini 4 Carbon / Neon | Opus, Fable, Astra, Carbon, Neon |
 
 Roles marked `multimodal` (`ui-builder`, `qa`) try Neon and Terra first within a tier, because
 those vendors lead with image understanding.
@@ -183,8 +183,9 @@ Role fields: `name`, `description`, `tier`, `maxTier`, `access`, `multimodal`, `
   checklist, followed by the PM model, not enforced by the server.
 - **Checks run through a small-model worker.** The `gatekeeper` role runs the commands and copies
   exit codes into `gates.json`; a server-side command runner would make this fully deterministic.
-- **Usage limits are seen through this PM's workers.** An account counts as limited once one of
-  the PM's workers stopped on its limit. Limits hit elsewhere are not seen until then.
+- **Usage limits combine live windows and worker errors.** Accounts with a 100%-used account-wide
+  usage window in the provider registry or a worker stopped on a usage limit are skipped
+  automatically by tier routing.
 - **No UI yet.** Roles and pipelines are files and tool output; there is no editor or board.
 
 ## Installing and updating this fork

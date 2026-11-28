@@ -19,8 +19,10 @@ export const BUILTIN_TIERS: TierMap = {
   ],
   frontier: [
     { provider: "claude", model: "opus", effort: "high" },
+    { provider: "claude", model: "fable", effort: "high" },
     { provider: "codex", model: "astra", effort: "high" },
     { provider: "antigravity", model: "carbon", effort: "high" },
+    { provider: "antigravity", model: "neon", effort: "high" },
   ],
 };
 

@@ -112,6 +112,34 @@ describe("resolveRole", () => {
     expect(result.ok && result.notes.join(" ")).toContain("usage limit");
   });
 
+  it("falls over to antigravity across tiers when both claude and codex are out of usage", () => {
+    const limited = new Map([
+      ["claudeAgent", "2026-11-25T03:00:00Z"],
+      ["codex", "2026-11-25T03:00:00Z"],
+    ]);
+    const light = resolveRole({ config, role: "triage", providers: all, limited });
+    expect(light.ok && light.selection.model).toBe("gemini-4-hydrogen");
+    const mid = resolveRole({ config, role: "builder", providers: all, limited });
+    expect(mid.ok && mid.selection.model).toBe("gemini-4-neon");
+    const heavy = resolveRole({ config, role: "architect", providers: all, limited });
+    expect(heavy.ok && heavy.selection.model).toBe("gemini-4-carbon");
+    const noCarbon = [
+      claude,
+      codex,
+      { ...antigravity, models: antigravity.models.filter((m) => !m.slug.includes("carbon")) },
+    ];
+    const heavyNeon = resolveRole({ config, role: "architect", providers: noCarbon, limited });
+    expect(heavyNeon.ok && heavyNeon.selection.model).toBe("gemini-4-neon");
+    const fableClaude: ProviderSnapshot = {
+      ...claude,
+      models: [
+        { slug: "claude-fable-5-2", name: "Claude Fable 5.2", reasoning: reasoning("effort") },
+      ],
+    };
+    const heavyFable = resolveRole({ config, role: "architect", providers: [fableClaude] });
+    expect(heavyFable.ok && heavyFable.selection.model).toBe("claude-fable-5-2");
+  });
+
   it("tries a second account of the same vendor first", () => {
     const limited = new Map([["claudeAgent", "2026-11-25T03:00:00Z"]]);
     const result = resolveRole({

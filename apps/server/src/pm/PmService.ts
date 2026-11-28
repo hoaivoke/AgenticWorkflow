@@ -3,6 +3,7 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Random from "effect/Random";
 import * as Ref from "effect/Ref";
@@ -28,10 +29,12 @@ import {
   type PmSummary,
   type PmThreadDetail,
   type ProjectId,
+  ProviderInstanceId,
   type ProviderInteractionMode,
   type RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
+import { resolveRole } from "@t3tools/pipelines";
 import {
   derivePmItemStatus,
   diffPmParagraphs,
@@ -58,6 +61,7 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
 import * as ThreadLaunch from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
+import { PipelineService } from "../pipelines/PipelineService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import {
   type PmAskRow,
@@ -259,6 +263,7 @@ const make = Effect.gen(function* () {
   const threads = yield* ThreadManagement.ThreadManagementService;
   const launches = yield* ThreadLaunch.ThreadLaunchService;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
+  const pipelines = Option.getOrUndefined(yield* Effect.serviceOption(PipelineService));
   const changes = yield* PubSub.unbounded<string>();
 
   const readEnabled = store
@@ -496,6 +501,39 @@ const make = Effect.gen(function* () {
     }
   });
 
+  const resolveDefaultPmModel = Effect.fn("PmService.resolveDefaultPmModel")(function* (
+    projectId: ProjectId,
+    preferred: ModelSelection,
+  ) {
+    if (pipelines === undefined) return preferred;
+    const [providers, limited] = yield* Effect.all([
+      pipelines.providers,
+      pipelines.limitedProviders,
+    ]);
+    if (providers.length === 0) return preferred;
+    const preferredProvider = providers.find((p) => p.instanceId === preferred.instanceId);
+    const preferredUsable =
+      preferredProvider !== undefined &&
+      preferredProvider.enabled &&
+      !limited.has(preferredProvider.instanceId);
+    if (preferredUsable) return preferred;
+    const loaded = yield* pipelines.configFor(projectId).pipe(Effect.orElseSucceed(() => null));
+    if (loaded === null) return preferred;
+    const resolution = resolveRole({
+      config: loaded.config,
+      role: "architect",
+      providers,
+      limited,
+    });
+    if (!resolution.ok) return preferred;
+    const picked = resolution.selection;
+    return yield* decodeModelSelection({
+      instanceId: ProviderInstanceId.make(picked.instanceId),
+      model: picked.model,
+      ...(picked.options.length === 0 ? {} : { options: picked.options }),
+    }).pipe(Effect.orElseSucceed(() => preferred));
+  });
+
   const create = Effect.fn("PmService.create")(function* (input: {
     readonly projectId: ProjectId;
     readonly modelSelection?: ModelSelection | undefined;
@@ -503,7 +541,12 @@ const make = Effect.gen(function* () {
     readonly creationSource: OrchestrationV2CreationSource;
   }) {
     yield* requireEnabled;
-    const modelSelection = input.modelSelection ?? (yield* lastModelSelection) ?? DEFAULT_PM_MODEL;
+    const modelSelection =
+      input.modelSelection ??
+      (yield* resolveDefaultPmModel(
+        input.projectId,
+        (yield* lastModelSelection) ?? DEFAULT_PM_MODEL,
+      ));
     const encoded = yield* encodeModelSelection(modelSelection).pipe(
       Effect.mapError(() => invalid("That model selection is not valid.")),
     );
@@ -590,9 +633,7 @@ const make = Effect.gen(function* () {
     }
     const at = yield* nowIso;
     for (const entry of workerStates) {
-      if (entry.worker.resolvedAt === null) {
-        yield* store.updateWorker(entry.worker.workerThreadId, { resolved_at: at });
-      }
+      yield* store.deleteWorker(entry.worker.workerThreadId);
     }
     yield* store.retirePm(pm, at);
     pmVisibility.remove(pm);
@@ -1832,6 +1873,11 @@ const make = Effect.gen(function* () {
     for (const row of pms) {
       const { derived, asks, workerStates } = yield* deriveItems(row);
       const live = workerStates.filter((entry) => entry.state !== "resolved");
+      // Keep resolved local workers attached to their PM in the sidebar so finished runs stay
+      // grouped under the PM instead of spilling into the top-level thread list (pm_worker_unlink
+      // detaches them explicitly, and archiving/deleting removes the row via PmReportWatcher).
+      const attachedLocal = workerStates.filter((entry) => entry.worker.environmentId === null);
+      const remoteLive = live.filter((entry) => entry.worker.environmentId !== null);
       const openAsks = asks.filter((entry) => entry.state === "open").length;
       const blocked = derived.some((entry) => entry.shownStatus === "blocked");
       // As in Ghostex, a snoozed ask is not Needs you until it wakes.
@@ -1848,14 +1894,12 @@ const make = Effect.gen(function* () {
           (entry) => entry.item.status === "moving" || entry.item.status === "later",
         ).length,
         openAsks,
-        workers: live.length,
+        workers: attachedLocal.length + remoteLive.length,
         runningWorkers: running,
         rowState: blocked ? "blocked" : needsYou ? "needs_you" : running > 0 ? "running" : "idle",
         // Threads on this computer only: clients look these up among their own threads.
-        workerThreadIds: live
-          .filter((entry) => entry.worker.environmentId === null)
-          .map((entry) => ThreadId.make(entry.worker.workerThreadId)),
-        remoteWorkers: live.flatMap((entry) => {
+        workerThreadIds: attachedLocal.map((entry) => ThreadId.make(entry.worker.workerThreadId)),
+        remoteWorkers: remoteLive.flatMap((entry) => {
           const computer = computerOf(entry.worker);
           return computer === null
             ? []

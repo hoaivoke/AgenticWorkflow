@@ -6950,6 +6950,104 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
     }),
   );
 
+  it.effect("omits unexecuted default provider threads from providerInstanceHistory", () =>
+    Effect.gen(function* () {
+      const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make("thread:provider-history-unexecuted");
+      const antigravityId = ProviderInstanceId.make("antigravity");
+      const antigravityDriver = ProviderDriverKind.make("antigravity");
+      const claudeId = ProviderInstanceId.make("claudeAgent");
+      const claudeDriverKind = ProviderDriverKind.make("claudeAgent");
+      const activePtId = ProviderThreadId.make("provider-thread:unexecuted:antigravity");
+      yield* projectionStore.apply({
+        id: EventId.make("event:provider-history-unexecuted:thread"),
+        type: "thread.created",
+        threadId,
+        occurredAt: now,
+        payload: {
+          createdBy: "user",
+          creationSource: "web",
+          id: threadId,
+          projectId: ProjectId.make("project:provider-history-unexecuted"),
+          title: "No fake Claude handoff",
+          providerInstanceId: antigravityId,
+          modelSelection: {
+            instanceId: antigravityId,
+            model: "gemini-4-neon",
+          },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          activeProviderThreadId: activePtId,
+          lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+          forkedFrom: null,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          settledOverride: null,
+          settledAt: null,
+          lastVisitedAt: null,
+          deletedAt: null,
+        },
+      });
+      yield* projectionStore.apply({
+        id: EventId.make("event:provider-history-unexecuted:claude-stub"),
+        type: "provider-thread.updated",
+        threadId,
+        driver: claudeDriverKind,
+        occurredAt: DateTime.add(now, { seconds: 1 }),
+        payload: {
+          id: ProviderThreadId.make("provider-thread:unexecuted:claude"),
+          driver: claudeDriverKind,
+          providerInstanceId: claudeId,
+          providerSessionId: null,
+          appThreadId: threadId,
+          ownerNodeId: null,
+          nativeThreadRef: null,
+          nativeConversationHeadRef: null,
+          status: "idle",
+          firstRunOrdinal: null,
+          lastRunOrdinal: null,
+          handoffIds: [],
+          forkedFrom: null,
+          createdAt: DateTime.add(now, { seconds: 1 }),
+          updatedAt: DateTime.add(now, { seconds: 1 }),
+        },
+      });
+      yield* projectionStore.apply({
+        id: EventId.make("event:provider-history-unexecuted:antigravity-ran"),
+        type: "provider-thread.updated",
+        threadId,
+        driver: antigravityDriver,
+        occurredAt: DateTime.add(now, { seconds: 2 }),
+        payload: {
+          id: activePtId,
+          driver: antigravityDriver,
+          providerInstanceId: antigravityId,
+          providerSessionId: ProviderSessionId.make("session-ag-1"),
+          appThreadId: threadId,
+          ownerNodeId: null,
+          nativeThreadRef: null,
+          nativeConversationHeadRef: null,
+          status: "idle",
+          firstRunOrdinal: 1,
+          lastRunOrdinal: 1,
+          handoffIds: [],
+          forkedFrom: null,
+          createdAt: DateTime.add(now, { seconds: 2 }),
+          updatedAt: DateTime.add(now, { seconds: 2 }),
+        },
+      });
+
+      const shell = (yield* projectionStore.getShellSnapshot()).threads.find(
+        (thread) => thread.id === threadId,
+      );
+      assert.deepEqual(shell?.providerInstanceHistory, [antigravityId]);
+    }),
+  );
+
   it.effect("shows the native goal of the active provider thread on the shell", () =>
     Effect.gen(function* () {
       const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
