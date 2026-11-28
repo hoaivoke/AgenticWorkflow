@@ -2595,7 +2595,7 @@ export function AboutSettingsPanel() {
             description={
               telemetryOff === undefined
                 ? gt(
-                    "How we handle your data, including the anonymous usage data T3 Code collects.",
+                    "How we handle your data, including the pseudonymous product usage data T3 Code collects.",
                   )
                 : gt("How we handle your data. {telemetryOff}", { telemetryOff })
             }
